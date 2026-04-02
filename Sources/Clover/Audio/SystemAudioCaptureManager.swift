@@ -9,9 +9,9 @@ enum AudioSourceMode: String, CaseIterable {
 
     var label: String {
         switch self {
-        case .microphone: return "マイク"
-        case .systemAudio: return "システム"
-        case .both: return "両方"
+        case .microphone: return L10n.mic
+        case .systemAudio: return L10n.system
+        case .both: return L10n.both
         }
     }
 
@@ -31,9 +31,9 @@ enum SystemAudioCaptureError: Error, LocalizedError {
     var errorDescription: String? {
         switch self {
         case .screenRecordingPermissionDenied:
-            return "画面収録のアクセスが拒否されました。システム設定 > プライバシーとセキュリティ > 画面収録 で許可してください"
+            return L10n.screenRecordingDenied
         case .noDisplayFound:
-            return "利用可能なディスプレイが見つかりません"
+            return L10n.noDisplayFound
         }
     }
 }

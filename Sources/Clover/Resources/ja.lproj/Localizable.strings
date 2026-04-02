@@ -1,0 +1,53 @@
+/* Common */
+"Delete" = "削除";
+"Rename" = "名前を変更";
+"Create" = "作成";
+
+/* Sidebar */
+"New Project" = "新規プロジェクト";
+"Project Name" = "プロジェクト名";
+"Edit README" = "README を編集";
+"Title" = "タイトル";
+
+/* Control Panel */
+"Preparing speech recognition..." = "音声認識を準備中...";
+"Recognizing..." = "認識中...";
+"Transcription" = "文字起こし";
+"%lld segments" = "%lld セグメント";
+"Stop" = "停止";
+"Resume" = "再開";
+"Record" = "録音";
+"Export" = "書き出し";
+"Clear transcription" = "文字起こしをクリア";
+
+/* Audio Source Mode */
+"Mic" = "マイク";
+"System" = "システム";
+"Both" = "両方";
+
+/* Settings */
+"Vault" = "保管庫";
+"Change..." = "変更...";
+"Root directory where project folders are stored." = "プロジェクトフォルダが格納されるルートディレクトリです。";
+"Loading supported languages..." = "対応言語を読み込み中...";
+"Search languages..." = "言語を検索...";
+"No matching languages" = "該当する言語がありません";
+"All languages shown" = "すべての言語を表示中";
+"%lld languages selected" = "%lld 言語を選択中";
+"Show all" = "すべて表示に戻す";
+"Display Languages" = "表示する言語";
+"Only selected languages will appear in the language picker. All languages are shown if none are selected." = "選択した言語のみが言語ピッカーに表示されます。未選択の場合はすべての言語が表示されます。";
+
+/* Error Messages - Audio */
+"Screen recording access denied. Please allow it in System Settings > Privacy & Security > Screen Recording." = "画面収録のアクセスが拒否されました。システム設定 > プライバシーとセキュリティ > 画面収録 で許可してください";
+"No available displays found" = "利用可能なディスプレイが見つかりません";
+"Invalid audio hardware format" = "無効なオーディオハードウェアフォーマットです";
+"Failed to create audio format converter" = "オーディオフォーマットコンバーターの作成に失敗しました";
+"Microphone access denied. Please allow it in System Settings > Privacy & Security > Microphone." = "マイクのアクセスが拒否されました。システム設定 > プライバシーとセキュリティ > マイク で許可してください";
+
+/* Error Messages - ViewModel */
+"Speech recognition is not available on this Mac" = "この Mac では音声認識を利用できません";
+"Failed to prepare speech recognition: %@" = "音声認識の準備に失敗: %@";
+"Failed to change language: %@" = "言語切替に失敗: %@";
+"Speech recognition is not ready" = "音声認識が準備されていません";
+"System audio capture stopped" = "システム音声キャプチャが停止しました";

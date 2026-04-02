@@ -1,0 +1,53 @@
+/* Common */
+"Delete" = "Delete";
+"Rename" = "Rename";
+"Create" = "Create";
+
+/* Sidebar */
+"New Project" = "New Project";
+"Project Name" = "Project Name";
+"Edit README" = "Edit README";
+"Title" = "Title";
+
+/* Control Panel */
+"Preparing speech recognition..." = "Preparing speech recognition...";
+"Recognizing..." = "Recognizing...";
+"Transcription" = "Transcription";
+"%lld segments" = "%lld segments";
+"Stop" = "Stop";
+"Resume" = "Resume";
+"Record" = "Record";
+"Export" = "Export";
+"Clear transcription" = "Clear transcription";
+
+/* Audio Source Mode */
+"Mic" = "Mic";
+"System" = "System";
+"Both" = "Both";
+
+/* Settings */
+"Vault" = "Vault";
+"Change..." = "Change...";
+"Root directory where project folders are stored." = "Root directory where project folders are stored.";
+"Loading supported languages..." = "Loading supported languages...";
+"Search languages..." = "Search languages...";
+"No matching languages" = "No matching languages";
+"All languages shown" = "All languages shown";
+"%lld languages selected" = "%lld languages selected";
+"Show all" = "Show all";
+"Display Languages" = "Display Languages";
+"Only selected languages will appear in the language picker. All languages are shown if none are selected." = "Only selected languages will appear in the language picker. All languages are shown if none are selected.";
+
+/* Error Messages - Audio */
+"Screen recording access denied. Please allow it in System Settings > Privacy & Security > Screen Recording." = "Screen recording access denied. Please allow it in System Settings > Privacy & Security > Screen Recording.";
+"No available displays found" = "No available displays found";
+"Invalid audio hardware format" = "Invalid audio hardware format";
+"Failed to create audio format converter" = "Failed to create audio format converter";
+"Microphone access denied. Please allow it in System Settings > Privacy & Security > Microphone." = "Microphone access denied. Please allow it in System Settings > Privacy & Security > Microphone.";
+
+/* Error Messages - ViewModel */
+"Speech recognition is not available on this Mac" = "Speech recognition is not available on this Mac";
+"Failed to prepare speech recognition: %@" = "Failed to prepare speech recognition: %@";
+"Failed to change language: %@" = "Failed to change language: %@";
+"Speech recognition is not ready" = "Speech recognition is not ready";
+"System audio capture stopped" = "System audio capture stopped";

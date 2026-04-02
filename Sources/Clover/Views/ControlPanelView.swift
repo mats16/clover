@@ -10,7 +10,7 @@ struct ControlPanelView: View {
         VStack(spacing: 12) {
             // 準備中プログレス
             if viewModel.isPreparingAnalyzer {
-                ProgressView("音声認識を準備中...")
+                ProgressView(L10n.preparingSpeechRecognition)
                     .progressViewStyle(.linear)
             }
 
@@ -33,7 +33,7 @@ struct ControlPanelView: View {
                                     ProgressView()
                                         .scaleEffect(0.5)
                                         .frame(width: 12, height: 12)
-                                    Text("認識中...")
+                                    Text(L10n.recognizing)
                                         .font(.caption)
                                         .foregroundColor(.secondary)
                                 }
@@ -53,11 +53,11 @@ struct ControlPanelView: View {
                 }
             } label: {
                 HStack {
-                    Text("文字起こし")
+                    Text(L10n.transcription)
                         .font(.caption)
                         .foregroundColor(.secondary)
                     Spacer()
-                    Text("\(viewModel.store.segments.count) セグメント")
+                    Text(L10n.segmentCount(viewModel.store.segments.count))
                         .font(.caption2)
                         .foregroundColor(.secondary)
                 }
@@ -159,7 +159,7 @@ struct ControlPanelView: View {
             }
             .buttonStyle(.borderless)
             .disabled(viewModel.store.segments.isEmpty)
-            .help("書き出し")
+            .help(L10n.export)
 
             // クリア
             Button(action: { viewModel.clearText() }) {
@@ -167,7 +167,7 @@ struct ControlPanelView: View {
             }
             .buttonStyle(.borderless)
             .disabled(viewModel.store.segments.isEmpty || !viewModel.isListening)
-            .help("文字起こしをクリア")
+            .help(L10n.clearTranscription)
         }
     }
 
@@ -195,11 +195,11 @@ struct ControlPanelView: View {
 
     private var recordButtonLabel: String {
         if viewModel.isListening {
-            return "停止"
+            return L10n.stop
         } else if viewModel.isViewingHistory {
-            return "再開"
+            return L10n.resume
         } else {
-            return "録音"
+            return L10n.record
         }
     }
 

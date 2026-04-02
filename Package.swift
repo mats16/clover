@@ -3,6 +3,7 @@ import PackageDescription
 
 let package = Package(
     name: "Clover",
+    defaultLocalization: "ja",
     platforms: [
         .macOS(.v26)
     ],
@@ -15,7 +16,8 @@ let package = Package(
             dependencies: [
                 .product(name: "GRDB", package: "GRDB.swift")
             ],
-            path: "Sources/Clover"
+            path: "Sources/Clover",
+            resources: [.process("Resources")]
         )
     ]
 )

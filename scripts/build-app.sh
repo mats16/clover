@@ -23,6 +23,12 @@ mkdir -p "${CONTENTS}/Resources"
 cp "${BUILD_DIR}/${APP_NAME}" "${MACOS}/${APP_NAME}"
 cp "Resources/Info.plist" "${CONTENTS}/Info.plist"
 
+# SPM リソースバンドルをコピー
+RESOURCE_BUNDLE="${BUILD_DIR}/Clover_Clover.bundle"
+if [ -d "$RESOURCE_BUNDLE" ]; then
+    cp -R "$RESOURCE_BUNDLE" "${CONTENTS}/Resources/"
+fi
+
 # コード署名
 codesign --force --sign - "${APP_BUNDLE}"
 

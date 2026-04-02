@@ -39,7 +39,7 @@ struct SidebarView: View {
             if columnVisibility != .detailOnly {
                 ToolbarItemGroup(placement: .primaryAction) {
                     Button(action: { showNewProjectField = true }) {
-                        Label("新規プロジェクト", systemImage: "folder.badge.plus")
+                        Label(L10n.newProject, systemImage: "folder.badge.plus")
                     }
                 }
             }
@@ -67,12 +67,12 @@ struct SidebarView: View {
                     transcriptionRow(transcription)
                         .tag(transcription.id)
                         .contextMenu {
-                            Button("名前を変更") {
+                            Button(L10n.rename) {
                                 editingTranscriptionTitle = transcription.title
                                 editingTranscriptionId = transcription.id
                             }
                             Divider()
-                            Button("削除", role: .destructive) {
+                            Button(L10n.delete, role: .destructive) {
                                 sidebarViewModel.deleteTranscription(id: transcription.id)
                             }
                         }
@@ -89,7 +89,7 @@ struct SidebarView: View {
         let isSelected = sidebarViewModel.selectedProject?.url == project.url
 
         if editingProjectURL == project.url {
-            TextField("プロジェクト名", text: $editingName)
+            TextField(L10n.projectName, text: $editingName)
                 .textFieldStyle(.roundedBorder)
                 .focused($isRenameFocused)
                 .onSubmit {
@@ -137,15 +137,15 @@ struct SidebarView: View {
                 viewModel.clearCurrentTranscription()
             }
             .contextMenu {
-                Button("名前を変更") {
+                Button(L10n.rename) {
                     editingName = project.name
                     editingProjectURL = project.url
                 }
-                Button("README を編集") {
+                Button(L10n.editReadme) {
                     sidebarViewModel.openReadme(for: project)
                 }
                 Divider()
-                Button("削除", role: .destructive) {
+                Button(L10n.delete, role: .destructive) {
                     sidebarViewModel.deleteProject(project)
                 }
             }
@@ -157,7 +157,7 @@ struct SidebarView: View {
     @ViewBuilder
     private func transcriptionRow(_ transcription: TranscriptionRecord) -> some View {
         if editingTranscriptionId == transcription.id {
-            TextField("タイトル", text: $editingTranscriptionTitle)
+            TextField(L10n.title, text: $editingTranscriptionTitle)
                 .textFieldStyle(.roundedBorder)
                 .focused($isTranscriptionRenameFocused)
                 .onSubmit {
@@ -227,12 +227,12 @@ struct SidebarView: View {
 
     private var newProjectInputField: some View {
         HStack {
-            TextField("プロジェクト名", text: $newProjectName)
+            TextField(L10n.projectName, text: $newProjectName)
                 .textFieldStyle(.roundedBorder)
                 .onSubmit {
                     createNewProject()
                 }
-            Button("作成") {
+            Button(L10n.create) {
                 createNewProject()
             }
             .disabled(newProjectName.trimmingCharacters(in: .whitespaces).isEmpty)

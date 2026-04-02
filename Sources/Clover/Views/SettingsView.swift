@@ -12,34 +12,34 @@ struct SettingsView: View {
 
     var body: some View {
         Form {
-            Section("保管庫") {
+            Section(L10n.vault) {
                 HStack {
                     Text(settings.vaultPath)
                         .lineLimit(1)
                         .truncationMode(.middle)
                         .foregroundColor(.primary)
                     Spacer()
-                    Button("変更...") {
+                    Button(L10n.change) {
                         showVaultPicker = true
                     }
                 }
 
-                Text("プロジェクトフォルダが格納されるルートディレクトリです。")
+                Text(L10n.vaultDescription)
                     .font(.caption)
                     .foregroundColor(.secondary)
             }
 
             Section {
                 if isLoadingLocales {
-                    ProgressView("対応言語を読み込み中...")
+                    ProgressView(L10n.loadingLanguages)
                         .font(.caption)
                 } else {
-                    TextField("言語を検索...", text: $localeSearchText)
+                    TextField(L10n.searchLanguages, text: $localeSearchText)
                         .textFieldStyle(.roundedBorder)
 
                     let searchedLocales = searchFilteredLocales
                     if searchedLocales.isEmpty {
-                        Text("該当する言語がありません")
+                        Text(L10n.noMatchingLanguages)
                             .font(.caption)
                             .foregroundColor(.secondary)
                     } else {
@@ -75,13 +75,13 @@ struct SettingsView: View {
                     HStack {
                         let enabledCount = settings.enabledLocaleIdentifiers.count
                         Text(enabledCount == 0
-                             ? "すべての言語を表示中"
-                             : "\(enabledCount) 言語を選択中")
+                             ? L10n.allLanguagesShown
+                             : L10n.languagesSelected(enabledCount))
                             .font(.caption)
                             .foregroundColor(.secondary)
                         Spacer()
                         if !settings.enabledLocaleIdentifiers.isEmpty {
-                            Button("すべて表示に戻す") {
+                            Button(L10n.showAll) {
                                 settings.enabledLocaleIdentifiers = []
                             }
                             .font(.caption)
@@ -89,9 +89,9 @@ struct SettingsView: View {
                     }
                 }
             } header: {
-                Text("表示する言語")
+                Text(L10n.displayLanguages)
             } footer: {
-                Text("選択した言語のみが言語ピッカーに表示されます。未選択の場合はすべての言語が表示されます。")
+                Text(L10n.displayLanguagesDescription)
                     .font(.caption)
                     .foregroundColor(.secondary)
             }

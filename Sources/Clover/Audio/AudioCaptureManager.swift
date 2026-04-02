@@ -8,11 +8,11 @@ enum AudioCaptureError: Error, LocalizedError {
     var errorDescription: String? {
         switch self {
         case .invalidHardwareFormat:
-            return "無効なオーディオハードウェアフォーマットです"
+            return L10n.invalidHardwareFormat
         case .converterCreationFailed:
-            return "オーディオフォーマットコンバーターの作成に失敗しました"
+            return L10n.converterCreationFailed
         case .microphonePermissionDenied:
-            return "マイクのアクセスが拒否されました。システム設定 > プライバシーとセキュリティ > マイク で許可してください"
+            return L10n.microphoneDenied
         }
     }
 }

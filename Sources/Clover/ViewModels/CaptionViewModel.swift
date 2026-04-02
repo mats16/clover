@@ -111,7 +111,7 @@ final class CaptionViewModel: ObservableObject {
             do {
                 guard SpeechTranscriber.isAvailable else {
                     self.isPreparingAnalyzer = false
-                    self.errorMessage = "この Mac では音声認識を利用できません"
+                    self.errorMessage = L10n.speechRecognitionUnavailable
                     return
                 }
 
@@ -126,7 +126,7 @@ final class CaptionViewModel: ObservableObject {
                 self.isPreparingAnalyzer = false
             } catch {
                 self.isPreparingAnalyzer = false
-                self.errorMessage = "音声認識の準備に失敗: \(error.localizedDescription)"
+                self.errorMessage = L10n.speechPreparationFailed(error.localizedDescription)
             }
         }
     }
@@ -176,7 +176,7 @@ final class CaptionViewModel: ObservableObject {
             self.analyzerReady = true
             errorMessage = nil
         } catch {
-            errorMessage = "言語切替に失敗: \(error.localizedDescription)"
+            errorMessage = L10n.languageChangeFailed(error.localizedDescription)
         }
     }
 
@@ -193,7 +193,7 @@ final class CaptionViewModel: ObservableObject {
     /// 新規文字起こしで録音を開始する。
     func startListening(dbQueue: DatabaseQueue, appendingTo existingTranscriptionId: UUID? = nil) async {
         guard analyzerReady else {
-            errorMessage = "音声認識が準備されていません"
+            errorMessage = L10n.speechRecognitionNotReady
             return
         }
 
@@ -335,7 +335,7 @@ final class CaptionViewModel: ObservableObject {
         }
         manager.onStreamStopped = { [weak self] error in
             DispatchQueue.main.async {
-                self?.errorMessage = error?.localizedDescription ?? "システム音声キャプチャが停止しました"
+                self?.errorMessage = error?.localizedDescription ?? L10n.systemAudioCaptureStopped
                 if self?.audioManager == nil {
                     self?.isListening = false
                 }

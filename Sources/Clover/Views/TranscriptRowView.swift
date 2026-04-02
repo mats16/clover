@@ -36,8 +36,8 @@ struct TranscriptRowView: View {
 
     private func speakerDisplayName(for label: String) -> String {
         switch label {
-        case "mic": return "マイク"
-        case "system": return "システム"
+        case "mic": return L10n.mic
+        case "system": return L10n.system
         default: return label
         }
     }
