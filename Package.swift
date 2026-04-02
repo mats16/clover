@@ -2,7 +2,7 @@
 import PackageDescription
 
 let package = Package(
-    name: "Transcriber",
+    name: "Clover",
     platforms: [
         .macOS(.v26)
     ],
@@ -11,11 +11,11 @@ let package = Package(
     ],
     targets: [
         .executableTarget(
-            name: "Transcriber",
+            name: "Clover",
             dependencies: [
                 .product(name: "GRDB", package: "GRDB.swift")
             ],
-            path: "Sources/Transcriber"
+            path: "Sources/Clover"
         )
     ]
 )

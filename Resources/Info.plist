@@ -3,11 +3,11 @@
 <plist version="1.0">
 <dict>
     <key>CFBundleName</key>
-    <string>Transcriber</string>
+    <string>Clover</string>
     <key>CFBundleDisplayName</key>
-    <string>Transcriber</string>
+    <string>Clover</string>
     <key>CFBundleIdentifier</key>
-    <string>com.transcriber.app</string>
+    <string>com.clover.app</string>
     <key>CFBundleVersion</key>
     <string>1</string>
     <key>CFBundleShortVersionString</key>
@@ -15,7 +15,7 @@
     <key>CFBundlePackageType</key>
     <string>APPL</string>
     <key>CFBundleExecutable</key>
-    <string>Transcriber</string>
+    <string>Clover</string>
     <key>LSMinimumSystemVersion</key>
     <string>26.0</string>
     <key>NSMicrophoneUsageDescription</key>

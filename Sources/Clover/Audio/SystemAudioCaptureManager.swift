@@ -45,7 +45,7 @@ final class SystemAudioCaptureManager: NSObject, @unchecked Sendable {
     private var converter: AVAudioConverter?
     private var sourceFormat: AVAudioFormat?
     private var captureTargetFormat: AVAudioFormat?
-    private let audioQueue = DispatchQueue(label: "com.transcriber.systemaudio", qos: .userInitiated)
+    private let audioQueue = DispatchQueue(label: "com.clover.systemaudio", qos: .userInitiated)
 
     /// 変換済み AVAudioPCMBuffer のコールバック
     var onAudioBuffer: ((AVAudioPCMBuffer) -> Void)?

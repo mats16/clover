@@ -2,13 +2,13 @@ import SwiftUI
 import AppKit
 
 @main
-struct TranscriberApp: App {
+struct CloverApp: App {
     @NSApplicationDelegateAdaptor(AppDelegate.self) var appDelegate
     @StateObject private var viewModel = CaptionViewModel()
     @StateObject private var sidebarViewModel = SidebarViewModel()
 
     var body: some Scene {
-        WindowGroup("Transcriber") {
+        WindowGroup("Clover") {
             ContentView(viewModel: viewModel, sidebarViewModel: sidebarViewModel)
                 .onAppear {
                     try? AppSettings.shared.ensureVaultExists()
