@@ -141,6 +141,9 @@ struct SidebarView: View {
                     editingName = project.name
                     editingProjectURL = project.url
                 }
+                Button("README を編集") {
+                    sidebarViewModel.openReadme(for: project)
+                }
                 Divider()
                 Button("削除", role: .destructive) {
                     sidebarViewModel.deleteProject(project)

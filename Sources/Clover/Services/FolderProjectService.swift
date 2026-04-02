@@ -45,4 +45,27 @@ struct FolderProjectService {
     func deleteProject(_ project: FolderProject) throws {
         try fileManager.trashItem(at: project.url, resultingItemURL: nil)
     }
+
+    // MARK: - README
+
+    /// README.md が存在しなければ Obsidian 互換のフロントマッター付きで作成し、URL を返す。
+    @discardableResult
+    func ensureReadmeExists(for project: FolderProject) throws -> URL {
+        let url = project.url.appendingPathComponent("README.md")
+        guard !fileManager.fileExists(atPath: url.path) else {
+            return url
+        }
+
+        let content = """
+        ---
+        tags:
+          - project
+        ---
+
+        # \(project.name)
+
+        """
+        try Data(content.utf8).write(to: url)
+        return url
+    }
 }
