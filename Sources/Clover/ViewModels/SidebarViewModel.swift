@@ -124,10 +124,10 @@ final class SidebarViewModel: ObservableObject {
         }
     }
 
-    /// README.md を作成（未存在の場合）し、デフォルトエディタで開く。
+    /// README.md を作成（未存在の場合）し、設定されたエディタで開く。
     func openReadme(for project: FolderProject) {
         guard let readmeURL = try? folderService.ensureReadmeExists(for: project) else { return }
-        NSWorkspace.shared.open(readmeURL)
+        AppSettings.shared.markdownEditor.open(readmeURL)
     }
 
     func deleteProject(_ project: FolderProject) {

@@ -1,6 +1,57 @@
 import SwiftUI
 import UniformTypeIdentifiers
 
+/// ホバー時に背景がハイライトされるアイコンボタンスタイル。
+struct ToolbarIconButtonStyle: ButtonStyle {
+    @State private var isHovered = false
+
+    func makeBody(configuration: Configuration) -> some View {
+        configuration.label
+            .padding(6)
+            .background(
+                RoundedRectangle(cornerRadius: 5)
+                    .fill(configuration.isPressed
+                          ? Color.primary.opacity(0.15)
+                          : isHovered ? Color.primary.opacity(0.08) : Color.clear)
+            )
+            .onHover { hovering in
+                isHovered = hovering
+            }
+    }
+}
+
+/// 音声ソース選択ボタン（ホバー対応）。
+private struct AudioSourceButton: View {
+    let mode: AudioSourceMode
+    let isSelected: Bool
+    let action: () -> Void
+    @State private var isHovered = false
+
+    var body: some View {
+        Button(action: action) {
+            HStack(spacing: 4) {
+                Image(systemName: mode.iconName)
+                    .font(.caption2)
+                Text(mode.label)
+                    .font(.subheadline)
+            }
+            .padding(.horizontal, 10)
+            .padding(.vertical, 5)
+            .frame(maxWidth: .infinity)
+            .background(
+                isSelected
+                    ? Color.accentColor
+                    : isHovered ? Color.primary.opacity(0.08) : Color.clear
+            )
+            .foregroundColor(isSelected ? .white : .primary)
+        }
+        .buttonStyle(.plain)
+        .onHover { hovering in
+            isHovered = hovering
+        }
+    }
+}
+
 /// メインコントロールウィンドウ（議事録ビュー）。
 struct ControlPanelView: View {
     @ObservedObject var viewModel: CaptionViewModel
@@ -75,6 +126,44 @@ struct ControlPanelView: View {
                     Spacer()
                 }
             }
+
+            // 要約ステータス
+            if viewModel.isSummaryGenerating {
+                HStack(spacing: 6) {
+                    ProgressView()
+                        .controlSize(.small)
+                    Text(L10n.generatingSummary)
+                        .font(.caption)
+                        .foregroundColor(.secondary)
+                    Spacer()
+                }
+            }
+
+            if let summaryError = viewModel.summaryError {
+                HStack {
+                    Image(systemName: "exclamationmark.triangle.fill")
+                        .foregroundColor(.orange)
+                    Text(summaryError)
+                        .font(.caption)
+                        .foregroundColor(.red)
+                    Spacer()
+                }
+            }
+
+            if let summaryURL = viewModel.lastSummaryURL {
+                HStack(spacing: 6) {
+                    Image(systemName: "checkmark.circle.fill")
+                        .foregroundColor(.green)
+                    Text(L10n.summaryGenerated)
+                        .font(.caption)
+                        .foregroundColor(.secondary)
+                    Button(L10n.openSummary) {
+                        AppSettings.shared.markdownEditor.open(summaryURL)
+                    }
+                    .font(.caption)
+                    Spacer()
+                }
+            }
         }
         .padding()
         .frame(minWidth: 500, minHeight: 500)
@@ -89,8 +178,9 @@ struct ControlPanelView: View {
                 if viewModel.isViewingHistory {
                     resumeRecording()
                 } else {
-                    guard let dbQueue = sidebarViewModel.dbQueue else { return }
-                    viewModel.toggleListening(dbQueue: dbQueue)
+                    guard let dbQueue = sidebarViewModel.dbQueue,
+                          let projectURL = sidebarViewModel.selectedProject?.url else { return }
+                    viewModel.toggleListening(dbQueue: dbQueue, projectURL: projectURL)
                 }
             }) {
                 HStack(spacing: 4) {
@@ -112,22 +202,12 @@ struct ControlPanelView: View {
             // 音声ソース選択
             HStack(spacing: 0) {
                 ForEach(AudioSourceMode.allCases, id: \.self) { mode in
-                    Button {
+                    AudioSourceButton(
+                        mode: mode,
+                        isSelected: viewModel.audioSourceMode == mode
+                    ) {
                         viewModel.audioSourceMode = mode
-                    } label: {
-                        HStack(spacing: 4) {
-                            Image(systemName: mode.iconName)
-                                .font(.caption2)
-                            Text(mode.label)
-                                .font(.subheadline)
-                        }
-                        .padding(.horizontal, 10)
-                        .padding(.vertical, 5)
-                        .frame(maxWidth: .infinity)
-                        .background(viewModel.audioSourceMode == mode ? Color.accentColor : Color.clear)
-                        .foregroundColor(viewModel.audioSourceMode == mode ? .white : .primary)
                     }
-                    .buttonStyle(.plain)
                 }
             }
             .background(Color.secondary.opacity(0.12))
@@ -153,11 +233,31 @@ struct ControlPanelView: View {
 
             Spacer()
 
+            // 要約生成
+            Button(action: {
+                guard let transcriptionId = viewModel.currentTranscriptionId,
+                      let projectURL = sidebarViewModel.selectedProject?.url else { return }
+                let text = viewModel.store.exportForSummary()
+                Task {
+                    await viewModel.generateSummary(
+                        transcriptionId: transcriptionId,
+                        transcriptText: text,
+                        projectURL: projectURL,
+                        startedAt: viewModel.store.recordingStartTime ?? Date()
+                    )
+                }
+            }) {
+                Image(systemName: "sparkles")
+            }
+            .buttonStyle(ToolbarIconButtonStyle())
+            .disabled(viewModel.store.segments.isEmpty || viewModel.isSummaryGenerating || viewModel.isListening)
+            .help(L10n.generateSummary)
+
             // 書き出し
             Button(action: { viewModel.exportTranscript() }) {
                 Image(systemName: "square.and.arrow.up")
             }
-            .buttonStyle(.borderless)
+            .buttonStyle(ToolbarIconButtonStyle())
             .disabled(viewModel.store.segments.isEmpty)
             .help(L10n.export)
 
@@ -165,7 +265,7 @@ struct ControlPanelView: View {
             Button(action: { viewModel.clearText() }) {
                 Image(systemName: "trash")
             }
-            .buttonStyle(.borderless)
+            .buttonStyle(ToolbarIconButtonStyle())
             .disabled(viewModel.store.segments.isEmpty || !viewModel.isListening)
             .help(L10n.clearTranscription)
         }
@@ -175,9 +275,10 @@ struct ControlPanelView: View {
 
     private func resumeRecording() {
         guard let dbQueue = sidebarViewModel.dbQueue,
+              let projectURL = sidebarViewModel.selectedProject?.url,
               let transcriptionId = viewModel.currentTranscriptionId else { return }
         Task {
-            await viewModel.startListening(dbQueue: dbQueue, appendingTo: transcriptionId)
+            await viewModel.startListening(dbQueue: dbQueue, projectURL: projectURL, appendingTo: transcriptionId)
         }
     }
 

@@ -49,6 +49,12 @@ enum L10n {
     static var displayLanguages: String { String(localized: "Display Languages", bundle: bundle) }
     static var displayLanguagesDescription: String { String(localized: "Only selected languages will appear in the language picker. All languages are shown if none are selected.", bundle: bundle) }
 
+    // MARK: - Settings (Markdown Editor)
+
+    static var markdownEditor: String { String(localized: "Markdown Editor", bundle: bundle) }
+    static var markdownEditorDescription: String { String(localized: "Editor used to open README and summary files.", bundle: bundle) }
+    static var systemDefault: String { String(localized: "System Default", bundle: bundle) }
+
     // MARK: - Settings (LLM)
 
     static var llmSettings: String { String(localized: "LLM Settings", bundle: bundle) }
@@ -66,6 +72,16 @@ enum L10n {
     static var llmErrorUnexpectedResponse: String { String(localized: "Unexpected response from server", bundle: bundle) }
     static func llmErrorHTTP(_ code: Int, _ detail: String) -> String { String(localized: "HTTP \(code): \(detail)", bundle: bundle) }
     static var llmErrorEmptyResponse: String { String(localized: "Empty response from server", bundle: bundle) }
+
+    // MARK: - Summary
+
+    static var generatingSummary: String { String(localized: "Generating summary...", bundle: bundle) }
+    static var summaryGenerated: String { String(localized: "Summary generated", bundle: bundle) }
+    static var openSummary: String { String(localized: "Open Summary", bundle: bundle) }
+    static var generateSummary: String { String(localized: "Generate Summary", bundle: bundle) }
+    static var summaryPrompt: String { String(localized: "Summary Prompt", bundle: bundle) }
+    static var resetToDefault: String { String(localized: "Reset to Default", bundle: bundle) }
+    static var llmConfigIncomplete: String { String(localized: "LLM configuration is incomplete. Please set endpoint, model, and API token in Settings.", bundle: bundle) }
 
     // MARK: - Error Messages (Audio)
 

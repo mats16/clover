@@ -35,6 +35,19 @@ struct SettingsView: View {
                 Text(L10n.vaultDescription)
                     .font(.caption)
                     .foregroundColor(.secondary)
+
+                Picker(L10n.markdownEditor, selection: Binding(
+                    get: { settings.markdownEditor },
+                    set: { settings.markdownEditor = $0 }
+                )) {
+                    ForEach(MarkdownEditor.availableEditors) { editor in
+                        Text(editor.displayName).tag(editor)
+                    }
+                }
+
+                Text(L10n.markdownEditorDescription)
+                    .font(.caption)
+                    .foregroundColor(.secondary)
             }
 
             Section {
@@ -92,6 +105,23 @@ struct SettingsView: View {
                 Text(L10n.autoSummaryDescription)
                     .font(.caption)
                     .foregroundColor(.secondary)
+
+                VStack(alignment: .leading, spacing: 4) {
+                    Text(L10n.summaryPrompt)
+                        .font(.caption)
+                        .foregroundColor(.secondary)
+                    TextEditor(text: $settings.llmSummaryPrompt)
+                        .font(.body)
+                        .frame(height: 80)
+                        .border(Color.secondary.opacity(0.3))
+                    HStack {
+                        Spacer()
+                        Button(L10n.resetToDefault) {
+                            settings.llmSummaryPrompt = AppSettings.defaultSummaryPrompt
+                        }
+                        .font(.caption)
+                    }
+                }
             } header: {
                 Text(L10n.llmSettings)
             } footer: {
@@ -168,7 +198,7 @@ struct SettingsView: View {
             }
         }
         .formStyle(.grouped)
-        .frame(width: 560, height: 620)
+        .frame(width: 560, height: 760)
         .padding()
         .task {
             apiToken = settings.llmAPIToken

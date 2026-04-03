@@ -38,6 +38,11 @@
 "Display Languages" = "表示する言語";
 "Only selected languages will appear in the language picker. All languages are shown if none are selected." = "選択した言語のみが言語ピッカーに表示されます。未選択の場合はすべての言語が表示されます。";
 
+/* Settings - Markdown Editor */
+"Markdown Editor" = "Markdown エディタ";
+"Editor used to open README and summary files." = "README やサマリファイルを開く際に使用するエディタです。";
+"System Default" = "システムデフォルト";
+
 /* Settings - LLM */
 "LLM Settings" = "LLM 設定";
 "Endpoint URL" = "エンドポイント URL";
@@ -54,6 +59,15 @@
 "Unexpected response from server" = "サーバーから予期しないレスポンスが返されました";
 "HTTP %lld: %@" = "HTTP %lld: %@";
 "Empty response from server" = "サーバーから空のレスポンスが返されました";
+
+/* Summary */
+"Generating summary..." = "要約を生成中...";
+"Summary generated" = "要約が生成されました";
+"Open Summary" = "要約を開く";
+"Generate Summary" = "要約を生成";
+"Summary Prompt" = "要約プロンプト";
+"Reset to Default" = "デフォルトに戻す";
+"LLM configuration is incomplete. Please set endpoint, model, and API token in Settings." = "LLM の設定が不完全です。設定画面でエンドポイント、モデル、API トークンを設定してください。";
 
 /* Error Messages - Audio */
 "Screen recording access denied. Please allow it in System Settings > Privacy & Security > Screen Recording." = "画面収録のアクセスが拒否されました。システム設定 > プライバシーとセキュリティ > 画面収録 で許可してください";

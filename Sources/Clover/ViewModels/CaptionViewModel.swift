@@ -21,6 +21,13 @@ final class CaptionViewModel: ObservableObject {
     // MARK: - Transcription State
 
     var currentTranscriptionId: UUID?
+    var currentProjectURL: URL?
+
+    // MARK: - Summary State
+
+    @Published var isSummaryGenerating: Bool = false
+    @Published var summaryError: String?
+    @Published var lastSummaryURL: URL?
 
     /// 録音中でなく、文字起こしを表示中の場合 true。
     var isViewingHistory: Bool {
@@ -182,16 +189,17 @@ final class CaptionViewModel: ObservableObject {
 
     // MARK: - Recording Control
 
-    func toggleListening(dbQueue: DatabaseQueue) {
+    func toggleListening(dbQueue: DatabaseQueue, projectURL: URL) {
         if isListening {
             stopListening()
         } else {
-            Task { await startListening(dbQueue: dbQueue) }
+            Task { await startListening(dbQueue: dbQueue, projectURL: projectURL) }
         }
     }
 
     /// 新規文字起こしで録音を開始する。
-    func startListening(dbQueue: DatabaseQueue, appendingTo existingTranscriptionId: UUID? = nil) async {
+    func startListening(dbQueue: DatabaseQueue, projectURL: URL, appendingTo existingTranscriptionId: UUID? = nil) async {
+        self.currentProjectURL = projectURL
         guard analyzerReady else {
             errorMessage = L10n.speechRecognitionNotReady
             return
@@ -261,6 +269,11 @@ final class CaptionViewModel: ObservableObject {
         systemAudioManager = nil
         isListening = false
 
+        let transcriptionId = currentTranscriptionId
+        let transcriptText = store.exportForSummary()
+        let projectURL = currentProjectURL
+        let recordingStart = store.recordingStartTime ?? Date()
+
         Task {
             for pipeline in pipelines {
                 pipeline.bridge.finish()
@@ -269,7 +282,55 @@ final class CaptionViewModel: ObservableObject {
             pipelines.removeAll()
             persistenceService?.stop()
             persistenceService = nil
+
+            if AppSettings.shared.llmAutoSummaryEnabled,
+               let transcriptionId,
+               let projectURL {
+                await generateSummary(
+                    transcriptionId: transcriptionId,
+                    transcriptText: transcriptText,
+                    projectURL: projectURL,
+                    startedAt: recordingStart
+                )
+            }
         }
+    }
+
+    // MARK: - Summary Generation
+
+    func generateSummary(
+        transcriptionId: UUID,
+        transcriptText: String,
+        projectURL: URL,
+        startedAt: Date
+    ) async {
+        guard !transcriptText.isEmpty else { return }
+
+        let settings = AppSettings.shared
+        guard !settings.llmEndpointURL.isEmpty,
+              !settings.llmModelName.isEmpty,
+              !settings.llmAPIToken.isEmpty else {
+            summaryError = L10n.llmConfigIncomplete
+            return
+        }
+
+        isSummaryGenerating = true
+        summaryError = nil
+        lastSummaryURL = nil
+
+        do {
+            let fileURL = try await SummaryService.generateSummary(
+                projectURL: projectURL,
+                transcriptionId: transcriptionId,
+                startedAt: startedAt,
+                transcriptText: transcriptText
+            )
+            lastSummaryURL = fileURL
+        } catch {
+            summaryError = error.localizedDescription
+        }
+
+        isSummaryGenerating = false
     }
 
     func clearText() {

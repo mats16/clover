@@ -108,47 +108,28 @@ struct SidebarView: View {
                     isRenameFocused = true
                 }
         } else {
-            HStack {
-                Image(systemName: isSelected ? "folder.fill" : "folder")
-                    .foregroundColor(isSelected ? .accentColor : .secondary)
-                Text(project.name)
-                    .font(.headline)
-                    .foregroundColor(isSelected ? .primary : .secondary)
-                Spacer()
-                if isSelected {
-                    Image(systemName: "chevron.down")
-                        .font(.caption2)
-                        .foregroundColor(.secondary)
-                }
-            }
-            .padding(.vertical, 8)
-            .padding(.horizontal, 4)
-            .background(
-                RoundedRectangle(cornerRadius: 6)
-                    .fill(isSelected ? Color.accentColor.opacity(0.12) : Color.clear)
-            )
-            .contentShape(Rectangle())
-            .onTapGesture(count: 2) {
-                editingName = project.name
-                editingProjectURL = project.url
-            }
-            .onTapGesture(count: 1) {
-                sidebarViewModel.selectProject(project)
-                viewModel.clearCurrentTranscription()
-            }
-            .contextMenu {
-                Button(L10n.rename) {
+            ProjectHeaderRow(
+                project: project,
+                isSelected: isSelected,
+                onSelect: {
+                    sidebarViewModel.selectProject(project)
+                    viewModel.clearCurrentTranscription()
+                },
+                onDoubleClick: {
                     editingName = project.name
                     editingProjectURL = project.url
-                }
-                Button(L10n.editReadme) {
+                },
+                onRename: {
+                    editingName = project.name
+                    editingProjectURL = project.url
+                },
+                onEditReadme: {
                     sidebarViewModel.openReadme(for: project)
-                }
-                Divider()
-                Button(L10n.delete, role: .destructive) {
+                },
+                onDelete: {
                     sidebarViewModel.deleteProject(project)
                 }
-            }
+            )
         }
     }
 
@@ -176,34 +157,12 @@ struct SidebarView: View {
                     isTranscriptionRenameFocused = true
                 }
         } else {
-            VStack(alignment: .leading, spacing: 2) {
-                HStack {
-                    Image(systemName: transcription.endedAt != nil ? "waveform" : "record.circle.fill")
-                        .font(.caption)
-                        .foregroundColor(transcription.endedAt != nil ? .secondary : .red)
-                    if transcription.title.isEmpty {
-                        Text(Self.dateFormatter.string(from: transcription.startedAt))
-                            .font(.subheadline)
-                    } else {
-                        Text(transcription.title)
-                            .font(.subheadline)
-                    }
-                }
-                HStack(spacing: 8) {
-                    if !transcription.title.isEmpty {
-                        Text(Self.dateFormatter.string(from: transcription.startedAt))
-                            .font(.caption2)
-                            .foregroundColor(.secondary)
-                    }
-                    if let endedAt = transcription.endedAt {
-                        let duration = endedAt.timeIntervalSince(transcription.startedAt)
-                        Text(Self.durationFormatter.string(from: duration) ?? "")
-                            .font(.caption2)
-                            .foregroundColor(.secondary)
-                    }
-                }
-            }
-            .padding(.vertical, 2)
+            TranscriptionListRow(
+                transcription: transcription,
+                isSelected: sidebarViewModel.selectedTranscriptionId == transcription.id,
+                dateFormatter: Self.dateFormatter,
+                durationFormatter: Self.durationFormatter
+            )
         }
     }
 
@@ -268,5 +227,103 @@ struct SidebarView: View {
 
         guard let dbQueue = sidebarViewModel.dbQueue else { return }
         viewModel.loadTranscription(transcriptionId, dbQueue: dbQueue)
+    }
+}
+
+// MARK: - Hoverable Sub-Views
+
+/// ホバー対応のプロジェクトヘッダー行。
+private struct ProjectHeaderRow: View {
+    let project: FolderProject
+    let isSelected: Bool
+    let onSelect: () -> Void
+    let onDoubleClick: () -> Void
+    let onRename: () -> Void
+    let onEditReadme: () -> Void
+    let onDelete: () -> Void
+    @State private var isHovered = false
+
+    var body: some View {
+        HStack {
+            Image(systemName: isSelected ? "folder.fill" : "folder")
+                .foregroundColor(isSelected ? .accentColor : .secondary)
+            Text(project.name)
+                .font(.headline)
+                .foregroundColor(isSelected ? .primary : isHovered ? .primary : .secondary)
+            Spacer()
+            if isSelected {
+                Image(systemName: "chevron.down")
+                    .font(.caption2)
+                    .foregroundColor(.secondary)
+            }
+        }
+        .padding(.vertical, 8)
+        .padding(.horizontal, 4)
+        .background(
+            RoundedRectangle(cornerRadius: 6)
+                .fill(
+                    isSelected
+                        ? Color.accentColor.opacity(0.12)
+                        : isHovered ? Color.primary.opacity(0.06) : Color.clear
+                )
+        )
+        .contentShape(Rectangle())
+        .onHover { isHovered = $0 }
+        .onTapGesture(count: 2) { onDoubleClick() }
+        .onTapGesture(count: 1) { onSelect() }
+        .contextMenu {
+            Button(L10n.rename) { onRename() }
+            Button(L10n.editReadme) { onEditReadme() }
+            Divider()
+            Button(L10n.delete, role: .destructive) { onDelete() }
+        }
+    }
+}
+
+/// ホバー対応の文字起こし一覧行。
+private struct TranscriptionListRow: View {
+    let transcription: TranscriptionRecord
+    let isSelected: Bool
+    let dateFormatter: DateFormatter
+    let durationFormatter: DateComponentsFormatter
+    @State private var isHovered = false
+
+    var body: some View {
+        VStack(alignment: .leading, spacing: 2) {
+            HStack {
+                Image(systemName: transcription.endedAt != nil ? "waveform" : "record.circle.fill")
+                    .font(.caption)
+                    .foregroundColor(transcription.endedAt != nil ? .secondary : .red)
+                if transcription.title.isEmpty {
+                    Text(dateFormatter.string(from: transcription.startedAt))
+                        .font(.subheadline)
+                } else {
+                    Text(transcription.title)
+                        .font(.subheadline)
+                }
+            }
+            HStack(spacing: 8) {
+                if !transcription.title.isEmpty {
+                    Text(dateFormatter.string(from: transcription.startedAt))
+                        .font(.caption2)
+                        .foregroundColor(.secondary)
+                }
+                if let endedAt = transcription.endedAt {
+                    let duration = endedAt.timeIntervalSince(transcription.startedAt)
+                    Text(durationFormatter.string(from: duration) ?? "")
+                        .font(.caption2)
+                        .foregroundColor(.secondary)
+                }
+            }
+        }
+        .frame(maxWidth: .infinity, alignment: .leading)
+        .padding(.vertical, 2)
+        .padding(.horizontal, 4)
+        .contentShape(Rectangle())
+        .background(
+            RoundedRectangle(cornerRadius: 4)
+                .fill(isHovered && !isSelected ? Color.primary.opacity(0.06) : Color.clear)
+        )
+        .onHover { isHovered = $0 }
     }
 }

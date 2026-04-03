@@ -38,6 +38,11 @@
 "Display Languages" = "Display Languages";
 "Only selected languages will appear in the language picker. All languages are shown if none are selected." = "Only selected languages will appear in the language picker. All languages are shown if none are selected.";
 
+/* Settings - Markdown Editor */
+"Markdown Editor" = "Markdown Editor";
+"Editor used to open README and summary files." = "Editor used to open README and summary files.";
+"System Default" = "System Default";
+
 /* Settings - LLM */
 "LLM Settings" = "LLM Settings";
 "Endpoint URL" = "Endpoint URL";
@@ -54,6 +59,15 @@
 "Unexpected response from server" = "Unexpected response from server";
 "HTTP %lld: %@" = "HTTP %lld: %@";
 "Empty response from server" = "Empty response from server";
+
+/* Summary */
+"Generating summary..." = "Generating summary...";
+"Summary generated" = "Summary generated";
+"Open Summary" = "Open Summary";
+"Generate Summary" = "Generate Summary";
+"Summary Prompt" = "Summary Prompt";
+"Reset to Default" = "Reset to Default";
+"LLM configuration is incomplete. Please set endpoint, model, and API token in Settings." = "LLM configuration is incomplete. Please set endpoint, model, and API token in Settings.";
 
 /* Error Messages - Audio */
 "Screen recording access denied. Please allow it in System Settings > Privacy & Security > Screen Recording." = "Screen recording access denied. Please allow it in System Settings > Privacy & Security > Screen Recording.";
