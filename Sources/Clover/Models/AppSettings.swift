@@ -190,7 +190,11 @@ final class AppSettings: ObservableObject {
             if newValue.isEmpty {
                 KeychainService.delete(key: "llmAPIToken")
             } else {
-                try? KeychainService.save(key: "llmAPIToken", value: newValue)
+                do {
+                    try KeychainService.save(key: "llmAPIToken", value: newValue)
+                } catch {
+                    print("[KeychainService] Failed to save API token: \(error)")
+                }
             }
             objectWillChange.send()
         }

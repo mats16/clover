@@ -89,3 +89,6 @@
 "Failed to change language: %@" = "Failed to change language: %@";
 "Speech recognition is not ready" = "Speech recognition is not ready";
 "System audio capture stopped" = "System audio capture stopped";
+
+/* Keychain */
+"Authenticate to access your API token stored in Keychain." = "Authenticate to access your API token stored in Keychain.";

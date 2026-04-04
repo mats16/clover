@@ -9,10 +9,14 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 ## ビルド・実行
 
 ```bash
-# デバッグビルド
+# デバッグビルド（レガシーキーチェーンにフォールバック）
 swift build
+swift run
 
-# リリースビルド → .app バンドル作成（コード署名付き）
+# デバッグビルド + エンタイトルメント付き署名（Data Protection Keychain + Touch ID 有効）
+./scripts/run-dev.sh
+
+# リリースビルド → .app バンドル作成（エンタイトルメント付きコード署名）
 ./scripts/build-app.sh
 
 # 生成された .app を実行
@@ -20,6 +24,8 @@ open Clover.app
 ```
 
 Swift Package Manager プロジェクト。Xcode プロジェクトファイルは無い。唯一の外部依存は GRDB.swift（SQLite ORM）。
+
+> **Note:** `swift run` は未署名バイナリのため Data Protection Keychain が使えず、レガシーキーチェーンに自動フォールバックする。Touch ID 保護を含む完全な動作確認には `./scripts/run-dev.sh` を使用すること。
 
 ## アーキテクチャ
 

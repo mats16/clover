@@ -89,3 +89,6 @@
 "Failed to change language: %@" = "言語切替に失敗: %@";
 "Speech recognition is not ready" = "音声認識が準備されていません";
 "System audio capture stopped" = "システム音声キャプチャが停止しました";
+
+/* Keychain */
+"Authenticate to access your API token stored in Keychain." = "キーチェーンに保存された API トークンにアクセスするために認証が必要です。";
