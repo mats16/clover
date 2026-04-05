@@ -4,11 +4,10 @@ import Foundation
 struct SummaryTemplateService {
     private let fileManager = FileManager.default
 
-    /// テンプレートディレクトリ URL: `<vault>/.clover/summary_templates/`
+    /// テンプレートディレクトリ URL: `<vault>/_summarize_templates/`
     static func templatesDirectoryURL(in vaultURL: URL) -> URL {
         vaultURL
-            .appendingPathComponent(".clover", isDirectory: true)
-            .appendingPathComponent("summary_templates", isDirectory: true)
+            .appendingPathComponent("_summarize_templates", isDirectory: true)
     }
 
     /// テンプレートディレクトリが無ければ作成する。

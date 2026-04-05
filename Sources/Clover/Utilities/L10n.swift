@@ -51,7 +51,10 @@ enum L10n {
     static func languagesSelected(_ count: Int) -> String { String(localized: "\(count) languages selected", bundle: bundle) }
     static var showAll: String { String(localized: "Show all", bundle: bundle) }
     static var displayLanguages: String { String(localized: "Display Languages", bundle: bundle) }
-    static var displayLanguagesDescription: String { String(localized: "Only selected languages will appear in the language picker. All languages are shown if none are selected.", bundle: bundle) }
+    static var displayLanguagesDescription: String { String(
+        localized: "Only selected languages will appear in the language picker. All languages are shown if none are selected.",
+        bundle: bundle
+    ) }
 
     // MARK: - Settings (Markdown Editor)
 
@@ -91,21 +94,33 @@ enum L10n {
     static var openInEditor: String { String(localized: "Open in Editor", bundle: bundle) }
     static var openTemplatesFolder: String { String(localized: "Open Templates Folder", bundle: bundle) }
     static var resetPresets: String { String(localized: "Reset Presets", bundle: bundle) }
-    static var summaryTemplateDescription: String { String(localized: "Select a template from .clover/summary_templates/ in the vault.", bundle: bundle) }
-    static var llmConfigIncomplete: String { String(localized: "LLM configuration is incomplete. Please set endpoint, model, and API token in Settings.", bundle: bundle) }
+    static var summaryTemplateDescription: String { String(localized: "Select a template from _summarize_templates/ in the vault.", bundle: bundle) }
+    static var llmConfigIncomplete: String { String(
+        localized: "LLM configuration is incomplete. Please set endpoint, model, and API token in Settings.",
+        bundle: bundle
+    ) }
 
     // MARK: - Error Messages (Audio)
 
-    static var screenRecordingDenied: String { String(localized: "Screen recording access denied. Please allow it in System Settings > Privacy & Security > Screen Recording.", bundle: bundle) }
+    static var screenRecordingDenied: String { String(
+        localized: "Screen recording access denied. Please allow it in System Settings > Privacy & Security > Screen Recording.",
+        bundle: bundle
+    ) }
     static var noDisplayFound: String { String(localized: "No available displays found", bundle: bundle) }
     static var invalidHardwareFormat: String { String(localized: "Invalid audio hardware format", bundle: bundle) }
     static var converterCreationFailed: String { String(localized: "Failed to create audio format converter", bundle: bundle) }
-    static var microphoneDenied: String { String(localized: "Microphone access denied. Please allow it in System Settings > Privacy & Security > Microphone.", bundle: bundle) }
+    static var microphoneDenied: String { String(
+        localized: "Microphone access denied. Please allow it in System Settings > Privacy & Security > Microphone.",
+        bundle: bundle
+    ) }
 
     // MARK: - Error Messages (ViewModel)
 
     static var speechRecognitionUnavailable: String { String(localized: "Speech recognition is not available on this Mac", bundle: bundle) }
-    static func speechPreparationFailed(_ error: String) -> String { String(localized: "Failed to prepare speech recognition: \(error)", bundle: bundle) }
+    static func speechPreparationFailed(_ error: String) -> String { String(
+        localized: "Failed to prepare speech recognition: \(error)",
+        bundle: bundle
+    ) }
     static func languageChangeFailed(_ error: String) -> String { String(localized: "Failed to change language: \(error)", bundle: bundle) }
     static var speechRecognitionNotReady: String { String(localized: "Speech recognition is not ready", bundle: bundle) }
     static var systemAudioCaptureStopped: String { String(localized: "System audio capture stopped", bundle: bundle) }

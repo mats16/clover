@@ -1,0 +1,69 @@
+# SwiftFormat configuration for Clover (macOS app, Swift 6.2)
+
+# Swift バージョン
+--swiftversion 6.0
+
+# インデント（既存コードに合わせて4スペース）
+--indent 4
+--tabwidth 4
+--smarttabs enabled
+--indentcase false
+--ifdef indent
+
+# 改行
+--linebreaks lf
+--maxwidth 150
+--wraparguments before-first
+--wrapparameters before-first
+--wrapcollections before-first
+--wrapconditions after-first
+--wrapreturntype preserve
+--wraptypealiases before-first
+--closingparen balanced
+
+# スペース
+--operatorfunc spaced
+--nospaceoperators
+--ranges spaced
+--trimwhitespace always
+
+# Trailing comma（SwiftLint に合わせる）
+--commas always
+
+# セミコロン
+--semicolons never
+
+# Void
+--voidtype void
+
+# self（既存コードのスタイルを維持）
+--selfrequired
+
+# import
+--importgrouping testable-bottom
+
+# 冗長性の除去
+--redundanttype inferred
+
+# Braces
+--allman false
+
+# MARK
+--marktypes always
+--markextensions always
+--extensionmark "MARK: - %t + %c"
+
+# Header（著作権ヘッダーは付けない）
+--header strip
+
+# 除外
+--exclude .build,.swiftpm,DerivedData
+
+# 無効化ルール
+--disable blankLinesAtStartOfScope
+--disable blankLinesAtEndOfScope
+--disable wrapMultilineStatementBraces
+--disable acronyms
+--disable wrapPropertyBodies
+--disable wrapFunctionBodies
+--disable redundantSelf

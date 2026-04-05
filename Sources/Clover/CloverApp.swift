@@ -1,5 +1,5 @@
-import SwiftUI
 import AppKit
+import SwiftUI
 
 @main
 struct CloverApp: App {
@@ -12,8 +12,9 @@ struct CloverApp: App {
             ContentView(viewModel: viewModel, sidebarViewModel: sidebarViewModel)
                 .onAppear {
                     try? AppSettings.shared.ensureVaultExists()
+                    let appDb = try? AppDatabaseManager(vaultURL: AppSettings.shared.vaultURL)
+                    sidebarViewModel.setAppDatabase(appDb)
                     viewModel.prepareAnalyzer()
-                    sidebarViewModel.loadProjects()
                 }
         }
         .windowResizability(.contentMinSize)
@@ -25,11 +26,11 @@ struct CloverApp: App {
 }
 
 final class AppDelegate: NSObject, NSApplicationDelegate {
-    func applicationDidFinishLaunching(_ notification: Notification) {
+    func applicationDidFinishLaunching(_: Notification) {
         NSApplication.shared.setActivationPolicy(.regular)
     }
 
-    func applicationShouldTerminateAfterLastWindowClosed(_ sender: NSApplication) -> Bool {
+    func applicationShouldTerminateAfterLastWindowClosed(_: NSApplication) -> Bool {
         true
     }
 }

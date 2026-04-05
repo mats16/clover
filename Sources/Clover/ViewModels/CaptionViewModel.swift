@@ -1,17 +1,18 @@
-import SwiftUI
 import Combine
-import Speech
 import GRDB
+import Speech
+import SwiftUI
 
 /// 音声キャプチャ → Speech フレームワーク文字起こし → UI 更新を統括するビューモデル。
 @MainActor
 final class CaptionViewModel: ObservableObject {
+
     // MARK: - Published State
 
     @Published var store = TranscriptStore()
-    @Published var isListening: Bool = false
-    @Published var analyzerReady: Bool = false
-    @Published var isPreparingAnalyzer: Bool = false
+    @Published var isListening = false
+    @Published var analyzerReady = false
+    @Published var isPreparingAnalyzer = false
     @Published var errorMessage: String?
     @Published var audioSourceMode: AudioSourceMode = .both
     @Published var selectedLocale: String = AppSettings.shared.transcriptionLocale
@@ -22,10 +23,12 @@ final class CaptionViewModel: ObservableObject {
 
     var currentTranscriptionId: UUID?
     var currentProjectURL: URL?
+    var currentProjectId: UUID?
+    var currentProjectName: String?
 
     // MARK: - Summary State
 
-    @Published var isSummaryGenerating: Bool = false
+    @Published var isSummaryGenerating = false
     @Published var summaryError: String?
     @Published var lastSummaryURL: URL?
 
@@ -90,10 +93,12 @@ final class CaptionViewModel: ObservableObject {
     // MARK: - Transcription Loading
 
     /// DB から文字起こしのセグメントを読み込んで表示する。
-    func loadTranscription(_ transcriptionId: UUID, dbQueue: DatabaseQueue, projectURL: URL) {
+    func loadTranscription(_ transcriptionId: UUID, dbQueue: DatabaseQueue, projectURL: URL, projectId: UUID, projectName: String? = nil) {
         guard !isListening else { return }
         currentTranscriptionId = transcriptionId
         currentProjectURL = projectURL
+        currentProjectId = projectId
+        currentProjectName = projectName
         currentDbQueue = dbQueue
 
         let repo = TranscriptionRepository(dbQueue: dbQueue)
@@ -115,6 +120,8 @@ final class CaptionViewModel: ObservableObject {
     func clearCurrentTranscription() {
         currentTranscriptionId = nil
         currentProjectURL = nil
+        currentProjectId = nil
+        currentProjectName = nil
         store.clear()
         lastSummaryURL = nil
         summaryError = nil
@@ -204,17 +211,25 @@ final class CaptionViewModel: ObservableObject {
 
     // MARK: - Recording Control
 
-    func toggleListening(dbQueue: DatabaseQueue, projectURL: URL) {
+    func toggleListening(dbQueue: DatabaseQueue, projectURL: URL, projectId: UUID, projectName: String? = nil) {
         if isListening {
             stopListening()
         } else {
-            Task { await startListening(dbQueue: dbQueue, projectURL: projectURL) }
+            Task { await startListening(dbQueue: dbQueue, projectURL: projectURL, projectId: projectId, projectName: projectName) }
         }
     }
 
     /// 新規文字起こしで録音を開始する。
-    func startListening(dbQueue: DatabaseQueue, projectURL: URL, appendingTo existingTranscriptionId: UUID? = nil) async {
+    func startListening(
+        dbQueue: DatabaseQueue,
+        projectURL: URL,
+        projectId: UUID,
+        projectName: String? = nil,
+        appendingTo existingTranscriptionId: UUID? = nil
+    ) async {
         self.currentProjectURL = projectURL
+        self.currentProjectId = projectId
+        self.currentProjectName = projectName
         self.currentDbQueue = dbQueue
         guard analyzerReady else {
             errorMessage = L10n.speechRecognitionNotReady
@@ -231,6 +246,7 @@ final class CaptionViewModel: ObservableObject {
             persistenceService = TranscriptPersistenceService(
                 store: store,
                 dbQueue: dbQueue,
+                projectId: projectId,
                 existingTranscriptionId: existingTranscriptionId,
                 existingSegmentIds: existingIds
             )
@@ -238,7 +254,8 @@ final class CaptionViewModel: ObservableObject {
         } else {
             persistenceService = TranscriptPersistenceService(
                 store: store,
-                dbQueue: dbQueue
+                dbQueue: dbQueue,
+                projectId: projectId
             )
             currentTranscriptionId = persistenceService?.transcriptionId
         }
@@ -286,9 +303,13 @@ final class CaptionViewModel: ObservableObject {
         isListening = false
 
         let transcriptionId = currentTranscriptionId
+        let projectName = selectedProjectName
         let transcriptText = store.exportForSummary()
         let projectURL = currentProjectURL
         let recordingStart = store.recordingStartTime ?? Date()
+        let segments = store.segments
+        let dbQueue = currentDbQueue
+        let vaultURL = AppSettings.shared.vaultURL
 
         Task {
             for pipeline in pipelines {
@@ -298,6 +319,19 @@ final class CaptionViewModel: ObservableObject {
             pipelines.removeAll()
             persistenceService?.stop()
             persistenceService = nil
+
+            if let transcriptionId, !segments.isEmpty {
+                if let relativePath = try? TranscriptExportService.exportTranscript(
+                    vaultURL: vaultURL,
+                    transcriptionId: transcriptionId,
+                    projectName: projectName ?? "",
+                    startedAt: recordingStart,
+                    segments: segments
+                ), let dbQueue {
+                    let repo = TranscriptionRepository(dbQueue: dbQueue)
+                    try? repo.updateTranscriptFilePath(id: transcriptionId, path: relativePath)
+                }
+            }
 
             if AppSettings.shared.llmAutoSummaryEnabled,
                let transcriptionId,
@@ -310,6 +344,11 @@ final class CaptionViewModel: ObservableObject {
                 )
             }
         }
+    }
+
+    /// 現在選択中のプロジェクト名。
+    private var selectedProjectName: String? {
+        currentProjectName ?? currentProjectURL?.lastPathComponent
     }
 
     // MARK: - Summary Generation

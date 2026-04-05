@@ -9,7 +9,7 @@ enum Formatters {
 
 }
 
-extension Sequence where Element == Locale {
+extension Sequence<Locale> {
     func sortedByLocalizedName() -> [Locale] {
         sorted {
             ($0.localizedString(forIdentifier: $0.identifier) ?? $0.identifier)

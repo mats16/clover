@@ -1,5 +1,5 @@
-import SwiftUI
 import Speech
+import SwiftUI
 
 /// 設定画面「文字起こし」タブ。認識言語の表示フィルタを管理する。
 struct TranscriptionSettingsView: View {
@@ -56,8 +56,8 @@ struct TranscriptionSettingsView: View {
                     HStack {
                         let enabledCount = settings.enabledLocaleIdentifiers.count
                         Text(enabledCount == 0
-                             ? L10n.allLanguagesShown
-                             : L10n.languagesSelected(enabledCount))
+                            ? L10n.allLanguagesShown
+                            : L10n.languagesSelected(enabledCount))
                             .font(.caption)
                             .foregroundColor(.secondary)
                         Spacer()

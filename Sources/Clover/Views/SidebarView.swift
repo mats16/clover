@@ -5,12 +5,12 @@ struct SidebarView: View {
     @ObservedObject var viewModel: CaptionViewModel
     @ObservedObject var sidebarViewModel: SidebarViewModel
     var columnVisibility: NavigationSplitViewVisibility = .all
-    @State private var editingProjectURL: URL?
-    @State private var editingName: String = ""
+    @State private var editingProjectId: UUID?
+    @State private var editingName = ""
     @State private var editingTranscriptionId: UUID?
-    @State private var editingTranscriptionTitle: String = ""
-    @State private var showNewProjectField: Bool = false
-    @State private var newProjectName: String = ""
+    @State private var editingTranscriptionTitle = ""
+    @State private var showNewProjectField = false
+    @State private var newProjectName = ""
     @FocusState private var isRenameFocused: Bool
     @FocusState private var isTranscriptionRenameFocused: Bool
 
@@ -30,8 +30,8 @@ struct SidebarView: View {
 
     var body: some View {
         List(selection: $sidebarViewModel.selectedTranscriptionId) {
-            ForEach(sidebarViewModel.projects) { project in
-                projectSection(project)
+            ForEach(sidebarViewModel.flatProjects) { row in
+                projectRow(row)
             }
         }
         .listStyle(.sidebar)
@@ -53,88 +53,90 @@ struct SidebarView: View {
         .onChange(of: sidebarViewModel.selectedTranscriptionId) { _, newId in
             handleTranscriptionSelection(newId)
         }
+        .alert("エラー", isPresented: Binding(
+            get: { sidebarViewModel.lastError != nil },
+            set: { if !$0 { sidebarViewModel.lastError = nil } }
+        )) {
+            Button("OK") { sidebarViewModel.lastError = nil }
+        } message: {
+            Text(sidebarViewModel.lastError ?? "")
+        }
     }
 
-    // MARK: - Project Section
+    // MARK: - Project Row
 
     @ViewBuilder
-    private func projectSection(_ project: FolderProject) -> some View {
+    private func projectRow(_ row: FlatProjectRow) -> some View {
+        let isSelected = sidebarViewModel.selectedProject?.id == row.id
+
         Section {
-            let transcriptions = sidebarViewModel.transcriptionsForSelectedProject.filter { _ in
-                sidebarViewModel.selectedProject?.url == project.url
-            }
-            if sidebarViewModel.selectedProject?.url == project.url {
-                ForEach(transcriptions, id: \.id) { transcription in
+            if isSelected {
+                ForEach(sidebarViewModel.transcriptionsForSelectedProject, id: \.id) { transcription in
                     transcriptionRow(transcription)
                         .tag(transcription.id)
                         .contextMenu {
-                            Button(L10n.rename) {
-                                editingTranscriptionTitle = transcription.title
-                                editingTranscriptionId = transcription.id
-                            }
-                            Divider()
-                            Button(L10n.delete, role: .destructive) {
-                                sidebarViewModel.deleteTranscription(id: transcription.id)
-                            }
+                            transcriptionContextMenu(transcription)
                         }
                 }
             }
         } header: {
-            projectHeader(project)
+            projectHeader(row, isSelected: isSelected)
                 .padding(.bottom, 4)
+                .padding(.leading, CGFloat(row.depth) * 12)
         }
     }
 
-    @ViewBuilder
-    private func projectHeader(_ project: FolderProject) -> some View {
-        let isSelected = sidebarViewModel.selectedProject?.url == project.url
+    // MARK: - Project Header
 
-        if editingProjectURL == project.url {
-            TextField(L10n.projectName, text: $editingName)
-                .textFieldStyle(.roundedBorder)
-                .focused($isRenameFocused)
-                .onSubmit {
-                    commitRename(project: project)
-                }
-                .onExitCommand {
-                    editingProjectURL = nil
-                }
-                .onChange(of: isRenameFocused) { _, focused in
-                    if !focused {
-                        commitRename(project: project)
-                    }
-                }
-                .task {
-                    try? await Task.sleep(for: .milliseconds(50))
-                    isRenameFocused = true
-                }
+    @ViewBuilder
+    private func projectHeader(_ row: FlatProjectRow, isSelected: Bool) -> some View {
+        if editingProjectId == row.id {
+            projectRenameField(row)
         } else {
             ProjectHeaderRow(
-                project: project,
+                row: row,
                 isSelected: isSelected,
-                onSelect: {
-                    sidebarViewModel.selectProject(project)
-                    viewModel.clearCurrentTranscription()
-                },
+                onSelect: { selectRow(row) },
                 onDoubleClick: {
-                    editingName = project.name
-                    editingProjectURL = project.url
+                    editingName = row.displayName
+                    editingProjectId = row.id
                 },
                 onRename: {
-                    editingName = project.name
-                    editingProjectURL = project.url
+                    editingName = row.displayName
+                    editingProjectId = row.id
                 },
                 onEditContext: {
-                    sidebarViewModel.openContext(for: project)
+                    sidebarViewModel.openContext(projectName: row.name)
                 },
                 onOpenInFinder: {
-                    NSWorkspace.shared.open(project.url)
+                    let url = AppSettings.shared.vaultURL.appendingPathComponent(row.name, isDirectory: true)
+                    NSWorkspace.shared.open(url)
                 },
                 onDelete: {
-                    sidebarViewModel.deleteProject(project)
+                    sidebarViewModel.deleteProject(id: row.id, name: row.name)
                 }
             )
         }
+    }
+
+    private func projectRenameField(_ row: FlatProjectRow) -> some View {
+        TextField(L10n.projectName, text: $editingName)
+            .textFieldStyle(.roundedBorder)
+            .focused($isRenameFocused)
+            .onSubmit { commitRename(row: row) }
+            .onExitCommand { editingProjectId = nil }
+            .onChange(of: isRenameFocused) { _, focused in
+                if !focused { commitRename(row: row) }
+            }
+            .task {
+                try? await Task.sleep(for: .milliseconds(50))
+                isRenameFocused = true
+            }
+    }
+
+    private func selectRow(_ row: FlatProjectRow) {
+        sidebarViewModel.selectProject(id: row.id, name: row.name)
+        viewModel.clearCurrentTranscription()
     }
 
     // MARK: - Transcription Row
@@ -145,16 +147,10 @@ struct SidebarView: View {
             TextField(L10n.title, text: $editingTranscriptionTitle)
                 .textFieldStyle(.roundedBorder)
                 .focused($isTranscriptionRenameFocused)
-                .onSubmit {
-                    commitTranscriptionRename(id: transcription.id)
-                }
-                .onExitCommand {
-                    editingTranscriptionId = nil
-                }
+                .onSubmit { commitTranscriptionRename(id: transcription.id) }
+                .onExitCommand { editingTranscriptionId = nil }
                 .onChange(of: isTranscriptionRenameFocused) { _, focused in
-                    if !focused {
-                        commitTranscriptionRename(id: transcription.id)
-                    }
+                    if !focused { commitTranscriptionRename(id: transcription.id) }
                 }
                 .task {
                     try? await Task.sleep(for: .milliseconds(50))
@@ -170,6 +166,20 @@ struct SidebarView: View {
         }
     }
 
+    @ViewBuilder
+    private func transcriptionContextMenu(_ transcription: TranscriptionRecord) -> some View {
+        Button(L10n.rename) {
+            editingTranscriptionTitle = transcription.title
+            editingTranscriptionId = transcription.id
+        }
+        Divider()
+        Button(L10n.delete, role: .destructive) {
+            sidebarViewModel.deleteTranscription(id: transcription.id)
+        }
+    }
+
+    // MARK: - Rename Commits
+
     private func commitTranscriptionRename(id: UUID) {
         guard editingTranscriptionId == id else { return }
         let trimmed = editingTranscriptionTitle.trimmingCharacters(in: .whitespaces)
@@ -177,13 +187,19 @@ struct SidebarView: View {
         editingTranscriptionId = nil
     }
 
-    private func commitRename(project: FolderProject) {
-        guard editingProjectURL == project.url else { return }
+    private func commitRename(row: FlatProjectRow) {
+        guard editingProjectId == row.id else { return }
         let trimmed = editingName.trimmingCharacters(in: .whitespaces)
-        if !trimmed.isEmpty && trimmed != project.name {
-            sidebarViewModel.renameProject(project, newName: trimmed)
+        if !trimmed.isEmpty, trimmed != row.displayName {
+            let components = row.name.split(separator: "/")
+            let newName: String = if components.count > 1 {
+                components.dropLast().joined(separator: "/") + "/" + trimmed
+            } else {
+                trimmed
+            }
+            sidebarViewModel.renameProject(id: row.id, name: row.name, newName: newName)
         }
-        editingProjectURL = nil
+        editingProjectId = nil
     }
 
     // MARK: - New Project Input
@@ -192,13 +208,9 @@ struct SidebarView: View {
         HStack {
             TextField(L10n.projectName, text: $newProjectName)
                 .textFieldStyle(.roundedBorder)
-                .onSubmit {
-                    createNewProject()
-                }
-            Button(L10n.create) {
-                createNewProject()
-            }
-            .disabled(newProjectName.trimmingCharacters(in: .whitespaces).isEmpty)
+                .onSubmit { createNewProject() }
+            Button(L10n.create) { createNewProject() }
+                .disabled(newProjectName.trimmingCharacters(in: .whitespaces).isEmpty)
             Button {
                 showNewProjectField = false
                 newProjectName = ""
@@ -226,12 +238,19 @@ struct SidebarView: View {
             viewModel.clearCurrentTranscription()
             return
         }
-        if viewModel.isListening && viewModel.currentTranscriptionId == transcriptionId { return }
+        if viewModel.isListening, viewModel.currentTranscriptionId == transcriptionId { return }
         guard !viewModel.isListening else { return }
 
         guard let dbQueue = sidebarViewModel.dbQueue,
-              let projectURL = sidebarViewModel.selectedProject?.url else { return }
-        viewModel.loadTranscription(transcriptionId, dbQueue: dbQueue, projectURL: projectURL)
+              let projectURL = sidebarViewModel.selectedProjectURL,
+              let project = sidebarViewModel.selectedProject else { return }
+        viewModel.loadTranscription(
+            transcriptionId,
+            dbQueue: dbQueue,
+            projectURL: projectURL,
+            projectId: project.id,
+            projectName: project.name
+        )
     }
 }
 
@@ -239,7 +258,7 @@ struct SidebarView: View {
 
 /// ホバー対応のプロジェクトヘッダー行。
 private struct ProjectHeaderRow: View {
-    let project: FolderProject
+    let row: FlatProjectRow
     let isSelected: Bool
     let onSelect: () -> Void
     let onDoubleClick: () -> Void
@@ -253,11 +272,11 @@ private struct ProjectHeaderRow: View {
         HStack {
             Image(systemName: isSelected ? "folder.fill" : "folder")
                 .foregroundColor(isSelected ? .accentColor : .secondary)
-            Text(project.name)
+            Text(row.displayName)
                 .font(.headline)
                 .foregroundColor(isSelected ? .primary : isHovered ? .primary : .secondary)
             Spacer()
-            if isSelected {
+            if isSelected, !row.hasChildren {
                 Image(systemName: "chevron.down")
                     .font(.caption2)
                     .foregroundColor(.secondary)

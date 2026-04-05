@@ -19,16 +19,16 @@ extension UUID {
             UInt8(truncatingIfNeeded: ms >> 16),
             UInt8(truncatingIfNeeded: ms >> 8),
             UInt8(truncatingIfNeeded: ms),
-            UInt8(0), UInt8(0),  // version + rand_a
-            UInt8(0), UInt8(0),  // variant + rand_b
+            UInt8(0), UInt8(0), // version + rand_a
+            UInt8(0), UInt8(0), // variant + rand_b
             UInt8(0), UInt8(0), UInt8(0), UInt8(0), UInt8(0), UInt8(0)
         )
 
         // ランダムビットを埋める (bytes 6..15)
         withUnsafeMutableBytes(of: &bytes) { buf in
             // bytes 6〜15 にランダム値を書き込み
-            for i in 6..<16 {
-                buf[i] = UInt8.random(in: 0...255)
+            for i in 6 ..< 16 {
+                buf[i] = UInt8.random(in: 0 ... 255)
             }
         }
 

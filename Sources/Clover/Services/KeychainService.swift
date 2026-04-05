@@ -14,14 +14,14 @@ enum KeychainService {
 
     /// エンタイトルメントが無い環境で Data Protection Keychain を使うと返されるエラーコード。
     private static let fallbackErrors: Set<OSStatus> = [
-        errSecMissingEntitlement,  // -34018
-        errSecInternalComponent,   // -2070
+        errSecMissingEntitlement, // -34018
+        errSecInternalComponent, // -2070
     ]
 
     /// Data Protection Keychain が利用���能かのプロセスライフタイムキャッシュ。
     /// 初回操作で判定し、以降は無駄な LAContext 生成と IPC を省略する。
     /// 全呼び出しサイトが @MainActor 上のため、実質的にシングルスレッドアクセス。
-    nonisolated(unsafe) private static var dataProtectionAvailable: Bool?
+    private nonisolated(unsafe) static var dataProtectionAvailable: Bool?
 
     enum KeychainError: Error {
         case unexpectedStatus(OSStatus)

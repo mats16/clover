@@ -8,11 +8,11 @@ enum AudioCaptureError: Error, LocalizedError {
     var errorDescription: String? {
         switch self {
         case .invalidHardwareFormat:
-            return L10n.invalidHardwareFormat
+            L10n.invalidHardwareFormat
         case .converterCreationFailed:
-            return L10n.converterCreationFailed
+            L10n.converterCreationFailed
         case .microphonePermissionDenied:
-            return L10n.microphoneDenied
+            L10n.microphoneDenied
         }
     }
 }
