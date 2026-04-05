@@ -91,7 +91,7 @@ enum L10n {
     static var openInEditor: String { String(localized: "Open in Editor", bundle: bundle) }
     static var openTemplatesFolder: String { String(localized: "Open Templates Folder", bundle: bundle) }
     static var resetPresets: String { String(localized: "Reset Presets", bundle: bundle) }
-    static var summaryTemplateDescription: String { String(localized: "Select a template from .clover/summary_templates/ in the vault.", bundle: bundle) }
+    static var summaryTemplateDescription: String { String(localized: "Select a template from _summarize_templates/ in the vault.", bundle: bundle) }
     static var llmConfigIncomplete: String { String(localized: "LLM configuration is incomplete. Please set endpoint, model, and API token in Settings.", bundle: bundle) }
 
     // MARK: - Error Messages (Audio)

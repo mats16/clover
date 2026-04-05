@@ -12,8 +12,9 @@ struct CloverApp: App {
             ContentView(viewModel: viewModel, sidebarViewModel: sidebarViewModel)
                 .onAppear {
                     try? AppSettings.shared.ensureVaultExists()
+                    let appDb = try? AppDatabaseManager(vaultURL: AppSettings.shared.vaultURL)
+                    sidebarViewModel.setAppDatabase(appDb)
                     viewModel.prepareAnalyzer()
-                    sidebarViewModel.loadProjects()
                 }
         }
         .windowResizability(.contentMinSize)

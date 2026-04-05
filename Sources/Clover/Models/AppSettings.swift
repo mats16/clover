@@ -171,6 +171,12 @@ final class AppSettings: ObservableObject {
     ミーティング中に挙がった課題や懸念点をまとめてください。特に、フォローアップが必要な内容を重点的にリストアップします。
     </format>
 
+    <link_to_transcripts>
+    - When referencing a point in the transcript, use the format ([[<transript_id>#02:26:04|02:26:04]])
+    - Use the timestamp that best matches the referenced statement or discussion
+    - Add these links inline for key points, decisions, action items, and open questions whenever possible
+    </link_to_transcripts>
+
     # Instructions
 
     <rules>

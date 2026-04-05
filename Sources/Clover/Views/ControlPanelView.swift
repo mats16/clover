@@ -181,8 +181,9 @@ struct ControlPanelView: View {
                     resumeRecording()
                 } else {
                     guard let dbQueue = sidebarViewModel.dbQueue,
-                          let projectURL = sidebarViewModel.selectedProject?.url else { return }
-                    viewModel.toggleListening(dbQueue: dbQueue, projectURL: projectURL)
+                          let projectURL = sidebarViewModel.selectedProjectURL,
+                          let project = sidebarViewModel.selectedProject else { return }
+                    viewModel.toggleListening(dbQueue: dbQueue, projectURL: projectURL, projectId: project.id, projectName: project.name)
                 }
             }) {
                 HStack(spacing: 4) {
@@ -198,7 +199,7 @@ struct ControlPanelView: View {
                 .cornerRadius(6)
             }
             .buttonStyle(.plain)
-            .disabled(!viewModel.analyzerReady || sidebarViewModel.selectedProject == nil)
+            .disabled(!viewModel.analyzerReady || sidebarViewModel.selectedProjectURL == nil)
             .keyboardShortcut(.space, modifiers: [])
 
             // 音声ソース選択
@@ -238,7 +239,7 @@ struct ControlPanelView: View {
             // 要約生成
             Button(action: {
                 guard let transcriptionId = viewModel.currentTranscriptionId,
-                      let projectURL = sidebarViewModel.selectedProject?.url else { return }
+                      let projectURL = sidebarViewModel.selectedProjectURL else { return }
                 let text = viewModel.store.exportForSummary()
                 Task {
                     await viewModel.generateSummary(
@@ -277,10 +278,11 @@ struct ControlPanelView: View {
 
     private func resumeRecording() {
         guard let dbQueue = sidebarViewModel.dbQueue,
-              let projectURL = sidebarViewModel.selectedProject?.url,
+              let projectURL = sidebarViewModel.selectedProjectURL,
+              let project = sidebarViewModel.selectedProject,
               let transcriptionId = viewModel.currentTranscriptionId else { return }
         Task {
-            await viewModel.startListening(dbQueue: dbQueue, projectURL: projectURL, appendingTo: transcriptionId)
+            await viewModel.startListening(dbQueue: dbQueue, projectURL: projectURL, projectId: project.id, projectName: project.name, appendingTo: transcriptionId)
         }
     }
 

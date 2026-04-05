@@ -13,17 +13,19 @@ final class TranscriptPersistenceService {
     private var persistedSegmentIds: Set<UUID> = []
 
     /// 新規文字起こしを作成して録音を開始する。
-    init(store: TranscriptStore, dbQueue: DatabaseQueue) {
+    init(store: TranscriptStore, dbQueue: DatabaseQueue, projectId: UUID) {
         self.store = store
         self.dbQueue = dbQueue
         self.transcriptionId = .v7()
 
         let transcription = TranscriptionRecord(
             id: transcriptionId,
+            projectId: projectId,
             title: "",
             startedAt: store.recordingStartTime ?? Date(),
             endedAt: nil,
-            summaryCreated: false
+            summaryCreated: false,
+            filePath: nil
         )
         try? dbQueue.write { db in
             try transcription.insert(db)
@@ -33,7 +35,7 @@ final class TranscriptPersistenceService {
     }
 
     /// 既存の文字起こしに追記する（追記モード）。
-    init(store: TranscriptStore, dbQueue: DatabaseQueue, existingTranscriptionId: UUID, existingSegmentIds: Set<UUID>) {
+    init(store: TranscriptStore, dbQueue: DatabaseQueue, projectId: UUID, existingTranscriptionId: UUID, existingSegmentIds: Set<UUID>) {
         self.store = store
         self.dbQueue = dbQueue
         self.transcriptionId = existingTranscriptionId

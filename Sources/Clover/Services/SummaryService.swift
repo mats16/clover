@@ -26,7 +26,7 @@ enum SummaryService {
         if let contextContent {
             messages.append(.init(role: "user", content: contextContent))
         }
-        messages.append(.init(role: "user", content: "<transcript>\n\(transcriptText)\n</transcript>"))
+        messages.append(.init(role: "user", content: "<transcript_id>\(transcriptionId.uuidString)</transcript_id>\n<transcript>\n\(transcriptText)\n</transcript>"))
 
         let summary = try await LLMService.chatCompletion(
             endpoint: endpoint,

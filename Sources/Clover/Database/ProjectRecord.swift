@@ -1,0 +1,49 @@
+import Foundation
+import GRDB
+
+/// プロジェクトを表す GRDB レコード。name は保管庫内の相対パス（フォルダ名）に対応する。
+struct ProjectRecord: Codable, FetchableRecord, PersistableRecord, Sendable {
+    static let databaseTableName = "projects"
+
+    var id: UUID
+    var name: String
+    var createdAt: Date
+
+    // MARK: - Shared DB Helpers
+
+    /// 複数の name を INSERT OR IGNORE で一括挿入する（name UNIQUE 制約を利用）。
+    static func upsertAll(names: [String], in db: Database) throws {
+        let now = Date()
+        for name in names {
+            let record = ProjectRecord(id: .v7(), name: name, createdAt: now)
+            try record.insert(db, onConflict: .ignore)
+        }
+    }
+
+    /// name が指定プレフィクスで始まるレコードを一括リネームする。
+    static func renameByPrefix(oldPrefix: String, newPrefix: String, in db: Database) throws {
+        if var record = try ProjectRecord
+            .filter(Column("name") == oldPrefix)
+            .fetchOne(db) {
+            record.name = newPrefix
+            try record.update(db)
+        }
+        let childPrefix = oldPrefix + "/"
+        let records = try ProjectRecord
+            .filter(Column("name").like("\(childPrefix)%"))
+            .fetchAll(db)
+        for var record in records {
+            record.name = newPrefix + record.name.dropFirst(oldPrefix.count)
+            try record.update(db)
+        }
+    }
+
+    /// パス文字列から中間パスを含む全パスを生成する。
+    /// 例: "a/b/c" → ["a", "a/b", "a/b/c"]
+    static func allIntermediatePaths(for name: String) -> [String] {
+        let components = name.split(separator: "/")
+        return (1...components.count).map { i in
+            components[0..<i].joined(separator: "/")
+        }
+    }
+}
