@@ -6,11 +6,11 @@ struct SidebarView: View {
     @ObservedObject var sidebarViewModel: SidebarViewModel
     var columnVisibility: NavigationSplitViewVisibility = .all
     @State private var editingProjectId: UUID?
-    @State private var editingName: String = ""
+    @State private var editingName = ""
     @State private var editingTranscriptionId: UUID?
-    @State private var editingTranscriptionTitle: String = ""
-    @State private var showNewProjectField: Bool = false
-    @State private var newProjectName: String = ""
+    @State private var editingTranscriptionTitle = ""
+    @State private var showNewProjectField = false
+    @State private var newProjectName = ""
     @FocusState private var isRenameFocused: Bool
     @FocusState private var isTranscriptionRenameFocused: Bool
 
@@ -190,13 +190,12 @@ struct SidebarView: View {
     private func commitRename(row: FlatProjectRow) {
         guard editingProjectId == row.id else { return }
         let trimmed = editingName.trimmingCharacters(in: .whitespaces)
-        if !trimmed.isEmpty && trimmed != row.displayName {
+        if !trimmed.isEmpty, trimmed != row.displayName {
             let components = row.name.split(separator: "/")
-            let newName: String
-            if components.count > 1 {
-                newName = components.dropLast().joined(separator: "/") + "/" + trimmed
+            let newName: String = if components.count > 1 {
+                components.dropLast().joined(separator: "/") + "/" + trimmed
             } else {
-                newName = trimmed
+                trimmed
             }
             sidebarViewModel.renameProject(id: row.id, name: row.name, newName: newName)
         }
@@ -239,7 +238,7 @@ struct SidebarView: View {
             viewModel.clearCurrentTranscription()
             return
         }
-        if viewModel.isListening && viewModel.currentTranscriptionId == transcriptionId { return }
+        if viewModel.isListening, viewModel.currentTranscriptionId == transcriptionId { return }
         guard !viewModel.isListening else { return }
 
         guard let dbQueue = sidebarViewModel.dbQueue,
@@ -277,7 +276,7 @@ private struct ProjectHeaderRow: View {
                 .font(.headline)
                 .foregroundColor(isSelected ? .primary : isHovered ? .primary : .secondary)
             Spacer()
-            if isSelected && !row.hasChildren {
+            if isSelected, !row.hasChildren {
                 Image(systemName: "chevron.down")
                     .font(.caption2)
                     .foregroundColor(.secondary)

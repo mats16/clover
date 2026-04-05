@@ -26,7 +26,10 @@ enum SummaryService {
         if let contextContent {
             messages.append(.init(role: "user", content: contextContent))
         }
-        messages.append(.init(role: "user", content: "<transcript_id>\(transcriptionId.uuidString)</transcript_id>\n<transcript>\n\(transcriptText)\n</transcript>"))
+        messages.append(.init(
+            role: "user",
+            content: "<transcript_id>\(transcriptionId.uuidString)</transcript_id>\n<transcript>\n\(transcriptText)\n</transcript>"
+        ))
 
         let summary = try await LLMService.chatCompletion(
             endpoint: endpoint,
@@ -40,7 +43,7 @@ enum SummaryService {
         formatter.formatOptions = [.withInternetDateTime]
         let dateString = formatter.string(from: startedAt)
         // タグ: 常に transcription-summary を含め、CONTEXT.md の tags をマージ
-        var tags: [String] = ["transcription-summary"]
+        var tags = ["transcription-summary"]
         if let contextContent {
             for tag in parseFrontmatterTags(from: contextContent) where !tags.contains(tag) {
                 tags.append(tag)
@@ -131,7 +134,7 @@ enum SummaryService {
             return []
         }
 
-        let frontmatterLines = lines[1..<closingIndex]
+        let frontmatterLines = lines[1 ..< closingIndex]
 
         guard let tagsLineIndex = frontmatterLines.firstIndex(where: {
             $0.trimmingCharacters(in: .whitespaces) == "tags:"

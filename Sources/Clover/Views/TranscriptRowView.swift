@@ -36,9 +36,9 @@ struct TranscriptRowView: View {
 
     private func speakerDisplayName(for label: String) -> String {
         switch label {
-        case "mic": return L10n.mic
-        case "system": return L10n.system
-        default: return label
+        case "mic": L10n.mic
+        case "system": L10n.system
+        default: label
         }
     }
 
@@ -51,17 +51,16 @@ struct TranscriptRowView: View {
         default:
             let colors: [Color] = [.blue, .orange, .green, .purple, .pink, .teal, .indigo, .brown]
             let suffix = label.replacingOccurrences(of: "話者", with: "")
-            let index: Int
-            switch suffix {
-            case "A": index = 0
-            case "B": index = 1
-            case "C": index = 2
-            case "D": index = 3
-            case "E": index = 4
-            case "F": index = 5
-            case "G": index = 6
-            case "H": index = 7
-            default: index = (Int(suffix) ?? 1) - 1
+            let index: Int = switch suffix {
+            case "A": 0
+            case "B": 1
+            case "C": 2
+            case "D": 3
+            case "E": 4
+            case "F": 5
+            case "G": 6
+            case "H": 7
+            default: (Int(suffix) ?? 1) - 1
             }
             return colors[index % colors.count]
         }

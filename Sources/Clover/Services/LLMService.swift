@@ -2,7 +2,7 @@ import Foundation
 
 /// OpenAI 互換の Chat Completions API を呼び出すサービス。
 enum LLMService {
-    struct ChatMessage: Codable, Sendable {
+    struct ChatMessage: Codable {
         let role: String
         let content: String
     }
@@ -34,8 +34,10 @@ enum LLMService {
                     }
                 }
             }
+
             let message: Message
         }
+
         let choices: [Choice]
     }
 
@@ -71,7 +73,7 @@ enum LLMService {
         guard let httpResponse = response as? HTTPURLResponse else {
             throw LLMError.unexpectedResponse
         }
-        guard (200...299).contains(httpResponse.statusCode) else {
+        guard (200 ... 299).contains(httpResponse.statusCode) else {
             let detail = String(data: data, encoding: .utf8) ?? ""
             throw LLMError.httpError(statusCode: httpResponse.statusCode, detail: detail)
         }
@@ -92,13 +94,13 @@ enum LLMService {
         var errorDescription: String? {
             switch self {
             case .invalidEndpointURL:
-                return L10n.llmErrorInvalidURL
+                L10n.llmErrorInvalidURL
             case .unexpectedResponse:
-                return L10n.llmErrorUnexpectedResponse
-            case .httpError(let statusCode, let detail):
-                return L10n.llmErrorHTTP(statusCode, detail)
+                L10n.llmErrorUnexpectedResponse
+            case let .httpError(statusCode, detail):
+                L10n.llmErrorHTTP(statusCode, detail)
             case .emptyResponse:
-                return L10n.llmErrorEmptyResponse
+                L10n.llmErrorEmptyResponse
             }
         }
     }

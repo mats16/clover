@@ -11,8 +11,8 @@ struct ToolbarIconButtonStyle: ButtonStyle {
             .background(
                 RoundedRectangle(cornerRadius: 5)
                     .fill(configuration.isPressed
-                          ? Color.primary.opacity(0.15)
-                          : isHovered ? Color.primary.opacity(0.08) : Color.clear)
+                        ? Color.primary.opacity(0.15)
+                        : isHovered ? Color.primary.opacity(0.08) : Color.clear)
             )
             .onHover { hovering in
                 isHovered = hovering
@@ -282,7 +282,13 @@ struct ControlPanelView: View {
               let project = sidebarViewModel.selectedProject,
               let transcriptionId = viewModel.currentTranscriptionId else { return }
         Task {
-            await viewModel.startListening(dbQueue: dbQueue, projectURL: projectURL, projectId: project.id, projectName: project.name, appendingTo: transcriptionId)
+            await viewModel.startListening(
+                dbQueue: dbQueue,
+                projectURL: projectURL,
+                projectId: project.id,
+                projectName: project.name,
+                appendingTo: transcriptionId
+            )
         }
     }
 
@@ -290,21 +296,21 @@ struct ControlPanelView: View {
 
     private var recordButtonIcon: String {
         if viewModel.isListening {
-            return "stop.fill"
+            "stop.fill"
         } else if viewModel.isViewingHistory {
-            return "arrow.counterclockwise"
+            "arrow.counterclockwise"
         } else {
-            return "circle.fill"
+            "circle.fill"
         }
     }
 
     private var recordButtonLabel: String {
         if viewModel.isListening {
-            return L10n.stop
+            L10n.stop
         } else if viewModel.isViewingHistory {
-            return L10n.resume
+            L10n.resume
         } else {
-            return L10n.record
+            L10n.record
         }
     }
 

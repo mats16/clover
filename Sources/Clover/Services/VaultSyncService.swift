@@ -1,5 +1,5 @@
-import Foundation
 import CoreServices
+import Foundation
 import GRDB
 
 /// 保管庫ディレクトリとの同期を管理する。
@@ -157,10 +157,10 @@ final class VaultSyncService: @unchecked Sendable {
             let first = pendingRenames[i]
             let second = pendingRenames[i + 1]
 
-            if !first.exists && second.exists {
+            if !first.exists, second.exists {
                 renameProjectsByPrefix(oldPrefix: first.path, newPrefix: second.path)
                 i += 2
-            } else if first.exists && !second.exists {
+            } else if first.exists, !second.exists {
                 renameProjectsByPrefix(oldPrefix: second.path, newPrefix: first.path)
                 i += 2
             } else {
@@ -168,7 +168,7 @@ final class VaultSyncService: @unchecked Sendable {
                 i += 1
             }
         }
-        if i < pendingRenames.count && pendingRenames[i].exists {
+        if i < pendingRenames.count, pendingRenames[i].exists {
             newDirs.append(pendingRenames[i].path)
         }
 
@@ -187,12 +187,12 @@ final class VaultSyncService: @unchecked Sendable {
 // MARK: - C Callback
 
 private func fsEventsCallback(
-    streamRef: ConstFSEventStreamRef,
+    streamRef _: ConstFSEventStreamRef,
     clientCallBackInfo: UnsafeMutableRawPointer?,
     numEvents: Int,
     eventPaths: UnsafeMutableRawPointer,
     eventFlags: UnsafePointer<FSEventStreamEventFlags>,
-    eventIds: UnsafePointer<FSEventStreamEventId>
+    eventIds _: UnsafePointer<FSEventStreamEventId>
 ) {
     guard let info = clientCallBackInfo else { return }
     let service = Unmanaged<VaultSyncService>.fromOpaque(info).takeUnretainedValue()
@@ -201,7 +201,7 @@ private func fsEventsCallback(
     var paths: [String] = []
     var flags: [UInt32] = []
 
-    for i in 0..<numEvents {
+    for i in 0 ..< numEvents {
         if let cfPath = CFArrayGetValueAtIndex(cfPaths, i) {
             let path = Unmanaged<CFString>.fromOpaque(cfPath).takeUnretainedValue() as String
             paths.append(path)

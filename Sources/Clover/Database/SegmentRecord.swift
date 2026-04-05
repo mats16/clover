@@ -2,7 +2,7 @@ import Foundation
 import GRDB
 
 /// 文字起こしセグメントを表す GRDB レコード。
-struct SegmentRecord: Codable, FetchableRecord, PersistableRecord, Sendable {
+struct SegmentRecord: Codable, FetchableRecord, PersistableRecord {
     static let databaseTableName = "segments"
 
     var id: UUID

@@ -45,7 +45,7 @@ struct ProjectNode: Identifiable {
         // ルートノード群を構築
         var roots: [ProjectNode] = []
 
-        // 再帰的にノードを挿入する
+        /// 再帰的にノードを挿入する
         func insertNode(_ record: ProjectRecord) {
             let components = record.name.split(separator: "/").map(String.init)
             insertInto(nodes: &roots, components: components, depth: 0, record: record)
@@ -54,7 +54,7 @@ struct ProjectNode: Identifiable {
         func insertInto(nodes: inout [ProjectNode], components: [String], depth: Int, record: ProjectRecord) {
             guard depth < components.count else { return }
 
-            let pathUpToDepth = components[0...depth].joined(separator: "/")
+            let pathUpToDepth = components[0 ... depth].joined(separator: "/")
             let isLeaf = depth == components.count - 1
 
             if let existingIndex = nodes.firstIndex(where: { $0.name == pathUpToDepth }) {

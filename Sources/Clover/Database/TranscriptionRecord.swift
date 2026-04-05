@@ -2,7 +2,7 @@ import Foundation
 import GRDB
 
 /// 文字起こしセッションを表す GRDB レコード。
-struct TranscriptionRecord: Codable, FetchableRecord, PersistableRecord, Sendable {
+struct TranscriptionRecord: Codable, FetchableRecord, PersistableRecord {
     static let databaseTableName = "transcripts"
 
     var id: UUID

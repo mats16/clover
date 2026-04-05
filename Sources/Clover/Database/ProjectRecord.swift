@@ -2,7 +2,7 @@ import Foundation
 import GRDB
 
 /// プロジェクトを表す GRDB レコード。name は保管庫内の相対パス（フォルダ名）に対応する。
-struct ProjectRecord: Codable, FetchableRecord, PersistableRecord, Sendable {
+struct ProjectRecord: Codable, FetchableRecord, PersistableRecord {
     static let databaseTableName = "projects"
 
     var id: UUID
@@ -54,8 +54,8 @@ struct ProjectRecord: Codable, FetchableRecord, PersistableRecord, Sendable {
     /// 例: "a/b/c" → ["a", "a/b", "a/b/c"]
     static func allIntermediatePaths(for name: String) -> [String] {
         let components = name.split(separator: "/")
-        return (1...components.count).map { i in
-            components[0..<i].joined(separator: "/")
+        return (1 ... components.count).map { i in
+            components[0 ..< i].joined(separator: "/")
         }
     }
 }

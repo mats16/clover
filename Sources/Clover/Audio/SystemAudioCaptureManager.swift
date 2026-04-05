@@ -9,17 +9,17 @@ enum AudioSourceMode: String, CaseIterable {
 
     var label: String {
         switch self {
-        case .microphone: return L10n.mic
-        case .systemAudio: return L10n.system
-        case .both: return L10n.both
+        case .microphone: L10n.mic
+        case .systemAudio: L10n.system
+        case .both: L10n.both
         }
     }
 
     var iconName: String {
         switch self {
-        case .microphone: return "mic.fill"
-        case .systemAudio: return "speaker.wave.2.fill"
-        case .both: return "person.wave.2.fill"
+        case .microphone: "mic.fill"
+        case .systemAudio: "speaker.wave.2.fill"
+        case .both: "person.wave.2.fill"
         }
     }
 }
@@ -31,9 +31,9 @@ enum SystemAudioCaptureError: Error, LocalizedError {
     var errorDescription: String? {
         switch self {
         case .screenRecordingPermissionDenied:
-            return L10n.screenRecordingDenied
+            L10n.screenRecordingDenied
         case .noDisplayFound:
-            return L10n.noDisplayFound
+            L10n.noDisplayFound
         }
     }
 }
@@ -154,7 +154,7 @@ final class SystemAudioCaptureManager: NSObject, @unchecked Sendable {
 // MARK: - SCStreamOutput
 
 extension SystemAudioCaptureManager: SCStreamOutput {
-    func stream(_ stream: SCStream, didOutputSampleBuffer sampleBuffer: CMSampleBuffer, of type: SCStreamOutputType) {
+    func stream(_: SCStream, didOutputSampleBuffer sampleBuffer: CMSampleBuffer, of type: SCStreamOutputType) {
         guard type == .audio else { return }
         processAudioSampleBuffer(sampleBuffer)
     }
@@ -163,7 +163,7 @@ extension SystemAudioCaptureManager: SCStreamOutput {
 // MARK: - SCStreamDelegate
 
 extension SystemAudioCaptureManager: SCStreamDelegate {
-    func stream(_ stream: SCStream, didStopWithError error: Error) {
+    func stream(_: SCStream, didStopWithError error: Error) {
         self.stream = nil
         converter = nil
         sourceFormat = nil

@@ -1,5 +1,5 @@
-import Foundation
 import Combine
+import Foundation
 import GRDB
 
 /// 文字起こし結果を GRDB/SQLite にリアルタイム保存するサービス。
@@ -35,7 +35,7 @@ final class TranscriptPersistenceService {
     }
 
     /// 既存の文字起こしに追記する（追記モード）。
-    init(store: TranscriptStore, dbQueue: DatabaseQueue, projectId: UUID, existingTranscriptionId: UUID, existingSegmentIds: Set<UUID>) {
+    init(store: TranscriptStore, dbQueue: DatabaseQueue, projectId _: UUID, existingTranscriptionId: UUID, existingSegmentIds: Set<UUID>) {
         self.store = store
         self.dbQueue = dbQueue
         self.transcriptionId = existingTranscriptionId
@@ -67,7 +67,7 @@ final class TranscriptPersistenceService {
         guard !newConfirmed.isEmpty else { return }
 
         let records = newConfirmed.map { SegmentRecord(from: $0, transcriptionId: transcriptionId) }
-        let newIds = Set(newConfirmed.map { $0.id })
+        let newIds = Set(newConfirmed.map(\.id))
         persistedSegmentIds.formUnion(newIds)
 
         let queue = dbQueue

@@ -1,5 +1,5 @@
-import SwiftUI
 import AppKit
+import SwiftUI
 
 /// Markdown ファイルを開くエディタの選択肢。
 enum MarkdownEditor: String, CaseIterable, Identifiable {
@@ -13,21 +13,21 @@ enum MarkdownEditor: String, CaseIterable, Identifiable {
 
     var displayName: String {
         switch self {
-        case .system:      return L10n.systemDefault
-        case .obsidian:    return "Obsidian"
-        case .vscode:      return "Visual Studio Code"
-        case .cursor:      return "Cursor"
-        case .antigravity: return "Antigravity"
+        case .system: L10n.systemDefault
+        case .obsidian: "Obsidian"
+        case .vscode: "Visual Studio Code"
+        case .cursor: "Cursor"
+        case .antigravity: "Antigravity"
         }
     }
 
     var bundleIdentifier: String? {
         switch self {
-        case .system:      return nil
-        case .obsidian:    return "md.obsidian"
-        case .vscode:      return "com.microsoft.VSCode"
-        case .cursor:      return "com.todesktop.230313mzl4w4u92"
-        case .antigravity: return "com.google.antigravity"
+        case .system: nil
+        case .obsidian: "md.obsidian"
+        case .vscode: "com.microsoft.VSCode"
+        case .cursor: "com.todesktop.230313mzl4w4u92"
+        case .antigravity: "com.google.antigravity"
         }
     }
 
@@ -73,11 +73,13 @@ final class AppSettings: ObservableObject {
     static let shared = AppSettings()
 
     // MARK: - 音声認識設定
+
     @AppStorage("transcriptionLocale") var transcriptionLocale: String = Locale.current.identifier
 
     // MARK: - 表示言語設定
+
     /// 言語選択ピッカーに表示する言語の識別子（JSON配列）。空文字列の場合は全言語を表示。
-    @AppStorage("enabledLocaleIdentifiers") var enabledLocaleIdentifiersJSON: String = ""
+    @AppStorage("enabledLocaleIdentifiers") var enabledLocaleIdentifiersJSON = ""
 
     var enabledLocaleIdentifiers: Set<String> {
         get {
@@ -107,6 +109,7 @@ final class AppSettings: ObservableObject {
     }
 
     // MARK: - Markdown エディタ設定
+
     @AppStorage("markdownEditor") var markdownEditorRawValue: String = MarkdownEditor.system.rawValue
 
     var markdownEditor: MarkdownEditor {
@@ -115,14 +118,13 @@ final class AppSettings: ObservableObject {
     }
 
     // MARK: - 保管庫設定
+
     @AppStorage("vaultPath") var vaultPath: String = AppSettings.defaultVaultPath
 
-    nonisolated static let defaultVaultPath: String = {
-        FileManager.default.homeDirectoryForCurrentUser
-            .appendingPathComponent("Documents")
-            .appendingPathComponent("Obsidian Vault")
-            .path
-    }()
+    nonisolated static let defaultVaultPath: String = FileManager.default.homeDirectoryForCurrentUser
+        .appendingPathComponent("Documents")
+        .appendingPathComponent("Obsidian Vault")
+        .path
 
     var vaultURL: URL {
         URL(fileURLWithPath: vaultPath, isDirectory: true)
@@ -138,11 +140,11 @@ final class AppSettings: ObservableObject {
 
     // MARK: - LLM 設定
 
-    @AppStorage("llmEndpointURL") var llmEndpointURL: String = ""
-    @AppStorage("llmModelName") var llmModelName: String = ""
-    @AppStorage("llmAutoSummaryEnabled") var llmAutoSummaryEnabled: Bool = false
+    @AppStorage("llmEndpointURL") var llmEndpointURL = ""
+    @AppStorage("llmModelName") var llmModelName = ""
+    @AppStorage("llmAutoSummaryEnabled") var llmAutoSummaryEnabled = false
     @AppStorage("llmSummaryPrompt") var llmSummaryPrompt: String = AppSettings.defaultSummaryPrompt
-    @AppStorage("selectedTemplateName") var selectedTemplateName: String = "customer_meeting"
+    @AppStorage("selectedTemplateName") var selectedTemplateName = "customer_meeting"
 
     /// プリセットテンプレート名と内容のマッピング。
     nonisolated static let presetTemplates: [String: String] = [
@@ -150,7 +152,7 @@ final class AppSettings: ObservableObject {
     ]
 
     // swiftlint:disable:next line_length
-    nonisolated static let defaultSummaryPrompt: String = """
+    nonisolated static let defaultSummaryPrompt = """
     # Role and Objective
     You are a meeting analyst. Extract a structured summary from the provided <transcript>.
 

@@ -27,7 +27,7 @@ enum TranscriptExportService {
 
         let dateString = dateFormatter.string(from: startedAt)
 
-        let frontmatter: String = """
+        let frontmatter = """
         ---
         project: "\(projectName)"
         date: "\(dateString)"

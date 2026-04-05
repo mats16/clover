@@ -1,17 +1,18 @@
-import SwiftUI
 import Combine
-import Speech
 import GRDB
+import Speech
+import SwiftUI
 
 /// 音声キャプチャ → Speech フレームワーク文字起こし → UI 更新を統括するビューモデル。
 @MainActor
 final class CaptionViewModel: ObservableObject {
+
     // MARK: - Published State
 
     @Published var store = TranscriptStore()
-    @Published var isListening: Bool = false
-    @Published var analyzerReady: Bool = false
-    @Published var isPreparingAnalyzer: Bool = false
+    @Published var isListening = false
+    @Published var analyzerReady = false
+    @Published var isPreparingAnalyzer = false
     @Published var errorMessage: String?
     @Published var audioSourceMode: AudioSourceMode = .both
     @Published var selectedLocale: String = AppSettings.shared.transcriptionLocale
@@ -27,7 +28,7 @@ final class CaptionViewModel: ObservableObject {
 
     // MARK: - Summary State
 
-    @Published var isSummaryGenerating: Bool = false
+    @Published var isSummaryGenerating = false
     @Published var summaryError: String?
     @Published var lastSummaryURL: URL?
 
@@ -219,7 +220,13 @@ final class CaptionViewModel: ObservableObject {
     }
 
     /// 新規文字起こしで録音を開始する。
-    func startListening(dbQueue: DatabaseQueue, projectURL: URL, projectId: UUID, projectName: String? = nil, appendingTo existingTranscriptionId: UUID? = nil) async {
+    func startListening(
+        dbQueue: DatabaseQueue,
+        projectURL: URL,
+        projectId: UUID,
+        projectName: String? = nil,
+        appendingTo existingTranscriptionId: UUID? = nil
+    ) async {
         self.currentProjectURL = projectURL
         self.currentProjectId = projectId
         self.currentProjectName = projectName

@@ -1,11 +1,12 @@
-import Foundation
-import SwiftUI
 import Combine
+import Foundation
 import GRDB
+import SwiftUI
 
 /// サイドバーの状態管理。DB 駆動の階層プロジェクトツリーと文字起こし一覧を管理する。
 @MainActor
 final class SidebarViewModel: ObservableObject {
+
     // MARK: - Published State
 
     @Published var projectTree: [ProjectNode] = []

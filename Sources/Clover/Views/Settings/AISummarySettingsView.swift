@@ -58,7 +58,7 @@ struct AISummarySettingsView: View {
                         Label(L10n.connectionSuccess, systemImage: "checkmark.circle.fill")
                             .font(.caption)
                             .foregroundColor(.green)
-                    case .failure(let message):
+                    case let .failure(message):
                         Label(message, systemImage: "xmark.circle.fill")
                             .font(.caption)
                             .foregroundColor(.red)

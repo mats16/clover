@@ -1,5 +1,5 @@
-import Foundation
 import CoreServices
+import Foundation
 import GRDB
 
 /// `_transcripts/` ディレクトリを FSEvents で監視し、
@@ -97,17 +97,17 @@ final class TranscriptFileWatcher: Sendable {
 // MARK: - FSEvents C コールバック
 
 private func transcriptFileWatcherCallback(
-    streamRef: ConstFSEventStreamRef,
+    streamRef _: ConstFSEventStreamRef,
     clientCallBackInfo: UnsafeMutableRawPointer?,
     numEvents: Int,
-    eventPaths: UnsafeMutableRawPointer,
+    eventPaths _: UnsafeMutableRawPointer,
     eventFlags: UnsafePointer<FSEventStreamEventFlags>,
-    eventIds: UnsafePointer<FSEventStreamEventId>
+    eventIds _: UnsafePointer<FSEventStreamEventId>
 ) {
     guard let clientCallBackInfo else { return }
     let watcher = Unmanaged<TranscriptFileWatcher>.fromOpaque(clientCallBackInfo).takeUnretainedValue()
 
-    for i in 0..<numEvents {
+    for i in 0 ..< numEvents {
         if eventFlags[i] & UInt32(kFSEventStreamEventFlagItemRemoved) != 0 {
             watcher.reconcileFilePaths()
             return
