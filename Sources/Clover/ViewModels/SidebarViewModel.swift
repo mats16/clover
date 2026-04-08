@@ -128,8 +128,11 @@ final class SidebarViewModel: ObservableObject {
     // MARK: - Selection
 
     func selectProject(id: UUID, name: String) {
-        guard selectedProject?.id != id else { return }
         guard let vault = currentVault else { return }
+        if selectedProject?.id == id {
+            selectedTranscriptionId = nil
+            return
+        }
         selectedProject = ProjectRecord(id: id, vaultId: vault.id, name: name, createdAt: .distantPast)
         selectedTranscriptionId = nil
         observeTranscriptions()
