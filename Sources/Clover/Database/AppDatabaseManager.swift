@@ -2,25 +2,54 @@ import Foundation
 import GRDB
 
 /// アプリ全体で単一の SQLite データベースを管理する。
-/// 保管庫ルートに `.transcriptions.sqlite` を作成・オープンする。
+/// `~/Library/Application Support/Clover/clover.sqlite` に配置する。
 final class AppDatabaseManager: Sendable {
     let dbQueue: DatabaseQueue
 
-    init(vaultURL: URL) throws {
-        let dbPath = vaultURL.appendingPathComponent(".transcriptions.sqlite")
-        dbQueue = try DatabaseQueue(path: dbPath.path)
+    /// アプリケーションサポートディレクトリに DB を作成・オープンする。
+    init() throws {
+        let dbURL = Self.databaseURL
+        try FileManager.default.createDirectory(
+            at: dbURL.deletingLastPathComponent(),
+            withIntermediateDirectories: true
+        )
+        dbQueue = try DatabaseQueue(path: dbURL.path)
         try Self.migrator.migrate(dbQueue)
+    }
+
+    /// DB ファイルの URL。
+    nonisolated static var databaseURL: URL {
+        FileManager.default
+            .urls(for: .applicationSupportDirectory, in: .userDomainMask).first!
+            .appendingPathComponent("Clover")
+            .appendingPathComponent("clover.sqlite")
     }
 
     private static var migrator: DatabaseMigrator {
         var migrator = DatabaseMigrator()
 
         migrator.registerMigration("v1_consolidatedSchema") { db in
+            try db.create(table: "vaults") { t in
+                t.primaryKey("id", .blob)
+                t.column("path", .text).notNull().unique()
+                t.column("name", .text).notNull()
+                t.column("createdAt", .datetime).notNull()
+                t.column("lastOpenedAt", .datetime).notNull()
+            }
+
             try db.create(table: "projects") { t in
                 t.primaryKey("id", .blob)
-                t.column("name", .text).notNull().unique()
+                t.column("vaultId", .blob).notNull()
+                    .references("vaults", onDelete: .cascade)
+                t.column("name", .text).notNull()
                 t.column("createdAt", .datetime).notNull()
+                t.uniqueKey(["vaultId", "name"])
             }
+            try db.create(
+                index: "projects_on_vaultId",
+                on: "projects",
+                columns: ["vaultId"]
+            )
 
             try db.create(table: "transcripts") { t in
                 t.primaryKey("id", .blob)
@@ -57,6 +86,35 @@ final class AppDatabaseManager: Sendable {
                 index: "segments_on_transcriptionId_startTime",
                 on: "segments",
                 columns: ["transcriptionId", "startTime"]
+            )
+        }
+
+        migrator.registerMigration("v2_notesAndScreenshots") { db in
+            try db.create(table: "notes") { t in
+                t.primaryKey("id", .blob)
+                t.column("transcriptionId", .blob).notNull()
+                    .references("transcripts", onDelete: .cascade)
+                t.column("text", .text).notNull()
+                t.column("createdAt", .datetime).notNull()
+                t.column("updatedAt", .datetime).notNull()
+            }
+            try db.create(
+                index: "notes_on_transcriptionId",
+                on: "notes",
+                columns: ["transcriptionId"]
+            )
+
+            try db.create(table: "screenshots") { t in
+                t.primaryKey("id", .blob)
+                t.column("transcriptionId", .blob).notNull()
+                    .references("transcripts", onDelete: .cascade)
+                t.column("capturedAt", .datetime).notNull()
+                t.column("imageData", .blob).notNull()
+            }
+            try db.create(
+                index: "screenshots_on_transcriptionId",
+                on: "screenshots",
+                columns: ["transcriptionId"]
             )
         }
 

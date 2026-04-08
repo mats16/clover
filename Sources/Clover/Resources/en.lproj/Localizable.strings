@@ -20,6 +20,12 @@
 "Export" = "Export";
 "Clear transcription" = "Clear transcription";
 
+/* Detail Tabs */
+"Summary" = "Summary";
+"Notes" = "Notes";
+"Screenshots" = "Screenshots";
+"Transcript" = "Transcript";
+
 /* Audio Source Mode */
 "Mic" = "Mic";
 "System" = "System";
@@ -29,8 +35,14 @@
 "General" = "General";
 "AI Summary" = "AI Summary";
 "Vault" = "Vault";
-"Change..." = "Change...";
-"Root directory where project folders are stored." = "Root directory where project folders are stored.";
+
+/* Vault Picker */
+"Create New Vault" = "Create New Vault";
+"Create a new folder to use as a vault." = "Create a new folder to use as a vault.";
+"Open Folder as Vault" = "Open Folder as Vault";
+"Select an existing folder to use as a vault." = "Select an existing folder to use as a vault.";
+"Remove Vault" = "Remove Vault";
+"Open" = "Open";
 "Loading supported languages..." = "Loading supported languages...";
 "Search languages..." = "Search languages...";
 "No matching languages" = "No matching languages";
@@ -89,6 +101,11 @@
 "Failed to change language: %@" = "Failed to change language: %@";
 "Speech recognition is not ready" = "Speech recognition is not ready";
 "System audio capture stopped" = "System audio capture stopped";
+
+/* Sidebar Footer */
+"Switch Vault" = "Switch Vault";
+"Manage Vaults..." = "Manage Vaults...";
+"Settings" = "Settings";
 
 /* Keychain */
 "Authenticate to access your API token stored in Keychain." = "Authenticate to access your API token stored in Keychain.";

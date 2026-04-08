@@ -15,15 +15,18 @@ final class SidebarViewModel: ObservableObject {
     @Published var selectedTranscriptionId: UUID?
     @Published var transcriptionsForSelectedProject: [TranscriptionRecord] = []
     @Published var lastError: String?
+    @Published var allVaults: [VaultRecord] = []
 
-    // MARK: - Active Database
+    // MARK: - Active Database & Vault
 
     private(set) var appDatabase: AppDatabaseManager?
+    /// 現在の保管庫。AppSettings.shared.currentVault から委譲。
+    var currentVault: VaultRecord? { AppSettings.shared.currentVault }
     var dbQueue: DatabaseQueue? { appDatabase?.dbQueue }
 
     /// プロジェクト名から vault 内の URL を返す。
     func projectURL(for name: String) -> URL {
-        AppSettings.shared.vaultURL.appendingPathComponent(name, isDirectory: true)
+        currentVault!.url.appendingPathComponent(name, isDirectory: true)
     }
 
     /// 現在選択中のプロジェクトの vault 内 URL。
@@ -35,24 +38,18 @@ final class SidebarViewModel: ObservableObject {
     private let folderService = FolderProjectService()
     private var transcriptionRepository: TranscriptionRepository?
     private var fileWatcher: TranscriptFileWatcher?
-    private var vaultPathCancellable: AnyCancellable?
     private var transcriptionObservation: AnyDatabaseCancellable?
     private var projectObservation: AnyDatabaseCancellable?
+    private var vaultObservation: AnyDatabaseCancellable?
     private var vaultSyncService: VaultSyncService?
 
-    init() {
-        // 保管庫パスの変更を監視してプロジェクト一覧を再読み込み
-        vaultPathCancellable = UserDefaults.standard
-            .publisher(for: \.vaultPath)
-            .removeDuplicates()
-            .dropFirst()
-            .receive(on: RunLoop.main)
-            .sink { [weak self] (_: String?) in
-                self?.handleVaultPathChanged()
-            }
+    /// 保管庫の最終オープン日時を更新する。
+    func updateVaultLastOpened(_ id: UUID) {
+        try? transcriptionRepository?.updateVaultLastOpened(id: id)
     }
 
-    /// アプリ起動時に AppDatabaseManager を設定する。
+    /// アプリ起動時に AppDatabaseManager と保管庫を設定する。
+    /// 呼び出し前に AppSettings.shared.currentVault を設定しておくこと。
     func setAppDatabase(_ database: AppDatabaseManager?) {
         appDatabase = database
         transcriptionRepository = database.map { TranscriptionRepository(dbQueue: $0.dbQueue) }
@@ -60,19 +57,43 @@ final class SidebarViewModel: ObservableObject {
         // 既存の監視を停止
         vaultSyncService?.stopMonitoring()
         projectObservation?.cancel()
+        vaultObservation?.cancel()
         fileWatcher?.stopMonitoring()
 
-        guard let dbQueue = database?.dbQueue else {
+        // 選択状態をリセット
+        selectedProject = nil
+        selectedTranscriptionId = nil
+        transcriptionsForSelectedProject = []
+        transcriptionObservation = nil
+
+        // vaults テーブルの ValueObservation で保管庫一覧を自動更新
+        if let dbQueue = database?.dbQueue {
+            let vaultObs = ValueObservation.tracking { db in
+                try VaultRecord.order(Column("lastOpenedAt").desc).fetchAll(db)
+            }
+            vaultObservation = vaultObs.start(
+                in: dbQueue,
+                onError: { _ in },
+                onChange: { [weak self] vaults in
+                    Task { @MainActor in self?.allVaults = vaults }
+                }
+            )
+        }
+
+        guard let dbQueue = database?.dbQueue,
+              let vault = currentVault else {
             vaultSyncService = nil
             fileWatcher = nil
             projectTree = []
+            flatProjects = []
             return
         }
 
-        let vaultURL = AppSettings.shared.vaultURL
+        let vaultURL = vault.url
+        let vaultId = vault.id
 
         // VaultSyncService: 初期同期（バックグラウンド） + FSEvents 監視
-        let syncService = VaultSyncService(vaultURL: vaultURL, dbQueue: dbQueue)
+        let syncService = VaultSyncService(vaultURL: vaultURL, dbQueue: dbQueue, vaultId: vaultId)
         vaultSyncService = syncService
         Task.detached(priority: .userInitiated) {
             syncService.performInitialSync()
@@ -84,9 +105,12 @@ final class SidebarViewModel: ObservableObject {
         watcher.startMonitoring()
         fileWatcher = watcher
 
-        // projects テーブルの ValueObservation でツリーを自動更新
+        // projects テーブルの ValueObservation でツリーを自動更新（vaultId でフィルタ）
         let observation = ValueObservation.tracking { db in
-            try ProjectRecord.order(Column("name").asc).fetchAll(db)
+            try ProjectRecord
+                .filter(Column("vaultId") == vaultId)
+                .order(Column("name").asc)
+                .fetchAll(db)
         }
         projectObservation = observation.start(
             in: dbQueue,
@@ -101,27 +125,12 @@ final class SidebarViewModel: ObservableObject {
         )
     }
 
-    private func handleVaultPathChanged() {
-        selectedProject = nil
-        selectedTranscriptionId = nil
-        transcriptionsForSelectedProject = []
-        transcriptionObservation = nil
-
-        // 新しい vault パスで DB を再生成
-        let vaultURL = AppSettings.shared.vaultURL
-        do {
-            let database = try AppDatabaseManager(vaultURL: vaultURL)
-            setAppDatabase(database)
-        } catch {
-            setAppDatabase(nil)
-        }
-    }
-
     // MARK: - Selection
 
     func selectProject(id: UUID, name: String) {
         guard selectedProject?.id != id else { return }
-        selectedProject = ProjectRecord(id: id, name: name, createdAt: .distantPast)
+        guard let vault = currentVault else { return }
+        selectedProject = ProjectRecord(id: id, vaultId: vault.id, name: name, createdAt: .distantPast)
         selectedTranscriptionId = nil
         observeTranscriptions()
     }
@@ -161,6 +170,7 @@ final class SidebarViewModel: ObservableObject {
     // MARK: - Project CRUD
 
     func createProject(name: String) {
+        guard let vault = currentVault else { return }
         let projectURL = projectURL(for: name)
         do {
             try FileManager.default.createDirectory(at: projectURL, withIntermediateDirectories: true)
@@ -169,14 +179,18 @@ final class SidebarViewModel: ObservableObject {
         }
 
         guard let repo = transcriptionRepository else { return }
-        try? repo.upsertProjects(names: ProjectRecord.allIntermediatePaths(for: name))
-
-        if let record = try? repo.fetchOrCreateProject(name: name) {
+        // 中間パスの親プロジェクトを先に作成し、対象プロジェクトを fetchOrCreate で取得
+        let intermediates = ProjectRecord.allIntermediatePaths(for: name).dropLast()
+        if !intermediates.isEmpty {
+            try? repo.upsertProjects(names: Array(intermediates), vaultId: vault.id)
+        }
+        if let record = try? repo.fetchOrCreateProject(name: name, vaultId: vault.id) {
             selectProject(id: record.id, name: record.name)
         }
     }
 
     func renameProject(id: UUID, name: String, newName: String) {
+        guard let vault = currentVault else { return }
         let oldURL = projectURL(for: name)
         let newURL = projectURL(for: newName)
 
@@ -197,9 +211,9 @@ final class SidebarViewModel: ObservableObject {
             return
         }
 
-        try? transcriptionRepository?.renameProjectsByPrefix(oldPrefix: name, newPrefix: newName)
+        try? transcriptionRepository?.renameProjectsByPrefix(oldPrefix: name, newPrefix: newName, vaultId: vault.id)
 
-        if isActive, let updated = try? transcriptionRepository?.fetchOrCreateProject(name: newName) {
+        if isActive, let updated = try? transcriptionRepository?.fetchOrCreateProject(name: newName, vaultId: vault.id) {
             selectProject(id: updated.id, name: updated.name)
         }
     }
@@ -212,6 +226,7 @@ final class SidebarViewModel: ObservableObject {
     }
 
     func deleteProject(id: UUID, name: String) {
+        guard let vault = currentVault else { return }
         let projectURL = projectURL(for: name)
 
         if let selected = selectedProject,
@@ -232,7 +247,7 @@ final class SidebarViewModel: ObservableObject {
 
         // FS 成功後に DB 削除（サブツリー対応）
         do {
-            try transcriptionRepository?.deleteProjectsByPrefix(name: name)
+            try transcriptionRepository?.deleteProjectsByPrefix(name: name, vaultId: vault.id)
         } catch {
             lastError = "データベースの更新に失敗しました: \(error.localizedDescription)"
         }

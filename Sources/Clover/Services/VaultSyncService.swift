@@ -7,13 +7,15 @@ import GRDB
 final class VaultSyncService: @unchecked Sendable {
     private let vaultURL: URL
     private let dbQueue: DatabaseQueue
+    private let vaultId: UUID
     private var stream: FSEventStreamRef?
     private let fileManager = FileManager.default
     private let callbackQueue = DispatchQueue(label: "com.clover.vault-sync", qos: .utility)
 
-    init(vaultURL: URL, dbQueue: DatabaseQueue) {
+    init(vaultURL: URL, dbQueue: DatabaseQueue, vaultId: UUID) {
         self.vaultURL = vaultURL
         self.dbQueue = dbQueue
+        self.vaultId = vaultId
     }
 
     deinit {
@@ -107,13 +109,13 @@ final class VaultSyncService: @unchecked Sendable {
     private func upsertProjects(names: [String]) {
         guard !names.isEmpty else { return }
         try? dbQueue.write { db in
-            try ProjectRecord.upsertAll(names: names, in: db)
+            try ProjectRecord.upsertAll(names: names, vaultId: self.vaultId, in: db)
         }
     }
 
     private func renameProjectsByPrefix(oldPrefix: String, newPrefix: String) {
         try? dbQueue.write { db in
-            try ProjectRecord.renameByPrefix(oldPrefix: oldPrefix, newPrefix: newPrefix, in: db)
+            try ProjectRecord.renameByPrefix(oldPrefix: oldPrefix, newPrefix: newPrefix, vaultId: self.vaultId, in: db)
         }
     }
 

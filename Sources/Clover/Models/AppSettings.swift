@@ -117,25 +117,14 @@ final class AppSettings: ObservableObject {
         set { markdownEditorRawValue = newValue.rawValue }
     }
 
-    // MARK: - 保管庫設定
+    // MARK: - 保管庫（ランタイム状態）
 
-    @AppStorage("vaultPath") var vaultPath: String = AppSettings.defaultVaultPath
+    /// 現在開いている保管庫。DB の `vaults` テーブルから選択される。
+    @Published var currentVault: VaultRecord?
 
-    nonisolated static let defaultVaultPath: String = FileManager.default.homeDirectoryForCurrentUser
-        .appendingPathComponent("Documents")
-        .appendingPathComponent("Obsidian Vault")
-        .path
-
-    var vaultURL: URL {
-        URL(fileURLWithPath: vaultPath, isDirectory: true)
-    }
-
-    /// 保管庫ディレクトリが存在しなければ作成する。
-    func ensureVaultExists() throws {
-        try FileManager.default.createDirectory(
-            at: vaultURL,
-            withIntermediateDirectories: true
-        )
+    /// 現在の保管庫の URL。保管庫未選択時は nil。
+    var vaultURL: URL? {
+        currentVault?.url
     }
 
     // MARK: - LLM 設定
@@ -143,19 +132,72 @@ final class AppSettings: ObservableObject {
     @AppStorage("llmEndpointURL") var llmEndpointURL = ""
     @AppStorage("llmModelName") var llmModelName = ""
     @AppStorage("llmAutoSummaryEnabled") var llmAutoSummaryEnabled = false
-    @AppStorage("llmSummaryPrompt") var llmSummaryPrompt: String = AppSettings.defaultSummaryPrompt
-    @AppStorage("selectedTemplateName") var selectedTemplateName = "customer_meeting"
+    @AppStorage("llmSummaryLanguage") var llmSummaryLanguageRawValue = SummaryLanguage.ja.rawValue
 
-    /// プリセットテンプレート名と内容のマッピング。
+    var llmSummaryLanguage: SummaryLanguage {
+        get { SummaryLanguage(rawValue: llmSummaryLanguageRawValue) ?? .ja }
+        set { llmSummaryLanguageRawValue = newValue.rawValue }
+    }
+    @AppStorage("llmSummaryPrompt") var llmSummaryPrompt: String = AppSettings.defaultSummaryPrompt
+    @AppStorage("selectedTemplateName") var selectedTemplateName = AppSettings.autoTemplateName
+
+    /// Auto モードを示すテンプレート名（空文字列）。
+    nonisolated static let autoTemplateName = ""
+
+    /// プリセットテンプレート名と内容のマッピング（Output Format セクションのみ）。
     nonisolated static let presetTemplates: [String: String] = [
-        "customer_meeting": defaultSummaryPrompt,
+        "customer_meeting": customerMeetingOutputFormat,
     ]
 
-    // swiftlint:disable:next line_length
-    nonisolated static let defaultSummaryPrompt = """
-    # Role and Objective
-    You are a meeting analyst. Extract a structured summary from the provided <transcript>.
+    // MARK: - Summary Prompt 定数
 
+    /// ベースプロンプト（`# Output Format` より前の共通部分）。
+    nonisolated static let summaryPromptPreamble = """
+    # Role and Objective
+    <task>
+    You are a meeting analyst. Extract a structured summary from the provided <transcript>.
+    </task>
+
+    <output_policy>
+    - Output only the summary body.
+    - Use Markdown.
+    - Keep the summary easy to scan.
+      - Prefer headings and bullet points over long paragraphs.
+      - Use checkboxes only for concrete action items.
+      - Do not invent facts.
+    - Preserve uncertainty where the transcript is ambiguous.
+    - Write in a casual yet professional tone.
+    </output_policy>
+
+    <citation_policy>
+    - Support important claims with transcript references when possible.
+    - Add transcript links inline for key decisions, action items, risks, dates, and open questions.
+    - Do not over-cite to the point that readability suffers.
+    </citation_policy>
+
+    <rendering_rules>
+    <transcript_links>
+    - When referencing the transcript, use the format `([[<transcript_id>#HH:MM:SS|HH:MM:SS]])`.
+    - Use the most relevant timestamp for the referenced point.
+    </transcript_links>
+    </rendering_rules>
+    """
+
+    /// Auto モード時のデフォルト Output Format セクション。
+    nonisolated static let defaultOutputFormat = """
+    # Output Format
+
+    <summary_template>
+    - List action items if there are any.
+    - Add any other sections you think are necessary.
+    </summary_template>
+    """
+
+    /// 完全なデフォルトプロンプト（preamble + defaultOutputFormat）。
+    nonisolated static let defaultSummaryPrompt = summaryPromptPreamble + "\n\n" + defaultOutputFormat
+
+    /// customer_meeting プリセットの Output Format セクション。
+    nonisolated static let customerMeetingOutputFormat = """
     # Output Format
     Use Markdown for all output. Structure your response using the sections defined in <format>.
 
@@ -172,24 +214,12 @@ final class AppSettings: ObservableObject {
     ### 課題・懸念点
     ミーティング中に挙がった課題や懸念点をまとめてください。特に、フォローアップが必要な内容を重点的にリストアップします。
     </format>
-
-    <link_to_transcripts>
-    - When referencing a point in the transcript, use the format ([[<transript_id>#02:26:04|02:26:04]])
-    - Use the timestamp that best matches the referenced statement or discussion
-    - Add these links inline for key points, decisions, action items, and open questions whenever possible
-    </link_to_transcripts>
-
-    # Instructions
-
-    <rules>
-    - Output only the body of the summary
-    - Make the text easy to read and avoid information overload
-        - Prioritize headings and bullet points over paragraphs
-        - Use checkboxes for action items
-    - It is acceptable to directly quote the customer when necessary
-    - Write in a casual yet professional tone
-    </rules>
     """
+
+    /// LLM の接続設定が揃っているかどうか。
+    var isLLMConfigComplete: Bool {
+        !llmEndpointURL.isEmpty && !llmModelName.isEmpty && !llmAPIToken.isEmpty
+    }
 
     /// API トークン（Keychain に保存）。
     var llmAPIToken: String {
@@ -212,11 +242,8 @@ final class AppSettings: ObservableObject {
 // MARK: - UserDefaults KVO キーパス
 
 extension UserDefaults {
-    @objc dynamic var vaultPath: String? {
-        string(forKey: "vaultPath")
-    }
-
-    @objc dynamic var enabledLocaleIdentifiersJSON: String? {
+    // NOTE: KVO を正しく動作させるため、プロパティ名を UserDefaults キー名と一致させる
+    @objc dynamic var enabledLocaleIdentifiers: String? {
         string(forKey: "enabledLocaleIdentifiers")
     }
 

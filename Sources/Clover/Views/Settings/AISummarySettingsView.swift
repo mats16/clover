@@ -89,6 +89,7 @@ struct AISummarySettingsView: View {
                         .foregroundColor(.secondary)
 
                     Picker("", selection: $settings.selectedTemplateName) {
+                        Text("Auto").tag(AppSettings.autoTemplateName)
                         ForEach(templates) { template in
                             Text(template.displayName).tag(template.name)
                         }
@@ -96,6 +97,7 @@ struct AISummarySettingsView: View {
 
                     HStack {
                         Button(L10n.openInEditor) { openSelectedTemplateInEditor() }
+                            .disabled(settings.selectedTemplateName == AppSettings.autoTemplateName)
                         Button(L10n.openTemplatesFolder) { openTemplatesFolder() }
                         Spacer()
                         Button(L10n.resetPresets) { resetPresets() }
@@ -115,7 +117,7 @@ struct AISummarySettingsView: View {
             apiToken = settings.llmAPIToken
             loadTemplates()
         }
-        .onChange(of: settings.vaultPath) {
+        .onChange(of: settings.currentVault?.id) {
             loadTemplates()
         }
         .onDisappear {
@@ -151,10 +153,12 @@ struct AISummarySettingsView: View {
     private let templateService = SummaryTemplateService()
 
     private func loadTemplates() {
-        let vaultURL = settings.vaultURL
+        guard let vaultURL = settings.vaultURL else { return }
         try? templateService.seedPresets(in: vaultURL)
         templates = (try? templateService.fetchTemplates(in: vaultURL)) ?? []
-        if !templates.contains(where: { $0.name == settings.selectedTemplateName }),
+        // Auto モードは常に有効。テンプレート選択中でファイルが見つからない場合のみリセット
+        if settings.selectedTemplateName != AppSettings.autoTemplateName,
+           !templates.contains(where: { $0.name == settings.selectedTemplateName }),
            let first = templates.first {
             settings.selectedTemplateName = first.name
         }
@@ -166,11 +170,13 @@ struct AISummarySettingsView: View {
     }
 
     private func openTemplatesFolder() {
-        let dir = SummaryTemplateService.templatesDirectoryURL(in: settings.vaultURL)
+        guard let vaultURL = settings.vaultURL else { return }
+        let dir = SummaryTemplateService.templatesDirectoryURL(in: vaultURL)
         NSWorkspace.shared.open(dir)
     }
 
     private func resetPresets() {
-        try? templateService.resetPresets(in: settings.vaultURL)
+        guard let vaultURL = settings.vaultURL else { return }
+        try? templateService.resetPresets(in: vaultURL)
     }
 }

@@ -1,7 +1,14 @@
 import Combine
 import GRDB
+import ImageIO
+@preconcurrency import ScreenCaptureKit
 import Speech
 import SwiftUI
+import UniformTypeIdentifiers
+
+private enum ScreenshotError: Error {
+    case encodingFailed
+}
 
 /// 音声キャプチャ → Speech フレームワーク文字起こし → UI 更新を統括するビューモデル。
 @MainActor
@@ -25,12 +32,23 @@ final class CaptionViewModel: ObservableObject {
     var currentProjectURL: URL?
     var currentProjectId: UUID?
     var currentProjectName: String?
+    var currentVaultURL: URL?
 
     // MARK: - Summary State
 
     @Published var isSummaryGenerating = false
     @Published var summaryError: String?
     @Published var lastSummaryURL: URL?
+    /// Summary タブへの切り替えをリクエストするフラグ。
+    @Published var requestShowSummaryTab = false
+
+    // MARK: - Screenshot State
+
+    @Published var screenshots: [ScreenshotRecord] = []
+    /// キャプチャ対象として選択可能なウィンドウ一覧。
+    @Published var availableWindows: [SCWindow] = []
+    /// 選択中のウィンドウ ID。nil の場合はデスクトップ全体をキャプチャ。
+    @Published var selectedWindowID: CGWindowID?
 
     /// 録音中でなく、文字起こしを表示中の場合 true。
     var isViewingHistory: Bool {
@@ -62,7 +80,7 @@ final class CaptionViewModel: ObservableObject {
 
         // AppSettings の表示言語設定変更を監視
         settingsCancellable = UserDefaults.standard
-            .publisher(for: \.enabledLocaleIdentifiersJSON)
+            .publisher(for: \.enabledLocaleIdentifiers)
             .removeDuplicates()
             .receive(on: RunLoop.main)
             .sink { [weak self] _ in
@@ -93,12 +111,13 @@ final class CaptionViewModel: ObservableObject {
     // MARK: - Transcription Loading
 
     /// DB から文字起こしのセグメントを読み込んで表示する。
-    func loadTranscription(_ transcriptionId: UUID, dbQueue: DatabaseQueue, projectURL: URL, projectId: UUID, projectName: String? = nil) {
+    func loadTranscription(_ transcriptionId: UUID, dbQueue: DatabaseQueue, projectURL: URL, projectId: UUID, projectName: String? = nil, vaultURL: URL) {
         guard !isListening else { return }
         currentTranscriptionId = transcriptionId
         currentProjectURL = projectURL
         currentProjectId = projectId
         currentProjectName = projectName
+        currentVaultURL = vaultURL
         currentDbQueue = dbQueue
 
         let repo = TranscriptionRepository(dbQueue: dbQueue)
@@ -114,6 +133,7 @@ final class CaptionViewModel: ObservableObject {
             lastSummaryURL = nil
         }
         summaryError = nil
+        reloadScreenshots()
     }
 
     /// 現在の文字起こし表示をクリアして初期状態に戻す。
@@ -122,9 +142,11 @@ final class CaptionViewModel: ObservableObject {
         currentProjectURL = nil
         currentProjectId = nil
         currentProjectName = nil
+        currentVaultURL = nil
         store.clear()
         lastSummaryURL = nil
         summaryError = nil
+        screenshots = []
     }
 
     // MARK: - Analyzer Preparation
@@ -211,11 +233,11 @@ final class CaptionViewModel: ObservableObject {
 
     // MARK: - Recording Control
 
-    func toggleListening(dbQueue: DatabaseQueue, projectURL: URL, projectId: UUID, projectName: String? = nil) {
+    func toggleListening(dbQueue: DatabaseQueue, projectURL: URL, projectId: UUID, projectName: String? = nil, vaultURL: URL) {
         if isListening {
             stopListening()
         } else {
-            Task { await startListening(dbQueue: dbQueue, projectURL: projectURL, projectId: projectId, projectName: projectName) }
+            Task { await startListening(dbQueue: dbQueue, projectURL: projectURL, projectId: projectId, projectName: projectName, vaultURL: vaultURL) }
         }
     }
 
@@ -225,11 +247,13 @@ final class CaptionViewModel: ObservableObject {
         projectURL: URL,
         projectId: UUID,
         projectName: String? = nil,
+        vaultURL: URL,
         appendingTo existingTranscriptionId: UUID? = nil
     ) async {
         self.currentProjectURL = projectURL
         self.currentProjectId = projectId
         self.currentProjectName = projectName
+        self.currentVaultURL = vaultURL
         self.currentDbQueue = dbQueue
         guard analyzerReady else {
             errorMessage = L10n.speechRecognitionNotReady
@@ -309,7 +333,7 @@ final class CaptionViewModel: ObservableObject {
         let recordingStart = store.recordingStartTime ?? Date()
         let segments = store.segments
         let dbQueue = currentDbQueue
-        let vaultURL = AppSettings.shared.vaultURL
+        guard let vaultURL = currentVaultURL else { return }
 
         Task {
             for pipeline in pipelines {
@@ -353,6 +377,30 @@ final class CaptionViewModel: ObservableObject {
 
     // MARK: - Summary Generation
 
+    /// 手動で要約を実行できるかどうか。
+    var canGenerateSummary: Bool {
+        guard currentTranscriptionId != nil,
+              currentProjectURL != nil else { return false }
+        return AppSettings.shared.isLLMConfigComplete && !store.segments.isEmpty
+    }
+
+    /// プルダウンメニューから手動で要約を実行する。
+    func triggerManualSummary() {
+        guard let transcriptionId = currentTranscriptionId,
+              let projectURL = currentProjectURL else { return }
+        let transcriptText = store.exportForSummary()
+        let startedAt = store.recordingStartTime ?? Date()
+        requestShowSummaryTab = true
+        Task {
+            await generateSummary(
+                transcriptionId: transcriptionId,
+                transcriptText: transcriptText,
+                projectURL: projectURL,
+                startedAt: startedAt
+            )
+        }
+    }
+
     func generateSummary(
         transcriptionId: UUID,
         transcriptText: String,
@@ -361,10 +409,7 @@ final class CaptionViewModel: ObservableObject {
     ) async {
         guard !transcriptText.isEmpty else { return }
 
-        let settings = AppSettings.shared
-        guard !settings.llmEndpointURL.isEmpty,
-              !settings.llmModelName.isEmpty,
-              !settings.llmAPIToken.isEmpty else {
+        guard AppSettings.shared.isLLMConfigComplete else {
             summaryError = L10n.llmConfigIncomplete
             return
         }
@@ -402,6 +447,121 @@ final class CaptionViewModel: ObservableObject {
                 await pipeline.service.reset()
             }
         }
+    }
+
+    // MARK: - Screenshot
+
+    /// キャプチャ対象のウィンドウ一覧を更新する。
+    func refreshAvailableWindows() {
+        Task {
+            do {
+                let content = try await SCShareableContent.excludingDesktopWindows(true, onScreenWindowsOnly: true)
+                let myBundleID = Bundle.main.bundleIdentifier
+                self.availableWindows = content.windows
+                    .filter { window in
+                        window.isOnScreen
+                            && window.frame.width > 0
+                            && window.frame.height > 0
+                            && window.windowLayer == 0
+                            && !(window.title ?? "").isEmpty
+                            && window.owningApplication?.bundleIdentifier != myBundleID
+                    }
+                    .sorted { ($0.owningApplication?.applicationName ?? "") < ($1.owningApplication?.applicationName ?? "") }
+                // 選択中のウィンドウが一覧から消えていたらリセット
+                if let id = selectedWindowID,
+                   !self.availableWindows.contains(where: { $0.windowID == id }) {
+                    selectedWindowID = nil
+                }
+            } catch {
+                self.availableWindows = []
+            }
+        }
+    }
+
+    func takeScreenshot() {
+        guard let transcriptionId = currentTranscriptionId,
+              let dbQueue = currentDbQueue else { return }
+
+        Task {
+            do {
+                let content = try await SCShareableContent.excludingDesktopWindows(false, onScreenWindowsOnly: true)
+
+                let filter: SCContentFilter
+                let config = SCStreamConfiguration()
+                config.showsCursor = false
+
+                if let windowID = selectedWindowID,
+                   let window = content.windows.first(where: { $0.windowID == windowID }) {
+                    // 選択ウィンドウをキャプチャ
+                    filter = SCContentFilter(desktopIndependentWindow: window)
+                    config.width = Int(window.frame.width) * 2
+                    config.height = Int(window.frame.height) * 2
+                } else {
+                    // デスクトップ全体をキャプチャ
+                    guard let display = content.displays.first else {
+                        errorMessage = "ディスプレイが見つかりません"
+                        return
+                    }
+                    filter = SCContentFilter(display: display, excludingWindows: [])
+                    config.width = display.width * 2
+                    config.height = display.height * 2
+                }
+
+                let cgImage = try await SCScreenshotManager.captureImage(contentFilter: filter, configuration: config)
+
+                // WebP エンコードを MainActor 外で実行
+                let imageData: Data = try await Task.detached(priority: .userInitiated) {
+                    let webPData = NSMutableData()
+                    guard let destination = CGImageDestinationCreateWithData(
+                        webPData,
+                        UTType.webP.identifier as CFString,
+                        1,
+                        nil
+                    ) else {
+                        throw ScreenshotError.encodingFailed
+                    }
+                    CGImageDestinationAddImage(destination, cgImage, [
+                        kCGImageDestinationLossyCompressionQuality: 0.85,
+                    ] as CFDictionary)
+                    guard CGImageDestinationFinalize(destination) else {
+                        throw ScreenshotError.encodingFailed
+                    }
+                    return webPData as Data
+                }.value
+
+                let record = ScreenshotRecord(
+                    id: UUID.v7(),
+                    transcriptionId: transcriptionId,
+                    capturedAt: Date(),
+                    imageData: imageData
+                )
+
+                try await dbQueue.write { db in
+                    try record.insert(db)
+                }
+                reloadScreenshots()
+            } catch {
+                errorMessage = "スクリーンショットの取得に失敗しました: \(error.localizedDescription)"
+            }
+        }
+    }
+
+    /// DB からスクリーンショット一覧を再読み込みする。
+    func reloadScreenshots() {
+        guard let transcriptionId = currentTranscriptionId,
+              let dbQueue = currentDbQueue else {
+            screenshots = []
+            return
+        }
+        let repo = TranscriptionRepository(dbQueue: dbQueue)
+        screenshots = (try? repo.fetchScreenshots(forTranscriptionId: transcriptionId)) ?? []
+    }
+
+    func deleteScreenshot(_ screenshot: ScreenshotRecord) {
+        guard let dbQueue = currentDbQueue else { return }
+        let repo = TranscriptionRepository(dbQueue: dbQueue)
+        try? repo.deleteScreenshot(id: screenshot.id)
+        reloadScreenshots()
     }
 
     func exportTranscript() {
