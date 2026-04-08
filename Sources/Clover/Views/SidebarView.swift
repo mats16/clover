@@ -258,6 +258,7 @@ struct SidebarView: View {
                         .contentShape(Rectangle())
                 }
                 .buttonStyle(.plain)
+                .pointerStyle(.link)
                 .onHover { isSettingsHovered = $0 }
                 .help(L10n.settings)
             }
@@ -338,6 +339,7 @@ private struct ProjectHeaderRow: View {
                 )
         )
         .contentShape(Rectangle())
+        .pointerStyle(.link)
         .onHover { isHovered = $0 }
         .onTapGesture(count: 2) { onDoubleClick() }
         .onTapGesture(count: 1) { onSelect() }
@@ -391,6 +393,7 @@ private struct TranscriptionListRow: View {
         .padding(.vertical, 2)
         .padding(.horizontal, 4)
         .contentShape(Rectangle())
+        .pointerStyle(.link)
         .background(
             RoundedRectangle(cornerRadius: 4)
                 .fill(isHovered && !isSelected ? Color.primary.opacity(0.06) : Color.clear)
@@ -409,20 +412,22 @@ private struct VaultMenuButton: View {
 
     var body: some View {
         Menu {
-            let currentId = currentVault?.id
-            ForEach(allVaults) { vault in
-                Button {
-                    if vault.id != currentId {
+            Picker(selection: Binding(
+                get: { currentVault?.id },
+                set: { newId in
+                    if let vault = allVaults.first(where: { $0.id == newId }) {
                         onSelectVault(vault)
                     }
-                } label: {
-                    if vault.id == currentId {
-                        Label(vault.name, systemImage: "checkmark")
-                    } else {
-                        Text(vault.name)
-                    }
                 }
+            )) {
+                ForEach(allVaults) { vault in
+                    Text(vault.name).tag(UUID?.some(vault.id))
+                }
+            } label: {
+                EmptyView()
             }
+            .pickerStyle(.inline)
+            .labelsHidden()
 
             Divider()
 
@@ -451,6 +456,7 @@ private struct VaultMenuButton: View {
                 .fill(isHovered ? Color.primary.opacity(0.08) : Color.clear)
         )
         .contentShape(Rectangle())
+        .pointerStyle(.link)
         .onHover { isHovered = $0 }
         .help(L10n.switchVault)
     }

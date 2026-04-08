@@ -167,6 +167,7 @@ private struct VaultRow: View {
         .frame(maxWidth: .infinity, alignment: .leading)
         .padding(.vertical, 4)
         .contentShape(Rectangle())
+        .pointerStyle(.link)
         .onHover { isHovered = $0 }
         .background(
             RoundedRectangle(cornerRadius: 4)

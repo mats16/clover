@@ -17,6 +17,7 @@ struct ToolbarIconButtonStyle: ButtonStyle {
             .onHover { hovering in
                 isHovered = hovering
             }
+            .pointerStyle(.link)
     }
 }
 
@@ -98,93 +99,84 @@ private struct SessionSettingsMenu: View {
                 }
 
                 Menu {
-                    ForEach(SummaryLanguage.allCases) { lang in
-                        Button {
-                            appSettings.llmSummaryLanguageRawValue = lang.rawValue
-                        } label: {
-                            if appSettings.llmSummaryLanguageRawValue == lang.rawValue {
-                                Label(lang.displayName, systemImage: "checkmark")
-                            } else {
-                                Text(lang.displayName)
-                            }
+                    Picker(selection: $appSettings.llmSummaryLanguageRawValue) {
+                        ForEach(SummaryLanguage.allCases) { lang in
+                            Text(lang.displayName).tag(lang.rawValue)
                         }
+                    } label: {
+                        EmptyView()
                     }
+                    .pickerStyle(.inline)
+                    .labelsHidden()
                 } label: {
                     Label("Summary の言語", systemImage: "globe")
                 }
 
                 Menu {
-                    Button {
-                        appSettings.selectedTemplateName = AppSettings.autoTemplateName
-                    } label: {
-                        if appSettings.selectedTemplateName == AppSettings.autoTemplateName {
-                            Label("Auto", systemImage: "checkmark")
-                        } else {
-                            Text("Auto")
+                    Picker(selection: $appSettings.selectedTemplateName) {
+                        Text("Auto").tag(AppSettings.autoTemplateName)
+
+                        Divider()
+
+                        ForEach(summaryTemplates) { template in
+                            Text(template.displayName).tag(template.name)
                         }
+                    } label: {
+                        EmptyView()
                     }
+                    .pickerStyle(.inline)
+                    .labelsHidden()
 
                     Divider()
 
-                    ForEach(summaryTemplates) { template in
-                        Button {
-                            appSettings.selectedTemplateName = template.name
-                        } label: {
-                            if appSettings.selectedTemplateName == template.name {
-                                Label(template.displayName, systemImage: "checkmark")
-                            } else {
-                                Text(template.displayName)
-                            }
-                        }
+                    Button {
+                        createNewTemplate()
+                    } label: {
+                        Label("新しく作る", systemImage: "plus")
                     }
                 } label: {
-                    Label("Summary Instructions", systemImage: "pencil.line")
+                    Label("Instructions", systemImage: "pencil.line")
                 }
             }
 
             // ── Transcribe ──
             Section("Transcribe") {
                 Menu {
-                    ForEach(AudioSourceMode.allCases, id: \.self) { mode in
-                        Button {
-                            viewModel.audioSourceMode = mode
-                        } label: {
-                            if viewModel.audioSourceMode == mode {
-                                Label(mode.label, systemImage: "checkmark")
-                            } else {
-                                Text(mode.label)
-                            }
+                    Picker(selection: $viewModel.audioSourceMode) {
+                        ForEach(AudioSourceMode.allCases, id: \.self) { mode in
+                            Text(mode.label).tag(mode)
                         }
-                        .disabled(viewModel.isListening)
+                    } label: {
+                        EmptyView()
                     }
+                    .pickerStyle(.inline)
+                    .labelsHidden()
+                    .disabled(viewModel.isListening)
                 } label: {
                     Label("音声ソース", systemImage: "waveform.badge.microphone")
                 }
 
                 Menu {
-                    if viewModel.filteredLocales.isEmpty {
-                        let id = viewModel.selectedLocale
-                        let name = Locale.current.localizedString(forIdentifier: id) ?? id
-                        Button {
-                            viewModel.changeLocale(id)
-                        } label: {
-                            Label(name, systemImage: "checkmark")
-                        }
-                    } else {
-                        ForEach(viewModel.filteredLocales, id: \.identifier) { locale in
-                            let id = locale.identifier
-                            let name = locale.localizedString(forIdentifier: id) ?? id
-                            Button {
-                                viewModel.changeLocale(id)
-                            } label: {
-                                if viewModel.selectedLocale == id {
-                                    Label(name, systemImage: "checkmark")
-                                } else {
-                                    Text(name)
-                                }
+                    Picker(selection: Binding(
+                        get: { viewModel.selectedLocale },
+                        set: { viewModel.changeLocale($0) }
+                    )) {
+                        if viewModel.filteredLocales.isEmpty {
+                            let id = viewModel.selectedLocale
+                            let name = Locale.current.localizedString(forIdentifier: id) ?? id
+                            Text(name).tag(id)
+                        } else {
+                            ForEach(viewModel.filteredLocales, id: \.identifier) { locale in
+                                let id = locale.identifier
+                                let name = locale.localizedString(forIdentifier: id) ?? id
+                                Text(name).tag(id)
                             }
                         }
+                    } label: {
+                        EmptyView()
                     }
+                    .pickerStyle(.inline)
+                    .labelsHidden()
                 } label: {
                     Label("文字起こし言語", systemImage: "globe")
                 }
@@ -193,32 +185,22 @@ private struct SessionSettingsMenu: View {
             // ── Screenshots ──
             Section("Screenshots") {
                 Menu {
-                    Button {
-                        viewModel.selectedWindowID = nil
+                    Picker(selection: $viewModel.selectedWindowID) {
+                        Text("デスクトップ全体").tag(CGWindowID?.none)
+
+                        Divider()
+
+                        ForEach(viewModel.availableWindows, id: \.windowID) { window in
+                            let appName = window.owningApplication?.applicationName ?? "不明"
+                            let title = window.title ?? ""
+                            let displayName = title.isEmpty ? appName : "\(appName) — \(title)"
+                            Text(displayName).tag(CGWindowID?.some(window.windowID))
+                        }
                     } label: {
-                        if viewModel.selectedWindowID == nil {
-                            Label("デスクトップ全体", systemImage: "checkmark")
-                        } else {
-                            Text("デスクトップ全体")
-                        }
+                        EmptyView()
                     }
-
-                    Divider()
-
-                    ForEach(viewModel.availableWindows, id: \.windowID) { window in
-                        let appName = window.owningApplication?.applicationName ?? "不明"
-                        let title = window.title ?? ""
-                        let displayName = title.isEmpty ? appName : "\(appName) — \(title)"
-                        Button {
-                            viewModel.selectedWindowID = window.windowID
-                        } label: {
-                            if viewModel.selectedWindowID == window.windowID {
-                                Label(displayName, systemImage: "checkmark")
-                            } else {
-                                Text(displayName)
-                            }
-                        }
-                    }
+                    .pickerStyle(.inline)
+                    .labelsHidden()
                 } label: {
                     Label("キャプチャ対象", systemImage: "inset.filled.rectangle.and.person.filled")
                 }
@@ -242,6 +224,7 @@ private struct SessionSettingsMenu: View {
                 viewModel.refreshAvailableWindows()
             }
         }
+        .pointerStyle(.link)
         .task { loadSummaryTemplates() }
         .onChange(of: appSettings.currentVault?.id) { loadSummaryTemplates() }
     }
@@ -250,6 +233,30 @@ private struct SessionSettingsMenu: View {
         guard let vaultURL = appSettings.vaultURL else { return }
         try? templateService.seedPresets(in: vaultURL)
         summaryTemplates = (try? templateService.fetchTemplates(in: vaultURL)) ?? []
+    }
+
+    private func createNewTemplate() {
+        guard let vaultURL = appSettings.vaultURL else { return }
+        let dir = SummaryTemplateService.templatesDirectoryURL(in: vaultURL)
+        try? FileManager.default.createDirectory(at: dir, withIntermediateDirectories: true)
+
+        // ユニークなファイル名を生成
+        var name = "new_template"
+        var counter = 1
+        while FileManager.default.fileExists(atPath: dir.appendingPathComponent("\(name).md").path) {
+            name = "new_template_\(counter)"
+            counter += 1
+        }
+
+        let fileURL = dir.appendingPathComponent("\(name).md")
+        FileManager.default.createFile(atPath: fileURL.path, contents: nil)
+
+        // テンプレート一覧を更新して新しいテンプレートを選択
+        loadSummaryTemplates()
+        appSettings.selectedTemplateName = name
+
+        // エディタで開く
+        appSettings.markdownEditor.open(fileURL)
     }
 }
 
@@ -275,6 +282,7 @@ private struct TranscribeButton: View {
             )
         }
         .buttonStyle(.plain)
+        .pointerStyle(.link)
         .disabled(!viewModel.analyzerReady || sidebarViewModel.selectedProjectURL == nil)
         .keyboardShortcut(.space, modifiers: [])
     }
@@ -362,6 +370,7 @@ private struct ScreenshotThumbnailView: View {
                     .aspectRatio(contentMode: .fit)
                     .clipShape(RoundedRectangle(cornerRadius: 6))
                     .shadow(color: .black.opacity(0.1), radius: 2, y: 1)
+                    .pointerStyle(.link)
                     .onTapGesture {
                         withAnimation(.easeOut(duration: 0.15)) {
                             expandedScreenshot = screenshot
@@ -408,6 +417,7 @@ private struct ScreenshotButton: View {
                 )
         }
         .buttonStyle(.plain)
+        .pointerStyle(.link)
         .disabled(viewModel.currentTranscriptionId == nil)
         .help("スクリーンショットを撮影")
     }
@@ -441,6 +451,7 @@ private struct DetailTabButton: View {
             )
         }
         .buttonStyle(.plain)
+        .pointerStyle(.link)
         .onHover { hovering in
             isHovered = hovering
         }
