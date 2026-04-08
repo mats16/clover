@@ -90,7 +90,7 @@ private struct SessionSettingsMenu: View {
                 Button {
                     viewModel.triggerManualSummary()
                 } label: {
-                    Label("要約を実行", systemImage: "pencil.and.scribble")
+                    Label("Retry summary", systemImage: "pencil.and.scribble")
                 }
                 .disabled(viewModel.isSummaryGenerating || !viewModel.canGenerateSummary)
 
@@ -109,7 +109,7 @@ private struct SessionSettingsMenu: View {
                     .pickerStyle(.inline)
                     .labelsHidden()
                 } label: {
-                    Label("Summary の言語", systemImage: "globe")
+                    Label("Language", systemImage: "globe")
                 }
 
                 Menu {
@@ -132,7 +132,7 @@ private struct SessionSettingsMenu: View {
                     Button {
                         createNewTemplate()
                     } label: {
-                        Label("新しく作る", systemImage: "plus")
+                        Label("Add custom instructions", systemImage: "plus")
                     }
                 } label: {
                     Label("Instructions", systemImage: "pencil.line")
@@ -153,7 +153,7 @@ private struct SessionSettingsMenu: View {
                     .labelsHidden()
                     .disabled(viewModel.isListening)
                 } label: {
-                    Label("音声ソース", systemImage: "waveform.badge.microphone")
+                    Label("Audio source", systemImage: "waveform.badge.microphone")
                 }
 
                 Menu {
@@ -178,7 +178,7 @@ private struct SessionSettingsMenu: View {
                     .pickerStyle(.inline)
                     .labelsHidden()
                 } label: {
-                    Label("文字起こし言語", systemImage: "globe")
+                    Label("Language", systemImage: "globe")
                 }
             }
 
@@ -202,7 +202,7 @@ private struct SessionSettingsMenu: View {
                     .pickerStyle(.inline)
                     .labelsHidden()
                 } label: {
-                    Label("キャプチャ対象", systemImage: "inset.filled.rectangle.and.person.filled")
+                    Label("Capture source", systemImage: "inset.filled.rectangle.and.person.filled")
                 }
             }
         } label: {
