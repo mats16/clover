@@ -183,6 +183,28 @@ final class TranscriptionRepository {
         }
     }
 
+    /// 文字起こし詳細をまとめて取得する（単一トランザクション）。
+    struct TranscriptionDetail {
+        let transcription: TranscriptionRecord?
+        let segments: [SegmentRecord]
+        let screenshots: [ScreenshotRecord]
+    }
+
+    func fetchTranscriptionDetail(id transcriptionId: UUID) throws -> TranscriptionDetail {
+        try dbQueue.read { db in
+            let transcription = try TranscriptionRecord.fetchOne(db, key: transcriptionId)
+            let segments = try SegmentRecord
+                .filter(Column("transcriptionId") == transcriptionId)
+                .order(Column("startTime").asc)
+                .fetchAll(db)
+            let screenshots = try ScreenshotRecord
+                .filter(Column("transcriptionId") == transcriptionId)
+                .order(Column("capturedAt").asc)
+                .fetchAll(db)
+            return TranscriptionDetail(transcription: transcription, segments: segments, screenshots: screenshots)
+        }
+    }
+
     func fetchSegmentIds(forTranscriptionId transcriptionId: UUID) throws -> Set<UUID> {
         try dbQueue.read { db in
             let ids = try SegmentRecord

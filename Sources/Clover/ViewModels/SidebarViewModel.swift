@@ -1,25 +1,25 @@
-import Combine
 import Foundation
 import GRDB
+import Observation
 import SwiftUI
 
 /// サイドバーの状態管理。DB 駆動の階層プロジェクトツリーと文字起こし一覧を管理する。
+@Observable
 @MainActor
-final class SidebarViewModel: ObservableObject {
+final class SidebarViewModel {
 
-    // MARK: - Published State
+    // MARK: - Observed State
 
-    @Published var projectTree: [ProjectNode] = []
-    @Published var flatProjects: [FlatProjectRow] = []
-    @Published var selectedProject: ProjectRecord?
-    @Published var selectedTranscriptionId: UUID?
-    @Published var transcriptionsForSelectedProject: [TranscriptionRecord] = []
-    @Published var lastError: String?
-    @Published var allVaults: [VaultRecord] = []
+    var flatProjects: [FlatProjectRow] = []
+    var selectedProject: ProjectRecord?
+    var selectedTranscriptionId: UUID?
+    var transcriptionsForSelectedProject: [TranscriptionRecord] = []
+    var lastError: String?
+    var allVaults: [VaultRecord] = []
 
     // MARK: - Active Database & Vault
 
-    private(set) var appDatabase: AppDatabaseManager?
+    @ObservationIgnored private(set) var appDatabase: AppDatabaseManager?
     /// 現在の保管庫。AppSettings.shared.currentVault から委譲。
     var currentVault: VaultRecord? { AppSettings.shared.currentVault }
     var dbQueue: DatabaseQueue? { appDatabase?.dbQueue }
@@ -35,13 +35,13 @@ final class SidebarViewModel: ObservableObject {
         return projectURL(for: name)
     }
 
-    private let folderService = FolderProjectService()
-    private var transcriptionRepository: TranscriptionRepository?
-    private var fileWatcher: TranscriptFileWatcher?
-    private var transcriptionObservation: AnyDatabaseCancellable?
-    private var projectObservation: AnyDatabaseCancellable?
-    private var vaultObservation: AnyDatabaseCancellable?
-    private var vaultSyncService: VaultSyncService?
+    @ObservationIgnored private let folderService = FolderProjectService()
+    @ObservationIgnored private var transcriptionRepository: TranscriptionRepository?
+    @ObservationIgnored private var fileWatcher: TranscriptFileWatcher?
+    @ObservationIgnored private var transcriptionObservation: AnyDatabaseCancellable?
+    @ObservationIgnored private var projectObservation: AnyDatabaseCancellable?
+    @ObservationIgnored private var vaultObservation: AnyDatabaseCancellable?
+    @ObservationIgnored private var vaultSyncService: VaultSyncService?
 
     /// 保管庫の最終オープン日時を更新する。
     func updateVaultLastOpened(_ id: UUID) {
@@ -84,7 +84,6 @@ final class SidebarViewModel: ObservableObject {
               let vault = currentVault else {
             vaultSyncService = nil
             fileWatcher = nil
-            projectTree = []
             flatProjects = []
             return
         }
@@ -118,7 +117,6 @@ final class SidebarViewModel: ObservableObject {
             onChange: { [weak self] records in
                 Task { @MainActor in
                     let tree = ProjectNode.buildTree(from: records)
-                    self?.projectTree = tree
                     self?.flatProjects = ProjectNode.flatten(tree)
                 }
             }

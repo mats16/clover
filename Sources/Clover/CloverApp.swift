@@ -9,7 +9,7 @@ enum WindowID {
 struct CloverApp: App {
     @NSApplicationDelegateAdaptor(AppDelegate.self) var appDelegate
     @StateObject private var viewModel = CaptionViewModel()
-    @StateObject private var sidebarViewModel = SidebarViewModel()
+    @State private var sidebarViewModel = SidebarViewModel()
     @StateObject private var meetingDetectionService = MeetingDetectionService()
     @State private var appDatabase: AppDatabaseManager?
     @State private var showVaultPicker = true

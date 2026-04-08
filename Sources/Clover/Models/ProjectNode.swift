@@ -1,7 +1,7 @@
 import Foundation
 
 /// サイドバー表示用のフラット化されたプロジェクト行。
-struct FlatProjectRow: Identifiable {
+struct FlatProjectRow: Identifiable, Equatable {
     let id: UUID
     let name: String
     let displayName: String
@@ -32,65 +32,56 @@ struct ProjectNode: Identifiable {
         return result
     }
 
-    /// フラットな ProjectRecord 配列からツリーを構築する。
+    /// フラットな ProjectRecord 配列からツリーを構築する。O(n) の Dictionary ベースアルゴリズム。
     static func buildTree(from records: [ProjectRecord]) -> [ProjectNode] {
+        // ソート済みなので中間ノード（親）は子より先に処理される
         let sorted = records.sorted { $0.name < $1.name }
 
-        // name → record のルックアップ
-        var lookup: [String: ProjectRecord] = [:]
-        for record in sorted {
-            lookup[record.name] = record
-        }
+        // name → (ノード, 子ノード配列) を管理。子配列は参照型で共有して後から追加可能にする。
+        final class MutableNode {
+            let id: UUID
+            let name: String
+            let displayName: String
+            var children: [MutableNode] = []
 
-        // ルートノード群を構築
-        var roots: [ProjectNode] = []
+            init(id: UUID, name: String, displayName: String) {
+                self.id = id
+                self.name = name
+                self.displayName = displayName
+            }
 
-        /// 再帰的にノードを挿入する
-        func insertNode(_ record: ProjectRecord) {
-            let components = record.name.split(separator: "/").map(String.init)
-            insertInto(nodes: &roots, components: components, depth: 0, record: record)
-        }
-
-        func insertInto(nodes: inout [ProjectNode], components: [String], depth: Int, record: ProjectRecord) {
-            guard depth < components.count else { return }
-
-            let pathUpToDepth = components[0 ... depth].joined(separator: "/")
-            let isLeaf = depth == components.count - 1
-
-            if let existingIndex = nodes.firstIndex(where: { $0.name == pathUpToDepth }) {
-                if isLeaf {
-                    // 既にノードが存在する場合はスキップ（先に中間ノードとして作られた場合）
-                    return
-                }
-                insertInto(nodes: &nodes[existingIndex].children, components: components, depth: depth + 1, record: record)
-            } else {
-                if isLeaf {
-                    let node = ProjectNode(
-                        id: record.id,
-                        name: record.name,
-                        displayName: components[depth],
-                        children: []
-                    )
-                    nodes.append(node)
-                } else {
-                    // 中間ノード: lookup から対応する record を取得
-                    guard let intermediateRecord = lookup[pathUpToDepth] else { return }
-                    var node = ProjectNode(
-                        id: intermediateRecord.id,
-                        name: pathUpToDepth,
-                        displayName: components[depth],
-                        children: []
-                    )
-                    insertInto(nodes: &node.children, components: components, depth: depth + 1, record: record)
-                    nodes.append(node)
-                }
+            func toProjectNode() -> ProjectNode {
+                ProjectNode(
+                    id: id,
+                    name: name,
+                    displayName: displayName,
+                    children: children.map { $0.toProjectNode() }
+                )
             }
         }
 
+        var nodeMap: [String: MutableNode] = [:]
+        var roots: [MutableNode] = []
+
         for record in sorted {
-            insertNode(record)
+            let components = record.name.split(separator: "/")
+            let displayName = String(components.last!)
+            let node = MutableNode(id: record.id, name: record.name, displayName: displayName)
+            nodeMap[record.name] = node
+
+            if components.count > 1 {
+                let parentPath = components.dropLast().joined(separator: "/")
+                if let parent = nodeMap[parentPath] {
+                    parent.children.append(node)
+                } else {
+                    // 親レコードが存在しない場合はルートとして扱う
+                    roots.append(node)
+                }
+            } else {
+                roots.append(node)
+            }
         }
 
-        return roots
+        return roots.map { $0.toProjectNode() }
     }
 }

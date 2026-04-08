@@ -53,7 +53,7 @@ enum DetailTab: String, CaseIterable, Identifiable {
 private struct DetailTabBar: View {
     @Binding var selection: DetailTab
     @ObservedObject var viewModel: CaptionViewModel
-    @ObservedObject var sidebarViewModel: SidebarViewModel
+    var sidebarViewModel: SidebarViewModel
 
     var body: some View {
         HStack(spacing: 2) {
@@ -263,7 +263,7 @@ private struct SessionSettingsMenu: View {
 /// 文字起こし開始/停止ボタン。
 private struct TranscribeButton: View {
     @ObservedObject var viewModel: CaptionViewModel
-    @ObservedObject var sidebarViewModel: SidebarViewModel
+    var sidebarViewModel: SidebarViewModel
 
     var body: some View {
         Button(action: toggle) {
@@ -461,7 +461,7 @@ private struct DetailTabButton: View {
 /// メインコントロールウィンドウ（議事録ビュー）。
 struct ControlPanelView: View {
     @ObservedObject var viewModel: CaptionViewModel
-    @ObservedObject var sidebarViewModel: SidebarViewModel
+    var sidebarViewModel: SidebarViewModel
     @ObservedObject private var appSettings = AppSettings.shared
     @State private var selectedTab: DetailTab = .transcript
     @State private var expandedScreenshot: ScreenshotRecord?

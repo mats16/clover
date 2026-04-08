@@ -119,19 +119,18 @@ final class CaptionViewModel: ObservableObject {
         currentDbQueue = dbQueue
 
         let repo = TranscriptionRepository(dbQueue: dbQueue)
-        let records = (try? repo.fetchSegments(forTranscriptionId: transcriptionId)) ?? []
-        let segments = records.map { TranscriptSegment(from: $0) }
+        let detail = try? repo.fetchTranscriptionDetail(id: transcriptionId)
+        let segments = (detail?.segments ?? []).map { TranscriptSegment(from: $0) }
         store.loadSegments(segments)
+        screenshots = detail?.screenshots ?? []
 
         // summaryCreated フラグが立っている場合のみファイルを探索
-        if let transcription = try? repo.fetchTranscription(id: transcriptionId),
-           transcription.summaryCreated {
+        if let transcription = detail?.transcription, transcription.summaryCreated {
             lastSummaryURL = SummaryService.findSummaryFile(in: projectURL, transcriptionId: transcriptionId)
         } else {
             lastSummaryURL = nil
         }
         summaryError = nil
-        reloadScreenshots()
     }
 
     /// 現在の文字起こし表示をクリアして初期状態に戻す。

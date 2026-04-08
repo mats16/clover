@@ -3,7 +3,7 @@ import SwiftUI
 /// NavigationSplitView でサイドバーと詳細ビューを構成するルートビュー。
 struct ContentView: View {
     @ObservedObject var viewModel: CaptionViewModel
-    @ObservedObject var sidebarViewModel: SidebarViewModel
+    var sidebarViewModel: SidebarViewModel
     var onSelectVault: (VaultRecord) -> Void = { _ in }
     @State private var columnVisibility: NavigationSplitViewVisibility = .all
 
