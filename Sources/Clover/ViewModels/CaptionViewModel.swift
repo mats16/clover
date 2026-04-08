@@ -378,7 +378,7 @@ final class CaptionViewModel: ObservableObject {
     var canGenerateSummary: Bool {
         guard currentTranscriptionId != nil,
               currentProjectURL != nil else { return false }
-        return AppSettings.shared.isLLMConfigComplete && !store.segments.isEmpty
+        return !store.segments.isEmpty
     }
 
     /// プルダウンメニューから手動で要約を実行する。
