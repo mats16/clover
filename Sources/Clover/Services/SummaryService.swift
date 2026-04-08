@@ -38,14 +38,14 @@ enum SummaryService {
             model: model,
             token: token,
             messages: messages,
-            maxTokens: 4096
+            maxTokens: 16000
         )
 
         let formatter = ISO8601DateFormatter()
         formatter.formatOptions = [.withInternetDateTime]
         let dateString = formatter.string(from: startedAt)
-        // タグ: 常に transcription-summary を含め、CONTEXT.md の tags をマージ
-        var tags = ["transcription-summary"]
+        // タグ: 常に ai_summary を含め、CONTEXT.md の tags をマージ
+        var tags = ["ai_summary"]
         if let contextContent {
             for tag in parseFrontmatterTags(from: contextContent) where !tags.contains(tag) {
                 tags.append(tag)
@@ -55,7 +55,7 @@ enum SummaryService {
 
         let frontmatter = """
         ---
-        transcription_id: "\(transcriptionId.uuidString)"
+        transcript_id: "\(transcriptionId.uuidString)"
         date: "\(dateString)"
         tags:
         \(tagsYAML)
@@ -87,9 +87,9 @@ enum SummaryService {
             defer { try? handle.close() }
             guard let data = try? handle.read(upToCount: 512),
                   let head = String(data: data, encoding: .utf8) else { continue }
-            // frontmatter 内の transcription_id を case-insensitive で照合
+            // frontmatter 内の transcript_id を case-insensitive で照合
             let lowered = head.lowercased()
-            if lowered.contains("transcription_id:"),
+            if lowered.contains("transcript_id:"),
                lowered.contains(targetId) {
                 return fileURL
             }
@@ -99,17 +99,30 @@ enum SummaryService {
 
     // MARK: - Private Helpers
 
-    /// 選択中テンプレートの内容をファイルから解決する。ファイルが見つからなければフォールバック。
+    /// 選択中テンプレートの内容をファイルから解決する。
+    /// Auto モード時はデフォルトプロンプト全体を返す。
+    /// テンプレート選択時は preamble + テンプレート内容（Output Format セクション）を結合して返す。
     @MainActor
     private static func resolvedSummaryPrompt(settings: AppSettings) -> String {
-        guard let vaultURL = settings.vaultURL else { return settings.llmSummaryPrompt }
-        let templateURL = SummaryTemplateService.templatesDirectoryURL(in: vaultURL)
-            .appendingPathComponent(settings.selectedTemplateName + ".md")
-        if let content = try? String(contentsOf: templateURL, encoding: .utf8),
-           !content.isEmpty {
-            return content
+        let preamble = AppSettings.summaryPromptPreamble
+
+        // Auto モード
+        guard settings.selectedTemplateName != AppSettings.autoTemplateName else {
+            return preamble + "\n\n" + AppSettings.defaultOutputFormat
         }
-        return settings.llmSummaryPrompt
+
+        // カスタムテンプレート: ファイルから Output Format セクションを読み込む
+        if let vaultURL = settings.vaultURL {
+            let templateURL = SummaryTemplateService.templatesDirectoryURL(in: vaultURL)
+                .appendingPathComponent(settings.selectedTemplateName + ".md")
+            if let content = try? String(contentsOf: templateURL, encoding: .utf8),
+               !content.isEmpty {
+                return preamble + "\n\n" + content
+            }
+        }
+
+        // フォールバック: デフォルト
+        return preamble + "\n\n" + AppSettings.defaultOutputFormat
     }
 
     /// プロジェクトフォルダ直下の CONTEXT.md を読み込む。存在しないか空なら nil。

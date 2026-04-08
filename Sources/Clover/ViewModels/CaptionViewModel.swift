@@ -39,6 +39,8 @@ final class CaptionViewModel: ObservableObject {
     @Published var isSummaryGenerating = false
     @Published var summaryError: String?
     @Published var lastSummaryURL: URL?
+    /// Summary タブへの切り替えをリクエストするフラグ。
+    @Published var requestShowSummaryTab = false
 
     // MARK: - Screenshot State
 
@@ -375,6 +377,30 @@ final class CaptionViewModel: ObservableObject {
 
     // MARK: - Summary Generation
 
+    /// 手動で要約を実行できるかどうか。
+    var canGenerateSummary: Bool {
+        guard currentTranscriptionId != nil,
+              currentProjectURL != nil else { return false }
+        return AppSettings.shared.isLLMConfigComplete && !store.segments.isEmpty
+    }
+
+    /// プルダウンメニューから手動で要約を実行する。
+    func triggerManualSummary() {
+        guard let transcriptionId = currentTranscriptionId,
+              let projectURL = currentProjectURL else { return }
+        let transcriptText = store.exportForSummary()
+        let startedAt = store.recordingStartTime ?? Date()
+        requestShowSummaryTab = true
+        Task {
+            await generateSummary(
+                transcriptionId: transcriptionId,
+                transcriptText: transcriptText,
+                projectURL: projectURL,
+                startedAt: startedAt
+            )
+        }
+    }
+
     func generateSummary(
         transcriptionId: UUID,
         transcriptText: String,
@@ -383,10 +409,7 @@ final class CaptionViewModel: ObservableObject {
     ) async {
         guard !transcriptText.isEmpty else { return }
 
-        let settings = AppSettings.shared
-        guard !settings.llmEndpointURL.isEmpty,
-              !settings.llmModelName.isEmpty,
-              !settings.llmAPIToken.isEmpty else {
+        guard AppSettings.shared.isLLMConfigComplete else {
             summaryError = L10n.llmConfigIncomplete
             return
         }

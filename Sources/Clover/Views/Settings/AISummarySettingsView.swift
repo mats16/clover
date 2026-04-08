@@ -89,6 +89,7 @@ struct AISummarySettingsView: View {
                         .foregroundColor(.secondary)
 
                     Picker("", selection: $settings.selectedTemplateName) {
+                        Text("Auto").tag(AppSettings.autoTemplateName)
                         ForEach(templates) { template in
                             Text(template.displayName).tag(template.name)
                         }
@@ -96,6 +97,7 @@ struct AISummarySettingsView: View {
 
                     HStack {
                         Button(L10n.openInEditor) { openSelectedTemplateInEditor() }
+                            .disabled(settings.selectedTemplateName == AppSettings.autoTemplateName)
                         Button(L10n.openTemplatesFolder) { openTemplatesFolder() }
                         Spacer()
                         Button(L10n.resetPresets) { resetPresets() }
@@ -154,7 +156,9 @@ struct AISummarySettingsView: View {
         guard let vaultURL = settings.vaultURL else { return }
         try? templateService.seedPresets(in: vaultURL)
         templates = (try? templateService.fetchTemplates(in: vaultURL)) ?? []
-        if !templates.contains(where: { $0.name == settings.selectedTemplateName }),
+        // Auto モードは常に有効。テンプレート選択中でファイルが見つからない場合のみリセット
+        if settings.selectedTemplateName != AppSettings.autoTemplateName,
+           !templates.contains(where: { $0.name == settings.selectedTemplateName }),
            let first = templates.first {
             settings.selectedTemplateName = first.name
         }

@@ -79,14 +79,25 @@ private struct SessionSettingsMenu: View {
     @ObservedObject var viewModel: CaptionViewModel
     @ObservedObject private var appSettings = AppSettings.shared
     @State private var isHovered = false
+    @State private var summaryTemplates: [SummaryTemplate] = []
+    private let templateService = SummaryTemplateService()
 
     var body: some View {
         Menu {
             // ── AI Summary ──
             Section("AI Summary") {
-                Toggle("終了時に自動要約", isOn: $appSettings.llmAutoSummaryEnabled)
+                Button {
+                    viewModel.triggerManualSummary()
+                } label: {
+                    Label("要約を実行", systemImage: "pencil.and.scribble")
+                }
+                .disabled(viewModel.isSummaryGenerating || !viewModel.canGenerateSummary)
 
-                Menu("Summary の言語") {
+                Toggle(isOn: $appSettings.llmAutoSummaryEnabled) {
+                    Label("終了時に自動要約", systemImage: "long.text.page.and.pencil")
+                }
+
+                Menu {
                     ForEach(SummaryLanguage.allCases) { lang in
                         Button {
                             appSettings.llmSummaryLanguageRawValue = lang.rawValue
@@ -98,12 +109,42 @@ private struct SessionSettingsMenu: View {
                             }
                         }
                     }
+                } label: {
+                    Label("Summary の言語", systemImage: "globe")
+                }
+
+                Menu {
+                    Button {
+                        appSettings.selectedTemplateName = AppSettings.autoTemplateName
+                    } label: {
+                        if appSettings.selectedTemplateName == AppSettings.autoTemplateName {
+                            Label("Auto", systemImage: "checkmark")
+                        } else {
+                            Text("Auto")
+                        }
+                    }
+
+                    Divider()
+
+                    ForEach(summaryTemplates) { template in
+                        Button {
+                            appSettings.selectedTemplateName = template.name
+                        } label: {
+                            if appSettings.selectedTemplateName == template.name {
+                                Label(template.displayName, systemImage: "checkmark")
+                            } else {
+                                Text(template.displayName)
+                            }
+                        }
+                    }
+                } label: {
+                    Label("Summary Instructions", systemImage: "pencil.line")
                 }
             }
 
             // ── Transcribe ──
             Section("Transcribe") {
-                Menu("音声ソース") {
+                Menu {
                     ForEach(AudioSourceMode.allCases, id: \.self) { mode in
                         Button {
                             viewModel.audioSourceMode = mode
@@ -116,9 +157,11 @@ private struct SessionSettingsMenu: View {
                         }
                         .disabled(viewModel.isListening)
                     }
+                } label: {
+                    Label("音声ソース", systemImage: "waveform.badge.microphone")
                 }
 
-                Menu("文字起こし言語") {
+                Menu {
                     if viewModel.filteredLocales.isEmpty {
                         let id = viewModel.selectedLocale
                         let name = Locale.current.localizedString(forIdentifier: id) ?? id
@@ -142,12 +185,14 @@ private struct SessionSettingsMenu: View {
                             }
                         }
                     }
+                } label: {
+                    Label("文字起こし言語", systemImage: "globe")
                 }
             }
 
             // ── Screenshots ──
             Section("Screenshots") {
-                Menu("キャプチャ対象") {
+                Menu {
                     Button {
                         viewModel.selectedWindowID = nil
                     } label: {
@@ -174,6 +219,8 @@ private struct SessionSettingsMenu: View {
                             }
                         }
                     }
+                } label: {
+                    Label("キャプチャ対象", systemImage: "inset.filled.rectangle.and.person.filled")
                 }
             }
         } label: {
@@ -195,6 +242,14 @@ private struct SessionSettingsMenu: View {
                 viewModel.refreshAvailableWindows()
             }
         }
+        .task { loadSummaryTemplates() }
+        .onChange(of: appSettings.currentVault?.id) { loadSummaryTemplates() }
+    }
+
+    private func loadSummaryTemplates() {
+        guard let vaultURL = appSettings.vaultURL else { return }
+        try? templateService.seedPresets(in: vaultURL)
+        summaryTemplates = (try? templateService.fetchTemplates(in: vaultURL)) ?? []
     }
 }
 
@@ -438,18 +493,6 @@ struct ControlPanelView: View {
                 }
             }
 
-            // 要約ステータス
-            if viewModel.isSummaryGenerating {
-                HStack(spacing: 6) {
-                    ProgressView()
-                        .controlSize(.small)
-                    Text(L10n.generatingSummary)
-                        .font(.caption)
-                        .foregroundColor(.secondary)
-                    Spacer()
-                }
-            }
-
             if let summaryError = viewModel.summaryError {
                 HStack {
                     Image(systemName: "exclamationmark.triangle.fill")
@@ -461,23 +504,15 @@ struct ControlPanelView: View {
                 }
             }
 
-            if let summaryURL = viewModel.lastSummaryURL {
-                HStack(spacing: 6) {
-                    Image(systemName: "checkmark.circle.fill")
-                        .foregroundColor(.green)
-                    Text(L10n.summaryGenerated)
-                        .font(.caption)
-                        .foregroundColor(.secondary)
-                    Button(L10n.openSummary) {
-                        AppSettings.shared.markdownEditor.open(summaryURL)
-                    }
-                    .font(.caption)
-                    Spacer()
-                }
-            }
         }
         .padding()
         .frame(minWidth: 500, minHeight: 500)
+        .onChange(of: viewModel.requestShowSummaryTab) {
+            if viewModel.requestShowSummaryTab {
+                selectedTab = .summary
+                viewModel.requestShowSummaryTab = false
+            }
+        }
         .navigationTitle(headerTitle)
         .toolbar {
             ToolbarItem(placement: .primaryAction) {
