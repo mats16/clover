@@ -207,7 +207,8 @@ final class AppSettings: ObservableObject {
 // MARK: - UserDefaults KVO キーパス
 
 extension UserDefaults {
-    @objc dynamic var enabledLocaleIdentifiersJSON: String? {
+    // NOTE: KVO を正しく動作させるため、プロパティ名を UserDefaults キー名と一致させる
+    @objc dynamic var enabledLocaleIdentifiers: String? {
         string(forKey: "enabledLocaleIdentifiers")
     }
 

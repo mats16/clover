@@ -78,7 +78,7 @@ final class CaptionViewModel: ObservableObject {
 
         // AppSettings の表示言語設定変更を監視
         settingsCancellable = UserDefaults.standard
-            .publisher(for: \.enabledLocaleIdentifiersJSON)
+            .publisher(for: \.enabledLocaleIdentifiers)
             .removeDuplicates()
             .receive(on: RunLoop.main)
             .sink { [weak self] _ in
