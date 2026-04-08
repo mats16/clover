@@ -6,23 +6,25 @@ struct ProjectRecord: Codable, FetchableRecord, PersistableRecord {
     static let databaseTableName = "projects"
 
     var id: UUID
+    var vaultId: UUID
     var name: String
     var createdAt: Date
 
     // MARK: - Shared DB Helpers
 
-    /// 複数の name を INSERT OR IGNORE で一括挿入する（name UNIQUE 制約を利用）。
-    static func upsertAll(names: [String], in db: Database) throws {
+    /// 複数の name を INSERT OR IGNORE で一括挿入する（vaultId + name UNIQUE 制約を利用）。
+    static func upsertAll(names: [String], vaultId: UUID, in db: Database) throws {
         let now = Date()
         for name in names {
-            let record = ProjectRecord(id: .v7(), name: name, createdAt: now)
+            let record = ProjectRecord(id: .v7(), vaultId: vaultId, name: name, createdAt: now)
             try record.insert(db, onConflict: .ignore)
         }
     }
 
     /// name が指定プレフィクスで始まるレコードを一括リネームする。
-    static func renameByPrefix(oldPrefix: String, newPrefix: String, in db: Database) throws {
+    static func renameByPrefix(oldPrefix: String, newPrefix: String, vaultId: UUID, in db: Database) throws {
         if var record = try ProjectRecord
+            .filter(Column("vaultId") == vaultId)
             .filter(Column("name") == oldPrefix)
             .fetchOne(db) {
             record.name = newPrefix
@@ -30,6 +32,7 @@ struct ProjectRecord: Codable, FetchableRecord, PersistableRecord {
         }
         let childPrefix = oldPrefix + "/"
         let records = try ProjectRecord
+            .filter(Column("vaultId") == vaultId)
             .filter(Column("name").like("\(childPrefix)%"))
             .fetchAll(db)
         for var record in records {
@@ -40,11 +43,13 @@ struct ProjectRecord: Codable, FetchableRecord, PersistableRecord {
 
     /// name が指定プレフィクスに一致するレコード、または配下のレコードを一括削除する。
     @discardableResult
-    static func deleteByPrefix(_ prefix: String, in db: Database) throws -> Int {
+    static func deleteByPrefix(_ prefix: String, vaultId: UUID, in db: Database) throws -> Int {
         let childCount = try ProjectRecord
+            .filter(Column("vaultId") == vaultId)
             .filter(Column("name").like(prefix + "/%"))
             .deleteAll(db)
         let selfCount = try ProjectRecord
+            .filter(Column("vaultId") == vaultId)
             .filter(Column("name") == prefix)
             .deleteAll(db)
         return childCount + selfCount

@@ -117,25 +117,14 @@ final class AppSettings: ObservableObject {
         set { markdownEditorRawValue = newValue.rawValue }
     }
 
-    // MARK: - 保管庫設定
+    // MARK: - 保管庫（ランタイム状態）
 
-    @AppStorage("vaultPath") var vaultPath: String = AppSettings.defaultVaultPath
+    /// 現在開いている保管庫。DB の `vaults` テーブルから選択される。
+    @Published var currentVault: VaultRecord?
 
-    nonisolated static let defaultVaultPath: String = FileManager.default.homeDirectoryForCurrentUser
-        .appendingPathComponent("Documents")
-        .appendingPathComponent("Obsidian Vault")
-        .path
-
-    var vaultURL: URL {
-        URL(fileURLWithPath: vaultPath, isDirectory: true)
-    }
-
-    /// 保管庫ディレクトリが存在しなければ作成する。
-    func ensureVaultExists() throws {
-        try FileManager.default.createDirectory(
-            at: vaultURL,
-            withIntermediateDirectories: true
-        )
+    /// 現在の保管庫の URL。保管庫未選択時は nil。
+    var vaultURL: URL? {
+        currentVault?.url
     }
 
     // MARK: - LLM 設定
@@ -212,10 +201,6 @@ final class AppSettings: ObservableObject {
 // MARK: - UserDefaults KVO キーパス
 
 extension UserDefaults {
-    @objc dynamic var vaultPath: String? {
-        string(forKey: "vaultPath")
-    }
-
     @objc dynamic var enabledLocaleIdentifiersJSON: String? {
         string(forKey: "enabledLocaleIdentifiers")
     }

@@ -25,6 +25,7 @@ final class CaptionViewModel: ObservableObject {
     var currentProjectURL: URL?
     var currentProjectId: UUID?
     var currentProjectName: String?
+    var currentVaultURL: URL?
 
     // MARK: - Summary State
 
@@ -93,12 +94,13 @@ final class CaptionViewModel: ObservableObject {
     // MARK: - Transcription Loading
 
     /// DB から文字起こしのセグメントを読み込んで表示する。
-    func loadTranscription(_ transcriptionId: UUID, dbQueue: DatabaseQueue, projectURL: URL, projectId: UUID, projectName: String? = nil) {
+    func loadTranscription(_ transcriptionId: UUID, dbQueue: DatabaseQueue, projectURL: URL, projectId: UUID, projectName: String? = nil, vaultURL: URL) {
         guard !isListening else { return }
         currentTranscriptionId = transcriptionId
         currentProjectURL = projectURL
         currentProjectId = projectId
         currentProjectName = projectName
+        currentVaultURL = vaultURL
         currentDbQueue = dbQueue
 
         let repo = TranscriptionRepository(dbQueue: dbQueue)
@@ -122,6 +124,7 @@ final class CaptionViewModel: ObservableObject {
         currentProjectURL = nil
         currentProjectId = nil
         currentProjectName = nil
+        currentVaultURL = nil
         store.clear()
         lastSummaryURL = nil
         summaryError = nil
@@ -211,11 +214,11 @@ final class CaptionViewModel: ObservableObject {
 
     // MARK: - Recording Control
 
-    func toggleListening(dbQueue: DatabaseQueue, projectURL: URL, projectId: UUID, projectName: String? = nil) {
+    func toggleListening(dbQueue: DatabaseQueue, projectURL: URL, projectId: UUID, projectName: String? = nil, vaultURL: URL) {
         if isListening {
             stopListening()
         } else {
-            Task { await startListening(dbQueue: dbQueue, projectURL: projectURL, projectId: projectId, projectName: projectName) }
+            Task { await startListening(dbQueue: dbQueue, projectURL: projectURL, projectId: projectId, projectName: projectName, vaultURL: vaultURL) }
         }
     }
 
@@ -225,11 +228,13 @@ final class CaptionViewModel: ObservableObject {
         projectURL: URL,
         projectId: UUID,
         projectName: String? = nil,
+        vaultURL: URL,
         appendingTo existingTranscriptionId: UUID? = nil
     ) async {
         self.currentProjectURL = projectURL
         self.currentProjectId = projectId
         self.currentProjectName = projectName
+        self.currentVaultURL = vaultURL
         self.currentDbQueue = dbQueue
         guard analyzerReady else {
             errorMessage = L10n.speechRecognitionNotReady
@@ -309,7 +314,7 @@ final class CaptionViewModel: ObservableObject {
         let recordingStart = store.recordingStartTime ?? Date()
         let segments = store.segments
         let dbQueue = currentDbQueue
-        let vaultURL = AppSettings.shared.vaultURL
+        guard let vaultURL = currentVaultURL else { return }
 
         Task {
             for pipeline in pipelines {

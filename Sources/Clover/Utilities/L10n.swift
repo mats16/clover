@@ -42,8 +42,15 @@ enum L10n {
     static var aiSummary: String { String(localized: "AI Summary", bundle: bundle) }
     static var editor: String { String(localized: "Editor", bundle: bundle) }
     static var vault: String { String(localized: "Vault", bundle: bundle) }
-    static var change: String { String(localized: "Change...", bundle: bundle) }
-    static var vaultDescription: String { String(localized: "Root directory where project folders are stored.", bundle: bundle) }
+
+    // MARK: - Vault Picker
+
+    static var createNewVault: String { String(localized: "Create New Vault", bundle: bundle) }
+    static var createNewVaultDescription: String { String(localized: "Create a new folder to use as a vault.", bundle: bundle) }
+    static var openFolderAsVault: String { String(localized: "Open Folder as Vault", bundle: bundle) }
+    static var openFolderAsVaultDescription: String { String(localized: "Select an existing folder to use as a vault.", bundle: bundle) }
+    static var removeVault: String { String(localized: "Remove Vault", bundle: bundle) }
+    static var open: String { String(localized: "Open", bundle: bundle) }
     static var loadingLanguages: String { String(localized: "Loading supported languages...", bundle: bundle) }
     static var searchLanguages: String { String(localized: "Search languages...", bundle: bundle) }
     static var noMatchingLanguages: String { String(localized: "No matching languages", bundle: bundle) }
@@ -124,6 +131,12 @@ enum L10n {
     static func languageChangeFailed(_ error: String) -> String { String(localized: "Failed to change language: \(error)", bundle: bundle) }
     static var speechRecognitionNotReady: String { String(localized: "Speech recognition is not ready", bundle: bundle) }
     static var systemAudioCaptureStopped: String { String(localized: "System audio capture stopped", bundle: bundle) }
+
+    // MARK: - Sidebar Footer
+
+    static var switchVault: String { String(localized: "Switch Vault", bundle: bundle) }
+    static var manageVaults: String { String(localized: "Manage Vaults...", bundle: bundle) }
+    static var settings: String { String(localized: "Settings", bundle: bundle) }
 
     // MARK: - Keychain
 

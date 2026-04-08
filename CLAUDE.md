@@ -49,23 +49,23 @@ TranscriptPersistenceService → GRDB/SQLite
 
 ### データ永続化
 
+- SQLite DB: `~/Library/Application Support/Clover/clover.sqlite`（`AppDatabaseManager`）
+- テーブル: `vaults`（保管庫）、`projects`（プロジェクト、vaultId で保管庫に紐付き）、`transcripts`（セッション）、`segments`（発話区間）
 - プロジェクト = ファイルシステム上のフォルダ（保管庫ディレクトリ配下）
-- 各プロジェクトフォルダ内に `.transcriptions.sqlite` を配置（`ProjectDatabaseManager`）
-- スキーマは `ProjectDatabaseManager.migrator` でマイグレーション管理（v1〜v3）
-- テーブル: `transcriptions`（セッション）、`segments`（発話区間）
+- 保管庫は DB の `vaults` テーブルで管理。初回起動時は `VaultPickerView` で登録
 - ID は UUID v7（`UUID.v7()` — 時系列ソート可能）
 
 ### MVVM 構成
 
 - **ViewModels**: `CaptionViewModel`（録音制御・文字起こし全体）、`SidebarViewModel`（プロジェクト・文字起こし一覧）
 - **Views**: `ContentView`（NavigationSplitView）→ `SidebarView` + `ControlPanelView`
-- **Models**: `TranscriptStore`（セグメント一元管理）、`TranscriptSegment`（発話区間）、`FolderProject`（フォルダプロジェクト）、`AppSettings`（UserDefaults ラッパー）
+- **Models**: `TranscriptStore`（セグメント一元管理）、`TranscriptSegment`（発話区間）、`VaultRecord`（保管庫）、`AppSettings`（UserDefaults ラッパー + 保管庫ランタイム状態）
 
 ### 設定
 
 - `AppSettings` が `@AppStorage` で UserDefaults に永続化
-- 保管庫パス（デフォルト: `~/Documents/Obsidian Vault`）
 - 認識言語ロケール、表示言語フィルタ
+- 保管庫は `AppSettings.currentVault`（ランタイム状態、DB から読み込み）
 
 ### 必要な権限（Info.plist）
 

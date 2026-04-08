@@ -5,6 +5,9 @@ struct SidebarView: View {
     @ObservedObject var viewModel: CaptionViewModel
     @ObservedObject var sidebarViewModel: SidebarViewModel
     var columnVisibility: NavigationSplitViewVisibility = .all
+    var onSelectVault: (VaultRecord) -> Void = { _ in }
+    @Environment(\.openSettings) private var openSettings
+    @Environment(\.openWindow) private var openWindow
     @State private var editingProjectId: UUID?
     @State private var editingName = ""
     @State private var editingTranscriptionId: UUID?
@@ -13,6 +16,7 @@ struct SidebarView: View {
     @State private var newProjectName = ""
     @FocusState private var isRenameFocused: Bool
     @FocusState private var isTranscriptionRenameFocused: Bool
+    @State private var isSettingsHovered = false
 
     private static let dateFormatter: DateFormatter = {
         let f = DateFormatter()
@@ -49,6 +53,9 @@ struct SidebarView: View {
             if showNewProjectField {
                 newProjectInputField
             }
+        }
+        .safeAreaInset(edge: .bottom) {
+            sidebarFooter
         }
         .onChange(of: sidebarViewModel.selectedTranscriptionId) { _, newId in
             handleTranscriptionSelection(newId)
@@ -109,8 +116,7 @@ struct SidebarView: View {
                     sidebarViewModel.openContext(projectName: row.name)
                 },
                 onOpenInFinder: {
-                    let url = AppSettings.shared.vaultURL.appendingPathComponent(row.name, isDirectory: true)
-                    NSWorkspace.shared.open(url)
+                    NSWorkspace.shared.open(sidebarViewModel.projectURL(for: row.name))
                 },
                 onDelete: {
                     sidebarViewModel.deleteProject(id: row.id, name: row.name)
@@ -223,6 +229,43 @@ struct SidebarView: View {
         .padding(8)
     }
 
+    // MARK: - Sidebar Footer
+
+    private var sidebarFooter: some View {
+        VStack(spacing: 0) {
+            Divider()
+            HStack(spacing: 0) {
+                VaultMenuButton(
+                    currentVault: sidebarViewModel.currentVault,
+                    allVaults: sidebarViewModel.allVaults,
+                    onSelectVault: onSelectVault,
+                    onManageVaults: { openWindow(id: WindowID.vaultManager) }
+                )
+
+                Spacer()
+
+                Button {
+                    openSettings()
+                } label: {
+                    Image(systemName: "gearshape")
+                        .font(.system(size: 12))
+                        .foregroundStyle(.secondary)
+                        .frame(width: 28, height: 28)
+                        .background(
+                            RoundedRectangle(cornerRadius: 6)
+                                .fill(isSettingsHovered ? Color.primary.opacity(0.08) : Color.clear)
+                        )
+                        .contentShape(Rectangle())
+                }
+                .buttonStyle(.plain)
+                .onHover { isSettingsHovered = $0 }
+                .help(L10n.settings)
+            }
+            .padding(.horizontal, 8)
+            .padding(.vertical, 2)
+        }
+    }
+
     // MARK: - Actions
 
     private func createNewProject() {
@@ -243,13 +286,15 @@ struct SidebarView: View {
 
         guard let dbQueue = sidebarViewModel.dbQueue,
               let projectURL = sidebarViewModel.selectedProjectURL,
-              let project = sidebarViewModel.selectedProject else { return }
+              let project = sidebarViewModel.selectedProject,
+              let vaultURL = sidebarViewModel.currentVault?.url else { return }
         viewModel.loadTranscription(
             transcriptionId,
             dbQueue: dbQueue,
             projectURL: projectURL,
             projectId: project.id,
-            projectName: project.name
+            projectName: project.name,
+            vaultURL: vaultURL
         )
     }
 }
@@ -351,5 +396,62 @@ private struct TranscriptionListRow: View {
                 .fill(isHovered && !isSelected ? Color.primary.opacity(0.06) : Color.clear)
         )
         .onHover { isHovered = $0 }
+    }
+}
+
+/// ホバー対応の保管庫切り替えメニュー。
+private struct VaultMenuButton: View {
+    let currentVault: VaultRecord?
+    let allVaults: [VaultRecord]
+    let onSelectVault: (VaultRecord) -> Void
+    let onManageVaults: () -> Void
+    @State private var isHovered = false
+
+    var body: some View {
+        Menu {
+            let currentId = currentVault?.id
+            ForEach(allVaults) { vault in
+                Button {
+                    if vault.id != currentId {
+                        onSelectVault(vault)
+                    }
+                } label: {
+                    if vault.id == currentId {
+                        Label(vault.name, systemImage: "checkmark")
+                    } else {
+                        Text(vault.name)
+                    }
+                }
+            }
+
+            Divider()
+
+            Button(L10n.manageVaults) {
+                onManageVaults()
+            }
+        } label: {
+            HStack(spacing: 5) {
+                Image(systemName: "chevron.up.chevron.down")
+                    .font(.system(size: 9, weight: .semibold))
+                    .foregroundStyle(.tertiary)
+                Text(currentVault?.name ?? L10n.vault)
+                    .font(.callout.bold())
+                    .foregroundStyle(.secondary)
+                    .lineLimit(1)
+                    .truncationMode(.tail)
+            }
+            .padding(.vertical, 6)
+            .padding(.horizontal, 8)
+        }
+        .menuStyle(.borderlessButton)
+        .menuIndicator(.hidden)
+        .fixedSize(horizontal: false, vertical: true)
+        .background(
+            RoundedRectangle(cornerRadius: 6)
+                .fill(isHovered ? Color.primary.opacity(0.08) : Color.clear)
+        )
+        .contentShape(Rectangle())
+        .onHover { isHovered = $0 }
+        .help(L10n.switchVault)
     }
 }

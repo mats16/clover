@@ -100,7 +100,8 @@ enum SummaryService {
     /// 選択中テンプレートの内容をファイルから解決する。ファイルが見つからなければフォールバック。
     @MainActor
     private static func resolvedSummaryPrompt(settings: AppSettings) -> String {
-        let templateURL = SummaryTemplateService.templatesDirectoryURL(in: settings.vaultURL)
+        guard let vaultURL = settings.vaultURL else { return settings.llmSummaryPrompt }
+        let templateURL = SummaryTemplateService.templatesDirectoryURL(in: vaultURL)
             .appendingPathComponent(settings.selectedTemplateName + ".md")
         if let content = try? String(contentsOf: templateURL, encoding: .utf8),
            !content.isEmpty {

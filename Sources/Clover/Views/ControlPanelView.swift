@@ -56,6 +56,7 @@ private struct AudioSourceButton: View {
 struct ControlPanelView: View {
     @ObservedObject var viewModel: CaptionViewModel
     @ObservedObject var sidebarViewModel: SidebarViewModel
+    @ObservedObject private var appSettings = AppSettings.shared
 
     var body: some View {
         VStack(spacing: 12) {
@@ -167,8 +168,18 @@ struct ControlPanelView: View {
         }
         .padding()
         .frame(minWidth: 500, minHeight: 500)
-        .navigationTitle("")
-        .toolbar(removing: .title)
+        .navigationTitle(headerTitle)
+        .toolbar {
+            ToolbarItem(placement: .primaryAction) {
+                if viewModel.currentTranscriptionId != nil {
+                    Button(action: { viewModel.exportTranscript() }) {
+                        Image(systemName: "square.and.arrow.up")
+                    }
+                    .disabled(viewModel.store.segments.isEmpty)
+                    .help(L10n.export)
+                }
+            }
+        }
     }
 
     // MARK: - Live Recording Controls
@@ -182,8 +193,9 @@ struct ControlPanelView: View {
                 } else {
                     guard let dbQueue = sidebarViewModel.dbQueue,
                           let projectURL = sidebarViewModel.selectedProjectURL,
-                          let project = sidebarViewModel.selectedProject else { return }
-                    viewModel.toggleListening(dbQueue: dbQueue, projectURL: projectURL, projectId: project.id, projectName: project.name)
+                          let project = sidebarViewModel.selectedProject,
+                          let vaultURL = sidebarViewModel.currentVault?.url else { return }
+                    viewModel.toggleListening(dbQueue: dbQueue, projectURL: projectURL, projectId: project.id, projectName: project.name, vaultURL: vaultURL)
                 }
             }) {
                 HStack(spacing: 4) {
@@ -236,41 +248,43 @@ struct ControlPanelView: View {
 
             Spacer()
 
-            // 要約生成
-            Button(action: {
-                guard let transcriptionId = viewModel.currentTranscriptionId,
-                      let projectURL = sidebarViewModel.selectedProjectURL else { return }
-                let text = viewModel.store.exportForSummary()
-                Task {
-                    await viewModel.generateSummary(
-                        transcriptionId: transcriptionId,
-                        transcriptText: text,
-                        projectURL: projectURL,
-                        startedAt: viewModel.store.recordingStartTime ?? Date()
-                    )
+            // 要約生成 + テンプレート選択
+            ControlGroup {
+                Button(action: {
+                    guard let transcriptionId = viewModel.currentTranscriptionId,
+                          let projectURL = sidebarViewModel.selectedProjectURL else { return }
+                    let text = viewModel.store.exportForSummary()
+                    Task {
+                        await viewModel.generateSummary(
+                            transcriptionId: transcriptionId,
+                            transcriptText: text,
+                            projectURL: projectURL,
+                            startedAt: viewModel.store.recordingStartTime ?? Date()
+                        )
+                    }
+                }) {
+                    Label(L10n.generateSummary, systemImage: "sparkles")
                 }
-            }) {
-                Image(systemName: "sparkles")
-            }
-            .buttonStyle(ToolbarIconButtonStyle())
-            .disabled(viewModel.store.segments.isEmpty || viewModel.isSummaryGenerating || viewModel.isListening)
-            .help(L10n.generateSummary)
 
-            // 書き出し
-            Button(action: { viewModel.exportTranscript() }) {
-                Image(systemName: "square.and.arrow.up")
+                Menu {
+                    ForEach(availableTemplates) { template in
+                        Button(action: {
+                            appSettings.selectedTemplateName = template.name
+                        }) {
+                            if template.name == appSettings.selectedTemplateName {
+                                Label(template.displayName, systemImage: "checkmark")
+                            } else {
+                                Text(template.displayName)
+                            }
+                        }
+                    }
+                } label: {
+                    Text(selectedTemplateDisplayName)
+                }
             }
-            .buttonStyle(ToolbarIconButtonStyle())
-            .disabled(viewModel.store.segments.isEmpty)
-            .help(L10n.export)
+            .disabled(isSummaryDisabled)
 
-            // クリア
-            Button(action: { viewModel.clearText() }) {
-                Image(systemName: "trash")
-            }
-            .buttonStyle(ToolbarIconButtonStyle())
-            .disabled(viewModel.store.segments.isEmpty || !viewModel.isListening)
-            .help(L10n.clearTranscription)
+
         }
     }
 
@@ -280,6 +294,7 @@ struct ControlPanelView: View {
         guard let dbQueue = sidebarViewModel.dbQueue,
               let projectURL = sidebarViewModel.selectedProjectURL,
               let project = sidebarViewModel.selectedProject,
+              let vaultURL = sidebarViewModel.currentVault?.url,
               let transcriptionId = viewModel.currentTranscriptionId else { return }
         Task {
             await viewModel.startListening(
@@ -287,12 +302,55 @@ struct ControlPanelView: View {
                 projectURL: projectURL,
                 projectId: project.id,
                 projectName: project.name,
+                vaultURL: vaultURL,
                 appendingTo: transcriptionId
             )
         }
     }
 
     // MARK: - Computed
+
+    /// 要約ボタン・テンプレート選択を無効化する条件。
+    private var isSummaryDisabled: Bool {
+        viewModel.currentTranscriptionId == nil
+            || viewModel.store.segments.isEmpty
+            || viewModel.isSummaryGenerating
+            || viewModel.isListening
+    }
+
+    /// 選択中テンプレートの表示名。
+    private var selectedTemplateDisplayName: String {
+        let name = appSettings.selectedTemplateName
+        return availableTemplates.first(where: { $0.name == name })?.displayName
+            ?? name.replacingOccurrences(of: "_", with: " ")
+    }
+
+    /// 保管庫内のテンプレート一覧。
+    private var availableTemplates: [SummaryTemplate] {
+        guard let vaultURL = sidebarViewModel.currentVault?.url else { return [] }
+        return (try? SummaryTemplateService().fetchTemplates(in: vaultURL)) ?? []
+    }
+
+    /// ヘッダーに表示する「プロジェクト名 - トランスクリプション名」。
+    private var headerTitle: String {
+        guard let project = sidebarViewModel.selectedProject else { return "" }
+        let transcriptName: String
+        if let transcriptionId = viewModel.currentTranscriptionId,
+           let record = sidebarViewModel.transcriptionsForSelectedProject.first(where: { $0.id == transcriptionId }) {
+            transcriptName = record.title.isEmpty
+                ? Self.headerDateFormatter.string(from: record.startedAt)
+                : record.title
+        } else {
+            transcriptName = "new"
+        }
+        return "\(project.name) - \(transcriptName)"
+    }
+
+    private static let headerDateFormatter: DateFormatter = {
+        let f = DateFormatter()
+        f.dateFormat = "yyyy/MM/dd HH:mm"
+        return f
+    }()
 
     private var recordButtonIcon: String {
         if viewModel.isListening {

@@ -29,8 +29,14 @@
 "General" = "一般";
 "AI Summary" = "AI 要約";
 "Vault" = "保管庫";
-"Change..." = "変更...";
-"Root directory where project folders are stored." = "プロジェクトフォルダが格納されるルートディレクトリです。";
+
+/* Vault Picker */
+"Create New Vault" = "保管庫を新規作成する";
+"Create a new folder to use as a vault." = "新しいフォルダを作成して保管庫として使用します。";
+"Open Folder as Vault" = "保管庫としてフォルダを開く";
+"Select an existing folder to use as a vault." = "既存のフォルダを選択して保管庫として使用します。";
+"Remove Vault" = "保管庫を登録解除";
+"Open" = "開く";
 "Loading supported languages..." = "対応言語を読み込み中...";
 "Search languages..." = "言語を検索...";
 "No matching languages" = "該当する言語がありません";
@@ -89,6 +95,11 @@
 "Failed to change language: %@" = "言語切替に失敗: %@";
 "Speech recognition is not ready" = "音声認識が準備されていません";
 "System audio capture stopped" = "システム音声キャプチャが停止しました";
+
+/* Sidebar Footer */
+"Switch Vault" = "保管庫を切り替え";
+"Manage Vaults..." = "保管庫を管理...";
+"Settings" = "設定";
 
 /* Keychain */
 "Authenticate to access your API token stored in Keychain." = "キーチェーンに保存された API トークンにアクセスするために認証が必要です。";
