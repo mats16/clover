@@ -1,28 +1,35 @@
 import SwiftUI
 
-/// 設定画面「AI 要約」タブ。LLM エンドポイント・テンプレートを管理する。
+/// 設定画面「AI 要約」タブ。LLM エンドポイントを管理する。
 struct AISummarySettingsView: View {
     @ObservedObject private var settings = AppSettings.shared
     @State private var apiToken = ""
     @State private var isTestingConnection = false
     @State private var connectionTestResult: ConnectionTestResult?
-    @State private var templates: [SummaryTemplate] = []
-
     private enum ConnectionTestResult {
         case success
         case failure(String)
     }
 
     var body: some View {
+        VStack(alignment: .leading, spacing: 0) {
+            Text(L10n.aiSummary)
+                .font(.title)
+                .fontWeight(.bold)
+                .padding(.horizontal, 20)
+                .padding(.top, 20)
+                .padding(.bottom, 4)
+
         Form {
             Section {
                 LabeledContent(L10n.endpointURL) {
-                    TextField("", text: $settings.llmEndpointURL)
+                    TextField("", text: $settings.llmEndpointURL, prompt: Text("https://…/mlflow/v1/chat/completions"))
                         .textFieldStyle(.roundedBorder)
+                        .frame(maxWidth: 300)
                 }
 
                 LabeledContent(L10n.modelName) {
-                    TextField("", text: $settings.llmModelName)
+                    TextField("", text: $settings.llmModelName, prompt: Text("databricks-gpt-5-4"))
                         .textFieldStyle(.roundedBorder)
                 }
 
@@ -31,98 +38,47 @@ struct AISummarySettingsView: View {
                         .textFieldStyle(.roundedBorder)
                         .onSubmit { settings.llmAPIToken = apiToken }
                 }
-
-                HStack {
-                    Text(L10n.apiTokenStoredInKeychain)
-                        .font(.caption)
-                        .foregroundColor(.secondary)
-                    Spacer()
-                    if isTestingConnection {
-                        ProgressView()
-                            .controlSize(.small)
-                        Text(L10n.testing)
-                            .font(.caption)
-                            .foregroundColor(.secondary)
-                    } else {
-                        Button(L10n.testConnection) {
-                            testConnection()
-                        }
-                        .font(.caption)
-                        .disabled(!isLLMConfigComplete)
-                    }
-                }
-
-                if let result = connectionTestResult {
-                    switch result {
-                    case .success:
-                        Label(L10n.connectionSuccess, systemImage: "checkmark.circle.fill")
-                            .font(.caption)
-                            .foregroundColor(.green)
-                    case let .failure(message):
-                        Label(message, systemImage: "xmark.circle.fill")
-                            .font(.caption)
-                            .foregroundColor(.red)
-                    }
-                }
-            } header: {
-                Text(L10n.model)
             } footer: {
-                Text(L10n.llmSettingsDescription)
-                    .font(.caption)
-                    .foregroundColor(.secondary)
-            }
-
-            Section {
-                Toggle(L10n.autoSummary, isOn: $settings.llmAutoSummaryEnabled)
-
-                Text(L10n.autoSummaryDescription)
-                    .font(.caption)
-                    .foregroundColor(.secondary)
-            } header: {
-                Text(L10n.autoSummary)
-            }
-
-            Section {
-                VStack(alignment: .leading, spacing: 4) {
-                    Text(L10n.summaryTemplate)
-                        .font(.caption)
-                        .foregroundColor(.secondary)
-
-                    Picker("", selection: $settings.selectedTemplateName) {
-                        Text("Auto").tag(AppSettings.autoTemplateName)
-                        ForEach(templates) { template in
-                            Text(template.displayName).tag(template.name)
-                        }
-                    }
+                VStack(alignment: .leading, spacing: 8) {
+                    Text(L10n.apiTokenStoredInKeychain)
+                        .foregroundStyle(.secondary)
 
                     HStack {
-                        Button(L10n.openInEditor) { openSelectedTemplateInEditor() }
-                            .disabled(settings.selectedTemplateName == AppSettings.autoTemplateName)
-                        Button(L10n.openTemplatesFolder) { openTemplatesFolder() }
+                        if let result = connectionTestResult {
+                            switch result {
+                            case .success:
+                                Label(L10n.connectionSuccess, systemImage: "checkmark.circle.fill")
+                                    .foregroundColor(.green)
+                            case let .failure(message):
+                                Label(message, systemImage: "xmark.circle.fill")
+                                    .foregroundColor(.red)
+                            }
+                        }
                         Spacer()
-                        Button(L10n.resetPresets) { resetPresets() }
+                        if isTestingConnection {
+                            ProgressView()
+                                .controlSize(.small)
+                            Text(L10n.testing)
+                                .foregroundStyle(.secondary)
+                        } else {
+                            Button(L10n.testConnection) {
+                                testConnection()
+                            }
+                            .disabled(!isLLMConfigComplete)
+                        }
                     }
-                    .font(.caption)
-
-                    Text(L10n.summaryTemplateDescription)
-                        .font(.caption)
-                        .foregroundColor(.secondary)
                 }
-            } header: {
-                Text(L10n.templates)
             }
         }
         .formStyle(.grouped)
         .task {
             apiToken = settings.llmAPIToken
-            loadTemplates()
-        }
-        .onChange(of: settings.currentVault?.id) {
-            loadTemplates()
         }
         .onDisappear {
             settings.llmAPIToken = apiToken
         }
+
+        } // VStack
     }
 
     // MARK: - Private
@@ -148,35 +104,5 @@ struct AISummarySettingsView: View {
             }
             isTestingConnection = false
         }
-    }
-
-    private let templateService = SummaryTemplateService()
-
-    private func loadTemplates() {
-        guard let vaultURL = settings.vaultURL else { return }
-        try? templateService.seedPresets(in: vaultURL)
-        templates = (try? templateService.fetchTemplates(in: vaultURL)) ?? []
-        // Auto モードは常に有効。テンプレート選択中でファイルが見つからない場合のみリセット
-        if settings.selectedTemplateName != AppSettings.autoTemplateName,
-           !templates.contains(where: { $0.name == settings.selectedTemplateName }),
-           let first = templates.first {
-            settings.selectedTemplateName = first.name
-        }
-    }
-
-    private func openSelectedTemplateInEditor() {
-        guard let template = templates.first(where: { $0.name == settings.selectedTemplateName }) else { return }
-        NSWorkspace.shared.open(template.url)
-    }
-
-    private func openTemplatesFolder() {
-        guard let vaultURL = settings.vaultURL else { return }
-        let dir = SummaryTemplateService.templatesDirectoryURL(in: vaultURL)
-        NSWorkspace.shared.open(dir)
-    }
-
-    private func resetPresets() {
-        guard let vaultURL = settings.vaultURL else { return }
-        try? templateService.resetPresets(in: vaultURL)
     }
 }

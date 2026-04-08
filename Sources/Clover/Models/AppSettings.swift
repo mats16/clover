@@ -1,6 +1,36 @@
 import AppKit
 import SwiftUI
 
+/// アプリの表示言語。
+enum AppLanguage: String, CaseIterable, Identifiable {
+    case system
+    case ja
+    case en
+
+    /// UserDefaults キー。
+    nonisolated static let userDefaultsKey = "appLanguage"
+
+    var id: String { rawValue }
+
+    /// ピッカーに表示する名前（各言語のネイティブ名）。
+    var displayName: String {
+        switch self {
+        case .system: L10n.followSystem
+        case .ja: "日本語"
+        case .en: "English"
+        }
+    }
+
+    /// 対応する lproj リソース名。system の場合は nil。
+    var lprojName: String? {
+        switch self {
+        case .system: nil
+        case .ja: "ja"
+        case .en: "en"
+        }
+    }
+}
+
 /// Markdown ファイルを開くエディタの選択肢。
 enum MarkdownEditor: String, CaseIterable, Identifiable {
     case system
@@ -72,6 +102,15 @@ enum MarkdownEditor: String, CaseIterable, Identifiable {
 final class AppSettings: ObservableObject {
     static let shared = AppSettings()
 
+    // MARK: - 表示言語
+
+    @AppStorage(AppLanguage.userDefaultsKey) var appLanguageRawValue: String = AppLanguage.system.rawValue
+
+    var appLanguage: AppLanguage {
+        get { AppLanguage(rawValue: appLanguageRawValue) ?? .system }
+        set { appLanguageRawValue = newValue.rawValue }
+    }
+
     // MARK: - 音声認識設定
 
     @AppStorage("transcriptionLocale") var transcriptionLocale: String = Locale.current.identifier
@@ -126,6 +165,10 @@ final class AppSettings: ObservableObject {
     var vaultURL: URL? {
         currentVault?.url
     }
+
+    // MARK: - 会議検出設定
+
+    @AppStorage("meetingDetectionEnabled") var meetingDetectionEnabled = true
 
     // MARK: - LLM 設定
 

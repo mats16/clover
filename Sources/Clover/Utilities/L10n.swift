@@ -2,7 +2,29 @@ import Foundation
 
 /// ローカライズ文字列への型安全なアクセスを提供する。
 enum L10n {
-    private static let bundle: Bundle = .module
+    /// キャッシュ済みの Bundle と、その生成元の言語 rawValue。
+    /// 言語設定が変わらない限り Bundle を再生成しない。
+    nonisolated(unsafe) private static var cachedBundle: Bundle = .module
+    nonisolated(unsafe) private static var cachedLanguageRaw: String = ""
+
+    /// 選択された表示言語に対応する Bundle を返す。
+    /// UserDefaults から直接読み取ることで @MainActor 制約を回避する。
+    nonisolated private static var bundle: Bundle {
+        let rawValue = UserDefaults.standard.string(forKey: AppLanguage.userDefaultsKey) ?? AppLanguage.system.rawValue
+        if rawValue == cachedLanguageRaw { return cachedBundle }
+        let resolved: Bundle
+        if let language = AppLanguage(rawValue: rawValue),
+           let lprojName = language.lprojName,
+           let path = Bundle.module.path(forResource: lprojName, ofType: "lproj"),
+           let lprojBundle = Bundle(path: path) {
+            resolved = lprojBundle
+        } else {
+            resolved = .module
+        }
+        cachedLanguageRaw = rawValue
+        cachedBundle = resolved
+        return resolved
+    }
 
     // MARK: - Common
 
@@ -49,6 +71,9 @@ enum L10n {
     static var aiSummary: String { String(localized: "AI Summary", bundle: bundle) }
     static var editor: String { String(localized: "Editor", bundle: bundle) }
     static var vault: String { String(localized: "Vault", bundle: bundle) }
+    static var appLanguage: String { String(localized: "App Language", bundle: bundle) }
+    static var appLanguageDescription: String { String(localized: "Set the display language for the app.", bundle: bundle) }
+    static var followSystem: String { String(localized: "Follow System", bundle: bundle) }
 
     // MARK: - Vault Picker
 
@@ -144,6 +169,25 @@ enum L10n {
     static var switchVault: String { String(localized: "Switch Vault", bundle: bundle) }
     static var manageVaults: String { String(localized: "Manage Vaults...", bundle: bundle) }
     static var settings: String { String(localized: "Settings", bundle: bundle) }
+
+    // MARK: - Meeting Detection
+
+    static var meetingDetection: String { String(localized: "Meeting Detection", bundle: bundle) }
+    static var meetingDetectionDescription: String { String(
+        localized: "Show a prompt when a video meeting is detected.",
+        bundle: bundle
+    ) }
+    static func meetingDetectedMessage(_ appName: String) -> String { String(
+        localized: "Meeting detected (\(appName)). Start transcription?",
+        bundle: bundle
+    ) }
+    static var startTranscription: String { String(localized: "Start Transcription", bundle: bundle) }
+    static var dismiss: String { String(localized: "Dismiss", bundle: bundle) }
+    static func meetingDetectedSubtitle(_ appName: String) -> String { String(
+        localized: "Meeting detected in \(appName)",
+        bundle: bundle
+    ) }
+    static var microphoneInUse: String { String(localized: "Microphone is in use", bundle: bundle) }
 
     // MARK: - Keychain
 

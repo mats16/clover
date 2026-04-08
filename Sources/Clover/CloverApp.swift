@@ -10,6 +10,7 @@ struct CloverApp: App {
     @NSApplicationDelegateAdaptor(AppDelegate.self) var appDelegate
     @StateObject private var viewModel = CaptionViewModel()
     @StateObject private var sidebarViewModel = SidebarViewModel()
+    @StateObject private var meetingDetectionService = MeetingDetectionService()
     @State private var appDatabase: AppDatabaseManager?
     @State private var showVaultPicker = true
 
@@ -70,6 +71,29 @@ struct CloverApp: App {
         sidebarViewModel.setAppDatabase(db)
         sidebarViewModel.updateVaultLastOpened(vault.id)
         viewModel.prepareAnalyzer()
+        meetingDetectionService.isRecording = { [weak viewModel] in viewModel?.isListening ?? false }
+        let capturedDb = db
+        meetingDetectionService.onStartTranscription = { [weak viewModel] in
+            guard let viewModel,
+                  let vault = AppSettings.shared.currentVault
+            else { return }
+
+            // "Meetings" プロジェクトを取得または自動作成
+            let repo = TranscriptionRepository(dbQueue: capturedDb.dbQueue)
+            let projectName = "Meetings"
+            guard let project = try? repo.fetchOrCreateProject(name: projectName, vaultId: vault.id) else { return }
+            let projectURL = vault.url.appendingPathComponent(projectName, isDirectory: true)
+            try? FileManager.default.createDirectory(at: projectURL, withIntermediateDirectories: true)
+
+            viewModel.toggleListening(
+                dbQueue: capturedDb.dbQueue,
+                projectURL: projectURL,
+                projectId: project.id,
+                projectName: project.name,
+                vaultURL: vault.url
+            )
+        }
+        meetingDetectionService.start()
         showVaultPicker = false
     }
 }

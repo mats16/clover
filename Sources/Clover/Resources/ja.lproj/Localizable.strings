@@ -35,6 +35,9 @@
 "General" = "一般";
 "AI Summary" = "AI 要約";
 "Vault" = "保管庫";
+"App Language" = "表示言語";
+"Set the display language for the app." = "アプリの表示言語を設定します。";
+"Follow System" = "システムに従う";
 
 /* Vault Picker */
 "Create New Vault" = "保管庫を新規作成する";
@@ -106,6 +109,15 @@
 "Switch Vault" = "保管庫を切り替え";
 "Manage Vaults..." = "保管庫を管理...";
 "Settings" = "設定";
+
+/* Meeting Detection */
+"Meeting Detection" = "会議検出";
+"Show a prompt when a video meeting is detected." = "ビデオ会議が検出されたときにプロンプトを表示します。";
+"Meeting detected (%@). Start transcription?" = "会議が検出されました（%@）。文字起こしを開始しますか？";
+"Start Transcription" = "文字起こしを開始";
+"Dismiss" = "閉じる";
+"Meeting detected in %@" = "%@ でミーティングが検出されました";
+"Microphone is in use" = "マイクが使用されています";
 
 /* Keychain */
 "Authenticate to access your API token stored in Keychain." = "キーチェーンに保存された API トークンにアクセスするために認証が必要です。";

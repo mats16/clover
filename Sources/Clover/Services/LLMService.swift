@@ -2,12 +2,71 @@ import Foundation
 
 /// OpenAI 互換の Chat Completions API を呼び出すサービス。
 enum LLMService {
-    struct ChatMessage: Codable {
-        let role: String
-        let content: String
+    // MARK: - Content Types
+
+    enum ContentPart {
+        case text(String)
+        case imageURL(String) // data URI (e.g. "data:image/webp;base64,...")
     }
 
-    private struct RequestBody: Codable {
+    enum ChatMessageContent {
+        case text(String)
+        case parts([ContentPart])
+    }
+
+    struct ChatMessage: Encodable {
+        let role: String
+        let content: ChatMessageContent
+
+        init(role: String, content: String) {
+            self.role = role
+            self.content = .text(content)
+        }
+
+        init(role: String, parts: [ContentPart]) {
+            self.role = role
+            self.content = .parts(parts)
+        }
+
+        func encode(to encoder: Encoder) throws {
+            var container = encoder.container(keyedBy: CodingKeys.self)
+            try container.encode(role, forKey: .role)
+            switch content {
+            case let .text(string):
+                try container.encode(string, forKey: .content)
+            case let .parts(parts):
+                var partsContainer = container.nestedUnkeyedContainer(forKey: .content)
+                for part in parts {
+                    switch part {
+                    case let .text(text):
+                        try partsContainer.encode(TextPart(type: "text", text: text))
+                    case let .imageURL(url):
+                        try partsContainer.encode(ImageURLPart(type: "image_url", image_url: .init(url: url)))
+                    }
+                }
+            }
+        }
+
+        private enum CodingKeys: String, CodingKey {
+            case role, content
+        }
+
+        private struct TextPart: Encodable {
+            let type: String
+            let text: String
+        }
+
+        private struct ImageURLPart: Encodable {
+            let type: String
+            let image_url: ImageURL
+
+            struct ImageURL: Encodable {
+                let url: String
+            }
+        }
+    }
+
+    private struct RequestBody: Encodable {
         let model: String
         let max_tokens: Int
         let messages: [ChatMessage]

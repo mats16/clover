@@ -9,7 +9,8 @@ enum SummaryService {
         projectURL: URL,
         transcriptionId: UUID,
         startedAt: Date,
-        transcriptText: String
+        transcriptText: String,
+        screenshots: [ScreenshotRecord] = []
     ) async throws -> URL {
         let settings = AppSettings.shared
         let endpoint = settings.llmEndpointURL
@@ -18,7 +19,7 @@ enum SummaryService {
         let prompt = resolvedSummaryPrompt(settings: settings)
         let languageName = settings.llmSummaryLanguage.displayName
 
-        // メッセージ組み立て: テンプレート(system) → CONTEXT.md(user) → 文字起こし(user)
+        // メッセージ組み立て: テンプレート(system) → CONTEXT.md(user) → 文字起こし(user) + スクリーンショット
         let contextContent = readContext(in: projectURL)
 
         let systemPrompt = prompt + "\n\n# Language\nWrite the summary in \(languageName)."
@@ -28,10 +29,26 @@ enum SummaryService {
         if let contextContent {
             messages.append(.init(role: "user", content: contextContent))
         }
-        messages.append(.init(
-            role: "user",
-            content: "<transcript_id>\(transcriptionId.uuidString)</transcript_id>\n<transcript>\n\(transcriptText)\n</transcript>"
-        ))
+
+        let transcriptContent = "<transcript_id>\(transcriptionId.uuidString)</transcript_id>\n<transcript>\n\(transcriptText)\n</transcript>"
+
+        if screenshots.isEmpty {
+            messages.append(.init(role: "user", content: transcriptContent))
+        } else {
+            // マルチモーダル: テキスト + スクリーンショット画像（MainActor 外でリサイズ・エンコード）
+            let dataURIs = await Task.detached(priority: .userInitiated) {
+                let mimeType = ImageEncoder.preferredMIMEType
+                return screenshots.map { screenshot in
+                    let imageData = ImageEncoder.resized(screenshot.imageData, maxLongEdge: 1024)
+                    return "data:\(mimeType);base64,\(imageData.base64EncodedString())"
+                }
+            }.value
+            var parts: [LLMService.ContentPart] = [.text(transcriptContent)]
+            for dataURI in dataURIs {
+                parts.append(.imageURL(dataURI))
+            }
+            messages.append(.init(role: "user", parts: parts))
+        }
 
         let summary = try await LLMService.chatCompletion(
             endpoint: endpoint,

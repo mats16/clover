@@ -1,10 +1,8 @@
 import Combine
 import GRDB
-import ImageIO
 @preconcurrency import ScreenCaptureKit
 import Speech
 import SwiftUI
-import UniformTypeIdentifiers
 
 private enum ScreenshotError: Error {
     case encodingFailed
@@ -419,11 +417,19 @@ final class CaptionViewModel: ObservableObject {
         lastSummaryURL = nil
 
         do {
+            // セッションに紐づくスクリーンショットを取得
+            var screenshots: [ScreenshotRecord] = []
+            if let queue = currentDbQueue {
+                let repo = TranscriptionRepository(dbQueue: queue)
+                screenshots = (try? repo.fetchScreenshots(forTranscriptionId: transcriptionId)) ?? []
+            }
+
             let fileURL = try await SummaryService.generateSummary(
                 projectURL: projectURL,
                 transcriptionId: transcriptionId,
                 startedAt: startedAt,
-                transcriptText: transcriptText
+                transcriptText: transcriptText,
+                screenshots: screenshots
             )
             lastSummaryURL = fileURL
 
@@ -509,24 +515,12 @@ final class CaptionViewModel: ObservableObject {
 
                 let cgImage = try await SCScreenshotManager.captureImage(contentFilter: filter, configuration: config)
 
-                // WebP エンコードを MainActor 外で実行
+                // 画像エンコードを MainActor 外で実行（WebP → JPEG フォールバック）
                 let imageData: Data = try await Task.detached(priority: .userInitiated) {
-                    let webPData = NSMutableData()
-                    guard let destination = CGImageDestinationCreateWithData(
-                        webPData,
-                        UTType.webP.identifier as CFString,
-                        1,
-                        nil
-                    ) else {
+                    guard let encoded = ImageEncoder.encode(cgImage, quality: 0.70) else {
                         throw ScreenshotError.encodingFailed
                     }
-                    CGImageDestinationAddImage(destination, cgImage, [
-                        kCGImageDestinationLossyCompressionQuality: 0.85,
-                    ] as CFDictionary)
-                    guard CGImageDestinationFinalize(destination) else {
-                        throw ScreenshotError.encodingFailed
-                    }
-                    return webPData as Data
+                    return encoded
                 }.value
 
                 let record = ScreenshotRecord(

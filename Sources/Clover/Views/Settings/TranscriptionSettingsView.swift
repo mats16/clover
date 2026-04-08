@@ -9,6 +9,14 @@ struct TranscriptionSettingsView: View {
     @State private var localeSearchText = ""
 
     var body: some View {
+        VStack(alignment: .leading, spacing: 0) {
+            Text(L10n.transcription)
+                .font(.title)
+                .fontWeight(.bold)
+                .padding(.horizontal, 20)
+                .padding(.top, 20)
+                .padding(.bottom, 4)
+
         Form {
             Section {
                 if isLoadingLocales {
@@ -69,18 +77,17 @@ struct TranscriptionSettingsView: View {
                         }
                     }
                 }
-            } header: {
-                Text(L10n.displayLanguages)
             } footer: {
                 Text(L10n.displayLanguagesDescription)
-                    .font(.caption)
-                    .foregroundColor(.secondary)
+                    .foregroundStyle(.secondary)
             }
         }
         .formStyle(.grouped)
         .task {
             await loadSupportedLocales()
         }
+
+        } // VStack
     }
 
     // MARK: - Private
