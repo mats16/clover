@@ -500,7 +500,7 @@ final class CaptionViewModel: ObservableObject {
     ) async {
         let dbQueue = currentDbQueue
 
-        let transcriptPath = await Task.detached {
+        async let transcriptPath = Task.detached {
             try? TranscriptExportService.exportTranscript(
                 vaultURL: vaultURL,
                 transcriptionId: transcriptionId,
@@ -510,19 +510,19 @@ final class CaptionViewModel: ObservableObject {
             )
         }.value
 
-        if let transcriptPath, let dbQueue {
-            let repo = TranscriptionRepository(dbQueue: dbQueue)
-            try? repo.updateTranscriptFilePath(id: transcriptionId, path: transcriptPath)
-        }
+        async let screenshotExport: Void = Task.detached {
+            guard !screenshots.isEmpty else { return }
+            _ = try? ScreenshotExportService.exportScreenshots(
+                vaultURL: vaultURL,
+                screenshots: screenshots
+            )
+        }.value
 
-        if !screenshots.isEmpty {
-            await Task.detached {
-                _ = try? ScreenshotExportService.exportScreenshots(
-                    vaultURL: vaultURL,
-                    screenshots: screenshots
-                )
-            }.value
+        if let path = await transcriptPath, let dbQueue {
+            let repo = TranscriptionRepository(dbQueue: dbQueue)
+            try? repo.updateTranscriptFilePath(id: transcriptionId, path: path)
         }
+        _ = await screenshotExport
     }
 
     func clearText() {
