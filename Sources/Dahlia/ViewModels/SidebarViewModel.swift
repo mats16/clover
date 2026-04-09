@@ -238,12 +238,14 @@ final class SidebarViewModel {
             transcriptionObservation = nil
         }
 
-        // FS 削除を先に実行 — 失敗時は DB を変更しない
-        do {
-            try FileManager.default.trashItem(at: projectURL, resultingItemURL: nil)
-        } catch {
-            lastError = "フォルダの削除に失敗しました: \(error.localizedDescription)"
-            return
+        // FS 削除を先に実行 — フォルダが既に存在しない場合はスキップ
+        if FileManager.default.fileExists(atPath: projectURL.path) {
+            do {
+                try FileManager.default.trashItem(at: projectURL, resultingItemURL: nil)
+            } catch {
+                lastError = "フォルダの削除に失敗しました: \(error.localizedDescription)"
+                return
+            }
         }
 
         // FS 成功後に DB 削除（サブツリー対応）
