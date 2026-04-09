@@ -1,5 +1,6 @@
 import Combine
 import GRDB
+import os
 @preconcurrency import ScreenCaptureKit
 import Speech
 import SwiftUI
@@ -68,6 +69,7 @@ final class CaptionViewModel: ObservableObject {
     private var persistenceService: TranscriptPersistenceService?
     private var storeCancellable: AnyCancellable?
     private var settingsCancellable: AnyCancellable?
+    private var transcriptionLoadTask: Task<Void, Never>?
 
     init() {
         storeCancellable = store.objectWillChange
@@ -106,6 +108,34 @@ final class CaptionViewModel: ObservableObject {
         return f
     }()
 
+    private struct LoadedTranscriptionData {
+        let segments: [TranscriptSegment]
+        let screenshots: [ScreenshotRecord]
+        let lastSummaryURL: URL?
+    }
+
+    private nonisolated static func fetchLoadedTranscriptionData(
+        transcriptionId: UUID,
+        dbQueue: DatabaseQueue,
+        projectURL: URL
+    ) throws -> LoadedTranscriptionData {
+        let repo = TranscriptionRepository(dbQueue: dbQueue)
+        let detail = try repo.fetchTranscriptionDetail(id: transcriptionId)
+        let segments = detail.segments.map(TranscriptSegment.init(from:))
+
+        let lastSummaryURL: URL? = if detail.transcription?.summaryCreated == true {
+            SummaryService.findSummaryFile(in: projectURL, transcriptionId: transcriptionId)
+        } else {
+            nil
+        }
+
+        return LoadedTranscriptionData(
+            segments: segments,
+            screenshots: detail.screenshots,
+            lastSummaryURL: lastSummaryURL
+        )
+    }
+
     // MARK: - Transcription Loading
 
     /// DB から文字起こしのセグメントを読み込んで表示する。
@@ -125,23 +155,43 @@ final class CaptionViewModel: ObservableObject {
         currentVaultURL = vaultURL
         currentDbQueue = dbQueue
 
-        let repo = TranscriptionRepository(dbQueue: dbQueue)
-        let detail = try? repo.fetchTranscriptionDetail(id: transcriptionId)
-        let segments = (detail?.segments ?? []).map { TranscriptSegment(from: $0) }
-        store.loadSegments(segments)
-        screenshots = detail?.screenshots ?? []
-
-        // summaryCreated フラグが立っている場合のみファイルを探索
-        if let transcription = detail?.transcription, transcription.summaryCreated {
-            lastSummaryURL = SummaryService.findSummaryFile(in: projectURL, transcriptionId: transcriptionId)
-        } else {
-            lastSummaryURL = nil
-        }
+        transcriptionLoadTask?.cancel()
+        store.clear()
+        screenshots = []
+        lastSummaryURL = nil
         summaryError = nil
+
+        transcriptionLoadTask = Task { [weak self, transcriptionId, dbQueue, projectURL] in
+            guard let self else { return }
+
+            let loaded: LoadedTranscriptionData
+            do {
+                loaded = try await Task.detached(priority: .userInitiated) {
+                    try Self.fetchLoadedTranscriptionData(
+                        transcriptionId: transcriptionId,
+                        dbQueue: dbQueue,
+                        projectURL: projectURL
+                    )
+                }.value
+            } catch is CancellationError {
+                return
+            } catch {
+                Logger(subsystem: "com.dahlia", category: "CaptionViewModel")
+                    .error("Failed to load transcription \(transcriptionId): \(error)")
+                return
+            }
+
+            guard !Task.isCancelled, self.currentTranscriptionId == transcriptionId else { return }
+
+            self.store.loadSegments(loaded.segments)
+            self.screenshots = loaded.screenshots
+            self.lastSummaryURL = loaded.lastSummaryURL
+        }
     }
 
     /// 現在の文字起こし表示をクリアして初期状態に戻す。
     func clearCurrentTranscription() {
+        transcriptionLoadTask?.cancel()
         currentTranscriptionId = nil
         currentProjectURL = nil
         currentProjectId = nil

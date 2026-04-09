@@ -75,7 +75,10 @@ final class SidebarViewModel {
                 in: dbQueue,
                 onError: { _ in },
                 onChange: { [weak self] vaults in
-                    Task { @MainActor in self?.allVaults = vaults }
+                    Task { @MainActor in
+                        guard let self, self.allVaults != vaults else { return }
+                        self.allVaults = vaults
+                    }
                 }
             )
         }
@@ -116,8 +119,10 @@ final class SidebarViewModel {
             onError: { _ in },
             onChange: { [weak self] records in
                 Task { @MainActor in
-                    let tree = ProjectNode.buildTree(from: records)
-                    self?.flatProjects = ProjectNode.flatten(tree)
+                    guard let self else { return }
+                    let rows = FlatProjectRow.buildRows(fromRecords: records)
+                    guard self.flatProjects != rows else { return }
+                    self.flatProjects = rows
                 }
             }
         )
@@ -162,7 +167,8 @@ final class SidebarViewModel {
             onError: { _ in },
             onChange: { [weak self] transcriptions in
                 Task { @MainActor in
-                    self?.transcriptionsForSelectedProject = transcriptions
+                    guard let self, self.transcriptionsForSelectedProject != transcriptions else { return }
+                    self.transcriptionsForSelectedProject = transcriptions
                 }
             }
         )

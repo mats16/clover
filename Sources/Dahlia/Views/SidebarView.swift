@@ -64,7 +64,7 @@ struct SidebarView: View {
                     row: row,
                     isSelected: isSelected,
                     transcriptions: isSelected ? transcriptions : [],
-                    selectedTranscriptionId: currentSelectedTranscriptionId,
+                    selectedTranscriptionId: isSelected ? currentSelectedTranscriptionId : nil,
                     sidebarViewModel: sidebarViewModel,
                     viewModel: viewModel,
                     editingProjectId: $editingProjectId,

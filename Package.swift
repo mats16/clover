@@ -18,6 +18,11 @@ let package = Package(
             ],
             path: "Sources/Dahlia",
             resources: [.process("Resources")]
+        ),
+        .testTarget(
+            name: "DahliaTests",
+            dependencies: ["Dahlia"],
+            path: "Tests/DahliaTests"
         )
     ]
 )

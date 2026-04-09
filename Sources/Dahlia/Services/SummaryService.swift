@@ -120,15 +120,18 @@ enum SummaryService {
 
         let markdown = frontmatter + "\n\n" + result.summary + "\n"
 
+        let datePrefix = dateFormatter.string(from: Date())
         let fileName: String
         if result.title.isEmpty {
-            fileName = "summary_\(transcriptionId.uuidString)"
+            fileName = "\(datePrefix)-summary_\(transcriptionId.uuidString)"
         } else {
             // ファイル名に使えない文字を除去し、空白をハイフンに置換
             let sanitized = result.title
                 .replacingOccurrences(of: " ", with: "-")
                 .replacingOccurrences(of: "[/\\\\:*?\"<>|]", with: "", options: .regularExpression)
-            fileName = sanitized.isEmpty ? "summary_\(transcriptionId.uuidString)" : sanitized
+            fileName = sanitized.isEmpty
+                ? "\(datePrefix)-summary_\(transcriptionId.uuidString)"
+                : "\(datePrefix)-\(sanitized)"
         }
         let fileURL = projectURL.appendingPathComponent("\(fileName).md")
         try Data(markdown.utf8).write(to: fileURL, options: .atomic)

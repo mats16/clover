@@ -59,37 +59,16 @@ struct MeetingDetectionPopupView: View {
         )
     }
 
-    @ViewBuilder
     private var appIcon: some View {
-        if let icon = meetingAppIcon() {
-            Image(nsImage: icon)
-                .resizable()
-                .aspectRatio(contentMode: .fit)
-                .clipShape(RoundedRectangle(cornerRadius: 8))
-        } else {
-            Image(systemName: "video.fill")
-                .font(.system(size: 18))
-                .foregroundColor(.accentColor)
-                .frame(width: 36, height: 36)
-                .background(RoundedRectangle(cornerRadius: 8).fill(Color.accentColor.opacity(0.12)))
-        }
+        Image(nsImage: NSApp.applicationIconImage)
+            .resizable()
+            .aspectRatio(contentMode: .fit)
+            .clipShape(RoundedRectangle(cornerRadius: 8))
     }
 
     private var meetingDescription: String {
         meeting.appName.isEmpty
             ? L10n.microphoneInUse
             : L10n.meetingDetectedSubtitle(meeting.appName)
-    }
-
-    private func meetingAppIcon() -> NSImage? {
-        let bundleID = meeting.bundleIdentifier
-        guard bundleID != "unknown",
-              let appURL = NSWorkspace.shared.urlForApplication(withBundleIdentifier: bundleID)
-        else {
-            return NSWorkspace.shared.runningApplications.first {
-                $0.localizedName == meeting.appName
-            }?.icon
-        }
-        return NSWorkspace.shared.icon(forFile: appURL.path)
     }
 }

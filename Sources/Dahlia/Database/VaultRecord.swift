@@ -2,7 +2,7 @@ import Foundation
 import GRDB
 
 /// 保管庫を表す GRDB レコード。path は保管庫ディレクトリの絶対パスに対応する。
-struct VaultRecord: Codable, FetchableRecord, PersistableRecord, Identifiable {
+struct VaultRecord: Codable, FetchableRecord, PersistableRecord, Identifiable, Equatable {
     static let databaseTableName = "vaults"
 
     var id: UUID

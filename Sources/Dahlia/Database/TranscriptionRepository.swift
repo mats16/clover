@@ -6,7 +6,7 @@ import GRDB
 final class TranscriptionRepository {
     private let dbQueue: DatabaseQueue
 
-    init(dbQueue: DatabaseQueue) {
+    nonisolated init(dbQueue: DatabaseQueue) {
         self.dbQueue = dbQueue
     }
 
@@ -199,7 +199,7 @@ final class TranscriptionRepository {
         let screenshots: [ScreenshotRecord]
     }
 
-    func fetchTranscriptionDetail(id transcriptionId: UUID) throws -> TranscriptionDetail {
+    nonisolated func fetchTranscriptionDetail(id transcriptionId: UUID) throws -> TranscriptionDetail {
         try dbQueue.read { db in
             let transcription = try TranscriptionRecord.fetchOne(db, key: transcriptionId)
             let segments = try SegmentRecord

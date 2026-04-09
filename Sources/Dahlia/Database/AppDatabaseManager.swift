@@ -118,6 +118,14 @@ final class AppDatabaseManager: Sendable {
             )
         }
 
+        migrator.registerMigration("v3_sidebarIndexes") { db in
+            try db.create(
+                index: "transcripts_on_projectId_startedAt",
+                on: "transcripts",
+                columns: ["projectId", "startedAt"]
+            )
+        }
+
         return migrator
     }
 }
