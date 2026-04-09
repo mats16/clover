@@ -329,7 +329,6 @@ final class CaptionViewModel: ObservableObject {
         let projectURL = currentProjectURL
         let recordingStart = store.recordingStartTime ?? Date()
         let segments = store.segments
-        let dbQueue = currentDbQueue
         guard let vaultURL = currentVaultURL else { return }
 
         Task {
@@ -342,27 +341,27 @@ final class CaptionViewModel: ObservableObject {
             persistenceService = nil
 
             if let transcriptionId, !segments.isEmpty {
-                if let relativePath = try? TranscriptExportService.exportTranscript(
-                    vaultURL: vaultURL,
-                    transcriptionId: transcriptionId,
-                    projectName: projectName ?? "",
-                    startedAt: recordingStart,
-                    segments: segments
-                ), let dbQueue {
-                    let repo = TranscriptionRepository(dbQueue: dbQueue)
-                    try? repo.updateTranscriptFilePath(id: transcriptionId, path: relativePath)
+                if AppSettings.shared.llmAutoSummaryEnabled, let projectURL {
+                    // 要約 + ファイル書き出しを並行実行
+                    await generateSummary(
+                        transcriptionId: transcriptionId,
+                        transcriptText: transcriptText,
+                        projectURL: projectURL,
+                        startedAt: recordingStart,
+                        vaultURL: vaultURL,
+                        projectName: projectName ?? "",
+                        segments: segments
+                    )
+                } else {
+                    // 要約なし: ファイル書き出しのみ
+                    await exportFiles(
+                        vaultURL: vaultURL,
+                        transcriptionId: transcriptionId,
+                        projectName: projectName ?? "",
+                        startedAt: recordingStart,
+                        segments: segments
+                    )
                 }
-            }
-
-            if AppSettings.shared.llmAutoSummaryEnabled,
-               let transcriptionId,
-               let projectURL {
-                await generateSummary(
-                    transcriptionId: transcriptionId,
-                    transcriptText: transcriptText,
-                    projectURL: projectURL,
-                    startedAt: recordingStart
-                )
             }
         }
     }
@@ -384,16 +383,22 @@ final class CaptionViewModel: ObservableObject {
     /// プルダウンメニューから手動で要約を実行する。
     func triggerManualSummary() {
         guard let transcriptionId = currentTranscriptionId,
-              let projectURL = currentProjectURL else { return }
+              let projectURL = currentProjectURL,
+              let vaultURL = currentVaultURL else { return }
         let transcriptText = store.exportForSummary()
         let startedAt = store.recordingStartTime ?? Date()
+        let projectName = selectedProjectName ?? ""
+        let segments = store.segments
         requestShowSummaryTab = true
         Task {
             await generateSummary(
                 transcriptionId: transcriptionId,
                 transcriptText: transcriptText,
                 projectURL: projectURL,
-                startedAt: startedAt
+                startedAt: startedAt,
+                vaultURL: vaultURL,
+                projectName: projectName,
+                segments: segments
             )
         }
     }
@@ -402,7 +407,10 @@ final class CaptionViewModel: ObservableObject {
         transcriptionId: UUID,
         transcriptText: String,
         projectURL: URL,
-        startedAt: Date
+        startedAt: Date,
+        vaultURL: URL,
+        projectName: String,
+        segments: [TranscriptSegment]
     ) async {
         guard !transcriptText.isEmpty else { return }
 
@@ -416,25 +424,39 @@ final class CaptionViewModel: ObservableObject {
         lastSummaryURL = nil
 
         do {
-            // セッションに紐づくスクリーンショットを取得
             var screenshots: [ScreenshotRecord] = []
             if let queue = currentDbQueue {
                 let repo = TranscriptionRepository(dbQueue: queue)
                 screenshots = (try? repo.fetchScreenshots(forTranscriptionId: transcriptionId)) ?? []
             }
 
-            let fileURL = try await SummaryService.generateSummary(
+            let screenshotsForExport = screenshots
+
+            // LLM 要約とファイル書き出しを並行実行
+            async let summaryResult = SummaryService.generateSummary(
                 projectURL: projectURL,
                 transcriptionId: transcriptionId,
                 startedAt: startedAt,
                 transcriptText: transcriptText,
                 screenshots: screenshots
             )
+
+            async let fileExport: Void = exportTranscriptAndScreenshots(
+                vaultURL: vaultURL,
+                transcriptionId: transcriptionId,
+                projectName: projectName,
+                startedAt: startedAt,
+                segments: segments,
+                screenshots: screenshotsForExport
+            )
+
+            let fileURL = try await summaryResult
+            _ = await fileExport
             lastSummaryURL = fileURL
 
             // summaryCreated フラグを立てる
-            if let queue = currentDbQueue {
-                let repo = TranscriptionRepository(dbQueue: queue)
+            if let dbQueue = currentDbQueue {
+                let repo = TranscriptionRepository(dbQueue: dbQueue)
                 try? repo.markSummaryCreated(id: transcriptionId)
             }
         } catch {
@@ -442,6 +464,65 @@ final class CaptionViewModel: ObservableObject {
         }
 
         isSummaryGenerating = false
+    }
+
+    /// 要約なしでファイル書き出しのみ実行する。
+    private func exportFiles(
+        vaultURL: URL,
+        transcriptionId: UUID,
+        projectName: String,
+        startedAt: Date,
+        segments: [TranscriptSegment]
+    ) async {
+        var screenshots: [ScreenshotRecord] = []
+        if let dbQueue = currentDbQueue {
+            let repo = TranscriptionRepository(dbQueue: dbQueue)
+            screenshots = (try? repo.fetchScreenshots(forTranscriptionId: transcriptionId)) ?? []
+        }
+        await exportTranscriptAndScreenshots(
+            vaultURL: vaultURL,
+            transcriptionId: transcriptionId,
+            projectName: projectName,
+            startedAt: startedAt,
+            segments: segments,
+            screenshots: screenshots
+        )
+    }
+
+    /// transcript と screenshot をファイルに書き出す共通処理。メインアクター外で実行。
+    private func exportTranscriptAndScreenshots(
+        vaultURL: URL,
+        transcriptionId: UUID,
+        projectName: String,
+        startedAt: Date,
+        segments: [TranscriptSegment],
+        screenshots: [ScreenshotRecord]
+    ) async {
+        let dbQueue = currentDbQueue
+
+        let transcriptPath = await Task.detached {
+            try? TranscriptExportService.exportTranscript(
+                vaultURL: vaultURL,
+                transcriptionId: transcriptionId,
+                projectName: projectName,
+                startedAt: startedAt,
+                segments: segments
+            )
+        }.value
+
+        if let transcriptPath, let dbQueue {
+            let repo = TranscriptionRepository(dbQueue: dbQueue)
+            try? repo.updateTranscriptFilePath(id: transcriptionId, path: transcriptPath)
+        }
+
+        if !screenshots.isEmpty {
+            await Task.detached {
+                _ = try? ScreenshotExportService.exportScreenshots(
+                    vaultURL: vaultURL,
+                    screenshots: screenshots
+                )
+            }.value
+        }
     }
 
     func clearText() {
