@@ -117,8 +117,11 @@ final class AppSettings: ObservableObject {
 
     // MARK: - 表示言語設定
 
-    /// 言語選択ピッカーに表示する言語の識別子（JSON配列）。空文字列の場合は全言語を表示。
-    @AppStorage("enabledLocaleIdentifiers") var enabledLocaleIdentifiersJSON = ""
+    /// デフォルトで有効にする言語識別子のJSON。
+    private static let defaultEnabledLocalesJSON = "[\"en_US\",\"ja_JP\"]"
+
+    /// 言語選択ピッカーに表示する言語の識別子（JSON配列）。
+    @AppStorage("enabledLocaleIdentifiers") var enabledLocaleIdentifiersJSON = defaultEnabledLocalesJSON
 
     var enabledLocaleIdentifiers: Set<String> {
         get {

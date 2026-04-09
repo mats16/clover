@@ -266,4 +266,13 @@ final class SidebarViewModel {
             selectedTranscriptionId = nil
         }
     }
+
+    func moveTranscription(id: UUID, toProjectId: UUID) {
+        guard let repo = transcriptionRepository else { return }
+        do {
+            try repo.moveTranscription(id: id, toProjectId: toProjectId)
+        } catch {
+            lastError = error.localizedDescription
+        }
+    }
 }

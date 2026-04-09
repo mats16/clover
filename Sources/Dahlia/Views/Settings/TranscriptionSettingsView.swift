@@ -62,16 +62,22 @@ struct TranscriptionSettingsView: View {
                     }
 
                     HStack {
-                        let enabledCount = settings.enabledLocaleIdentifiers.count
-                        Text(enabledCount == 0
+                        let enabled = settings.enabledLocaleIdentifiers
+                        Text(enabled.isEmpty
                             ? L10n.allLanguagesShown
-                            : L10n.languagesSelected(enabledCount))
+                            : L10n.languagesSelected(enabled.count))
                             .font(.caption)
                             .foregroundColor(.secondary)
                         Spacer()
-                        if !settings.enabledLocaleIdentifiers.isEmpty {
-                            Button(L10n.showAll) {
+                        if !enabled.isEmpty {
+                            Button(L10n.uncheckAll) {
                                 settings.enabledLocaleIdentifiers = []
+                            }
+                            .font(.caption)
+                        }
+                        if enabled.count != supportedLocales.count {
+                            Button(L10n.showAll) {
+                                settings.enabledLocaleIdentifiers = Set(supportedLocales.map(\.identifier))
                             }
                             .font(.caption)
                         }

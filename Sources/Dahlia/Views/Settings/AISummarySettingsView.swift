@@ -25,6 +25,7 @@ struct AISummarySettingsView: View {
                 Toggle(isOn: $settings.llmAutoSummaryEnabled) {
                     Text(L10n.autoSummaryDescription)
                 }
+                .disabled(!isLLMConfigComplete)
             }
 
             Section {

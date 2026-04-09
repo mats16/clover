@@ -18,7 +18,7 @@ struct VaultPickerView: View {
             Divider()
             mainPanel
         }
-        .frame(minWidth: 700, minHeight: 460)
+        .frame(minWidth: 820, minHeight: 460)
         .task { loadVaults() }
     }
 
@@ -63,24 +63,13 @@ struct VaultPickerView: View {
             // Actions
             VStack(spacing: 0) {
                 actionRow(
-                    title: L10n.createNewVault,
-                    description: L10n.createNewVaultDescription
-                ) {
-                    Button(L10n.create) {
-                        showFolderPicker = true
-                    }
-                    .buttonStyle(.borderedProminent)
-                }
-
-                Divider()
-
-                actionRow(
                     title: L10n.openFolderAsVault,
                     description: L10n.openFolderAsVaultDescription
                 ) {
                     Button(L10n.open) {
                         showFolderPicker = true
                     }
+                    .buttonStyle(.borderedProminent)
                 }
             }
             .background(Color(nsColor: .controlBackgroundColor))

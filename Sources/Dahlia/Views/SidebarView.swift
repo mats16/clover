@@ -208,6 +208,7 @@ private struct ProjectSectionView: View {
                 ForEach(transcriptions, id: \.id) { transcription in
                     transcriptionRow(transcription)
                         .tag(transcription.id)
+                        .draggable(transcription.id.uuidString)
                         .contextMenu {
                             transcriptionContextMenu(transcription)
                         }
@@ -247,6 +248,9 @@ private struct ProjectSectionView: View {
                 },
                 onDelete: {
                     sidebarViewModel.deleteProject(id: row.id, name: row.name)
+                },
+                onDropTranscription: { transcriptionId in
+                    sidebarViewModel.moveTranscription(id: transcriptionId, toProjectId: row.id)
                 }
             )
         }
@@ -348,7 +352,9 @@ private struct ProjectHeaderRow: View {
     let onEditContext: () -> Void
     let onOpenInFinder: () -> Void
     let onDelete: () -> Void
+    let onDropTranscription: (UUID) -> Void
     @State private var isHovered = false
+    @State private var isDropTargeted = false
 
     var body: some View {
         HStack {
@@ -369,9 +375,11 @@ private struct ProjectHeaderRow: View {
         .background(
             RoundedRectangle(cornerRadius: 6)
                 .fill(
-                    isSelected
-                        ? Color.accentColor.opacity(0.12)
-                        : isHovered ? Color.primary.opacity(0.06) : Color.clear
+                    isDropTargeted
+                        ? Color.accentColor.opacity(0.2)
+                        : isSelected
+                            ? Color.accentColor.opacity(0.12)
+                            : isHovered ? Color.primary.opacity(0.06) : Color.clear
                 )
         )
         .contentShape(Rectangle())
@@ -379,6 +387,15 @@ private struct ProjectHeaderRow: View {
         .onHover { isHovered = $0 }
         .onTapGesture(count: 2) { onDoubleClick() }
         .onTapGesture(count: 1) { onSelect() }
+        .dropDestination(for: String.self) { items, _ in
+            guard let first = items.first, let transcriptionId = UUID(uuidString: first) else {
+                return false
+            }
+            onDropTranscription(transcriptionId)
+            return true
+        } isTargeted: { targeted in
+            isDropTargeted = targeted
+        }
         .contextMenu {
             Button(L10n.rename) { onRename() }
             Button(L10n.editContext) { onEditContext() }

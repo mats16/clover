@@ -137,6 +137,15 @@ final class TranscriptionRepository {
         }
     }
 
+    func moveTranscription(id: UUID, toProjectId: UUID) throws {
+        try dbQueue.write { db in
+            if var record = try TranscriptionRecord.fetchOne(db, key: id) {
+                record.projectId = toProjectId
+                try record.update(db)
+            }
+        }
+    }
+
     func markSummaryCreated(id: UUID) throws {
         try dbQueue.write { db in
             if var record = try TranscriptionRecord.fetchOne(db, key: id) {

@@ -89,6 +89,7 @@ enum L10n {
     static var allLanguagesShown: String { String(localized: "All languages shown", bundle: bundle) }
     static func languagesSelected(_ count: Int) -> String { String(localized: "\(count) languages selected", bundle: bundle) }
     static var showAll: String { String(localized: "Show all", bundle: bundle) }
+    static var uncheckAll: String { String(localized: "Uncheck all", bundle: bundle) }
     static var displayLanguages: String { String(localized: "Display Languages", bundle: bundle) }
     static var displayLanguagesDescription: String { String(
         localized: "Only selected languages will appear in the language picker. All languages are shown if none are selected.",
