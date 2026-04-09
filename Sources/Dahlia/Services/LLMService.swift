@@ -2,6 +2,77 @@ import Foundation
 
 /// OpenAI 互換の Chat Completions API を呼び出すサービス。
 enum LLMService {
+    // MARK: - Response Format (Structured Outputs)
+
+    /// `response_format` パラメータ。`json_schema` の `schema` は生の JSON Data で保持する。
+    struct ResponseFormat: Encodable {
+        let type: String
+        let json_schema: JSONSchemaSpec?
+
+        struct JSONSchemaSpec: Encodable {
+            let name: String
+            let strict: Bool
+            /// JSON Schema を表す生の JSON バイト列。
+            let schemaData: Data
+
+            func encode(to encoder: Encoder) throws {
+                var container = encoder.container(keyedBy: CodingKeys.self)
+                try container.encode(name, forKey: .name)
+                try container.encode(strict, forKey: .strict)
+                // schemaData を JSON オブジェクトとしてそのまま埋め込む
+                let rawSchema = try JSONSerialization.jsonObject(with: schemaData)
+                try container.encode(AnyEncodable(rawSchema), forKey: .schema)
+            }
+
+            private enum CodingKeys: String, CodingKey {
+                case name, strict, schema
+            }
+        }
+    }
+
+    /// 任意の JSON-compatible な値を `Encodable` としてラップする。
+    private struct AnyEncodable: Encodable {
+        let value: Any
+
+        init(_ value: Any) { self.value = value }
+
+        func encode(to encoder: Encoder) throws {
+            switch value {
+            case let string as String:
+                var c = encoder.singleValueContainer()
+                try c.encode(string)
+            case let bool as Bool:
+                var c = encoder.singleValueContainer()
+                try c.encode(bool)
+            case let int as Int:
+                var c = encoder.singleValueContainer()
+                try c.encode(int)
+            case let double as Double:
+                var c = encoder.singleValueContainer()
+                try c.encode(double)
+            case let array as [Any]:
+                var c = encoder.unkeyedContainer()
+                for item in array { try c.encode(AnyEncodable(item)) }
+            case let dict as [String: Any]:
+                var c = encoder.container(keyedBy: DynamicKey.self)
+                for (key, val) in dict {
+                    try c.encode(AnyEncodable(val), forKey: DynamicKey(key))
+                }
+            default:
+                var c = encoder.singleValueContainer()
+                try c.encodeNil()
+            }
+        }
+
+        private struct DynamicKey: CodingKey {
+            var stringValue: String
+            var intValue: Int? { nil }
+            init(_ string: String) { self.stringValue = string }
+            init?(stringValue: String) { self.stringValue = stringValue }
+            init?(intValue _: Int) { nil }
+        }
+    }
+
     // MARK: - Content Types
 
     enum ContentPart {
@@ -70,6 +141,19 @@ enum LLMService {
         let model: String
         let max_tokens: Int
         let messages: [ChatMessage]
+        var response_format: ResponseFormat? = nil
+
+        func encode(to encoder: Encoder) throws {
+            var container = encoder.container(keyedBy: CodingKeys.self)
+            try container.encode(model, forKey: .model)
+            try container.encode(max_tokens, forKey: .max_tokens)
+            try container.encode(messages, forKey: .messages)
+            try container.encodeIfPresent(response_format, forKey: .response_format)
+        }
+
+        private enum CodingKeys: String, CodingKey {
+            case model, max_tokens, messages, response_format
+        }
     }
 
     private struct ResponseBody: Codable {
@@ -112,7 +196,8 @@ enum LLMService {
         model: String,
         token: String,
         messages: [ChatMessage],
-        maxTokens: Int = 1024
+        maxTokens: Int = 1024,
+        responseFormat: ResponseFormat? = nil
     ) async throws -> String {
         guard let url = URL(string: endpoint) else {
             throw LLMError.invalidEndpointURL
@@ -124,7 +209,7 @@ enum LLMService {
         request.setValue("Bearer \(token)", forHTTPHeaderField: "Authorization")
         request.timeoutInterval = 270
 
-        let body = RequestBody(model: model, max_tokens: maxTokens, messages: messages)
+        let body = RequestBody(model: model, max_tokens: maxTokens, messages: messages, response_format: responseFormat)
         request.httpBody = try JSONEncoder().encode(body)
 
         let (data, response) = try await URLSession.shared.data(for: request)

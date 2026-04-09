@@ -34,7 +34,15 @@ enum SummaryService {
         // メッセージ組み立て: テンプレート(system) → CONTEXT.md(user) → 文字起こし(user) + スクリーンショット
         let contextContent = readContext(in: projectURL)
 
-        let systemPrompt = prompt + "\n\n# Language\nWrite the summary in \(languageName)."
+        let structuredInstruction = """
+
+        # Response Format
+        Your response MUST be a JSON object with exactly three keys:
+        - "title": a concise title for this meeting/transcript (one line, no quotes)
+        - "summary": the full summary in Markdown format
+        - "tags": an array of relevant short tags for categorization (empty array if none)
+        """
+        let systemPrompt = prompt + "\n\n# Language\nWrite the summary in \(languageName)." + structuredInstruction
         var messages: [LLMService.ChatMessage] = [
             .init(role: "system", content: systemPrompt),
         ]
@@ -65,17 +73,30 @@ enum SummaryService {
             messages.append(.init(role: "user", parts: parts))
         }
 
-        let summary = try await LLMService.chatCompletion(
+        let responseText = try await LLMService.chatCompletion(
             endpoint: endpoint,
             model: model,
             token: token,
             messages: messages,
-            maxTokens: 16000
+            maxTokens: 16000,
+            responseFormat: SummaryResult.responseFormat
         )
 
+        // Structured output のパース（フォールバック: プレーンテキストとして扱う）
+        let result: SummaryResult
+        if let data = responseText.data(using: .utf8),
+           let decoded = try? JSONDecoder().decode(SummaryResult.self, from: data) {
+            result = decoded
+        } else {
+            result = SummaryResult(title: "", summary: responseText, tags: [])
+        }
+
         let dateString = dateFormatter.string(from: startedAt)
-        // タグ: 常に ai_summary を含め、CONTEXT.md の tags をマージ
+        // タグ: 常に ai_summary を含め、LLM 生成タグと CONTEXT.md の tags をマージ
         var tags = ["ai_summary"]
+        for tag in result.tags where !tags.contains(tag) {
+            tags.append(tag)
+        }
         if let contextContent {
             for tag in parseFrontmatterTags(from: contextContent) where !tags.contains(tag) {
                 tags.append(tag)
@@ -83,18 +104,34 @@ enum SummaryService {
         }
         let tagsYAML = tags.map { "  - \($0)" }.joined(separator: "\n")
 
-        let frontmatter = """
-        ---
+        var frontmatterFields = """
         transcript_id: "\(transcriptionId.uuidString)"
         date: \(dateString)
-        tags:
-        \(tagsYAML)
-        ---
         """
+        if !result.title.isEmpty {
+            let escapedTitle = result.title
+                .replacingOccurrences(of: "\\", with: "\\\\")
+                .replacingOccurrences(of: "\"", with: "\\\"")
+                .replacingOccurrences(of: "\n", with: "\\n")
+            frontmatterFields += "\ntitle: \"\(escapedTitle)\""
+        }
+        frontmatterFields += "\ntags:\n\(tagsYAML)"
 
-        let markdown = frontmatter + "\n\n" + summary + "\n"
+        let frontmatter = "---\n\(frontmatterFields)\n---"
 
-        let fileURL = projectURL.appendingPathComponent("summary_\(transcriptionId.uuidString).md")
+        let markdown = frontmatter + "\n\n" + result.summary + "\n"
+
+        let fileName: String
+        if result.title.isEmpty {
+            fileName = "summary_\(transcriptionId.uuidString)"
+        } else {
+            // ファイル名に使えない文字を除去し、空白をハイフンに置換
+            let sanitized = result.title
+                .replacingOccurrences(of: " ", with: "-")
+                .replacingOccurrences(of: "[/\\\\:*?\"<>|]", with: "", options: .regularExpression)
+            fileName = sanitized.isEmpty ? "summary_\(transcriptionId.uuidString)" : sanitized
+        }
+        let fileURL = projectURL.appendingPathComponent("\(fileName).md")
         try Data(markdown.utf8).write(to: fileURL, options: .atomic)
 
         return fileURL
