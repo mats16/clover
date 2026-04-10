@@ -24,10 +24,48 @@ final class VaultSyncService: @unchecked Sendable {
 
     // MARK: - Initial Sync
 
-    /// vault 内の全ディレクトリをスキャンし、projects テーブルに一括挿入する。
+    /// vault 内の全ディレクトリをスキャンし、projects テーブルと同期する。
     func performInitialSync() {
-        let names = scanAllDirectoryNames()
-        upsertProjects(names: names)
+        let diskNames = Set(scanAllDirectoryNames())
+        try? dbQueue.write { db in
+            try ProjectRecord.upsertAll(names: Array(diskNames), vaultId: self.vaultId, in: db)
+            try self.reconcileMissingProjects(diskNames: diskNames, in: db)
+        }
+    }
+
+    /// DB 内のプロジェクトとディスク上のフォルダを突合し、不整合を解消する。
+    /// transcript を持たない孤立プロジェクトは削除、持つものは missingOnDisk フラグを設定する。
+    private func reconcileMissingProjects(diskNames: Set<String>, in db: Database) throws {
+        let allProjects = try ProjectRecord
+            .filter(Column("vaultId") == self.vaultId)
+            .fetchAll(db)
+
+        // transcript を持つプロジェクト ID を一括取得（N+1 回避）
+        let idsWithTranscripts = try UUID.fetchSet(db, sql: """
+        SELECT DISTINCT projectId FROM transcripts
+        WHERE projectId IN (SELECT id FROM projects WHERE vaultId = ?)
+        """, arguments: [self.vaultId])
+
+        for project in allProjects {
+            let onDisk = diskNames.contains(project.name)
+            let shouldBeMissing = !onDisk
+
+            if shouldBeMissing {
+                if idsWithTranscripts.contains(project.id) {
+                    if !project.missingOnDisk {
+                        var updated = project
+                        updated.missingOnDisk = true
+                        try updated.update(db)
+                    }
+                } else {
+                    try project.delete(db)
+                }
+            } else if project.missingOnDisk {
+                var updated = project
+                updated.missingOnDisk = false
+                try updated.update(db)
+            }
+        }
     }
 
     // MARK: - FSEvents Monitoring
@@ -110,12 +148,45 @@ final class VaultSyncService: @unchecked Sendable {
         guard !names.isEmpty else { return }
         try? dbQueue.write { db in
             try ProjectRecord.upsertAll(names: names, vaultId: self.vaultId, in: db)
+            // 復活したフォルダの missingOnDisk を一括クリア
+            try db.execute(
+                sql: "UPDATE projects SET missingOnDisk = 0 WHERE vaultId = ? AND missingOnDisk = 1",
+                arguments: [self.vaultId]
+            )
         }
     }
 
     private func renameProjectsByPrefix(oldPrefix: String, newPrefix: String) {
         try? dbQueue.write { db in
             try ProjectRecord.renameByPrefix(oldPrefix: oldPrefix, newPrefix: newPrefix, vaultId: self.vaultId, in: db)
+        }
+    }
+
+    /// 削除されたフォルダ群を一括処理する。transcript ありなら missingOnDisk、なしなら DB 削除。
+    private func handleDirectoryRemovals(_ relativePaths: [String], in db: Database) throws {
+        guard !relativePaths.isEmpty else { return }
+
+        // transcript を持つプロジェクト ID を一括取得（N+1 回避）
+        let idsWithTranscripts = try UUID.fetchSet(db, sql: """
+        SELECT DISTINCT projectId FROM transcripts
+        WHERE projectId IN (SELECT id FROM projects WHERE vaultId = ?)
+        """, arguments: [self.vaultId])
+
+        let allProjects = try ProjectRecord
+            .filter(Column("vaultId") == self.vaultId)
+            .fetchAll(db)
+
+        for relativePath in relativePaths {
+            let matching = allProjects.filter {
+                $0.name == relativePath || $0.name.hasPrefix(relativePath + "/")
+            }
+            let hasTranscripts = matching.contains { idsWithTranscripts.contains($0.id) }
+
+            if hasTranscripts {
+                try ProjectRecord.setMissingByPrefix(relativePath, missing: true, vaultId: self.vaultId, in: db)
+            } else {
+                try ProjectRecord.deleteByPrefix(relativePath, vaultId: self.vaultId, in: db)
+            }
         }
     }
 
@@ -126,6 +197,7 @@ final class VaultSyncService: @unchecked Sendable {
 
         var pendingRenames: [(path: String, exists: Bool)] = []
         var newDirs: [String] = []
+        var removedDirs: [String] = []
 
         for (i, path) in paths.enumerated() {
             let flag = flags[i]
@@ -142,10 +214,15 @@ final class VaultSyncService: @unchecked Sendable {
 
             let isRenamed = (flag & UInt32(kFSEventStreamEventFlagItemRenamed)) != 0
             let isCreated = (flag & UInt32(kFSEventStreamEventFlagItemCreated)) != 0
+            let isRemoved = (flag & UInt32(kFSEventStreamEventFlagItemRemoved)) != 0
 
             if isRenamed {
                 let exists = fileManager.fileExists(atPath: path)
                 pendingRenames.append((path: relativePath, exists: exists))
+            } else if isRemoved {
+                if !fileManager.fileExists(atPath: path) {
+                    removedDirs.append(relativePath)
+                }
             } else if isCreated {
                 if fileManager.fileExists(atPath: path) {
                     newDirs.append(relativePath)
@@ -166,12 +243,26 @@ final class VaultSyncService: @unchecked Sendable {
                 renameProjectsByPrefix(oldPrefix: second.path, newPrefix: first.path)
                 i += 2
             } else {
-                if first.exists { newDirs.append(first.path) }
+                if first.exists {
+                    newDirs.append(first.path)
+                } else {
+                    removedDirs.append(first.path)
+                }
                 i += 1
             }
         }
-        if i < pendingRenames.count, pendingRenames[i].exists {
-            newDirs.append(pendingRenames[i].path)
+        if i < pendingRenames.count {
+            if pendingRenames[i].exists {
+                newDirs.append(pendingRenames[i].path)
+            } else {
+                removedDirs.append(pendingRenames[i].path)
+            }
+        }
+
+        if !removedDirs.isEmpty {
+            try? dbQueue.write { db in
+                try self.handleDirectoryRemovals(removedDirs, in: db)
+            }
         }
 
         if !newDirs.isEmpty {

@@ -2,12 +2,17 @@
 "Delete" = "Delete";
 "Rename" = "Rename";
 "Create" = "Create";
+"Close" = "Close";
+"Expand" = "Expand";
+"Collapse" = "Collapse";
 
 /* Sidebar */
 "New Project" = "New Project";
 "Project Name" = "Project Name";
 "Edit Context" = "Edit Context";
 "Title" = "Title";
+"Delete %lld items" = "Delete %lld items";
+"Move %lld items" = "Move %lld items";
 
 /* Control Panel */
 "Preparing speech recognition..." = "Preparing speech recognition...";
@@ -19,10 +24,12 @@
 "Record" = "Record";
 "Export" = "Export";
 "Clear transcription" = "Clear transcription";
+"New Transcription" = "New Transcription";
 
 /* Detail Tabs */
 "Summary" = "Summary";
-"Notes" = "Notes";
+"Notes" = "Note";
+"NotesPlaceholder" = "Write a note...";
 "Screenshots" = "Screenshots";
 "Transcript" = "Transcript";
 

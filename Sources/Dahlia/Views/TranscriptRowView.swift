@@ -9,25 +9,25 @@ struct TranscriptRowView: View {
             // タイムスタンプ
             Text(Formatters.timeHHmmss.string(from: segment.startTime))
                 .font(.system(.caption, design: .monospaced))
-                .foregroundColor(.secondary)
+                .foregroundStyle(.secondary)
                 .frame(width: 60, alignment: .leading)
 
             // 話者ラベル
             if let speaker = segment.speakerLabel {
                 Text(speakerDisplayName(for: speaker))
                     .font(.caption)
-                    .foregroundColor(.white)
+                    .foregroundStyle(.white)
                     .padding(.horizontal, 6)
                     .padding(.vertical, 1)
                     .background(speakerColor(for: speaker))
-                    .cornerRadius(4)
+                    .clipShape(.rect(cornerRadius: 4))
                     .frame(width: 56, alignment: .center)
             }
 
             // テキスト
             Text(segment.displayText)
                 .font(.body)
-                .foregroundColor(segment.isConfirmed ? .primary : .secondary)
+                .foregroundStyle(segment.isConfirmed ? .primary : .secondary)
                 .textSelection(.enabled)
                 .frame(maxWidth: .infinity, alignment: .leading)
         }

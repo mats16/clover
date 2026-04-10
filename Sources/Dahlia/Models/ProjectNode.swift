@@ -7,6 +7,7 @@ struct FlatProjectRow: Identifiable, Equatable {
     let displayName: String
     let depth: Int
     let hasChildren: Bool
+    let missingOnDisk: Bool
 
     /// ProjectRecord 配列から、入力順を保ったままサイドバー表示用のフラット行を構築する。
     static func buildRows(fromRecords records: [ProjectRecord]) -> [FlatProjectRow] {
@@ -28,12 +29,22 @@ struct FlatProjectRow: Identifiable, Equatable {
                     name: record.name,
                     displayName: displayName,
                     depth: depth,
-                    hasChildren: hasChildren
+                    hasChildren: hasChildren,
+                    missingOnDisk: record.missingOnDisk
                 )
             )
         }
 
         return rows
+    }
+
+    /// この行の全祖先パスを返す。例: "a/b/c" → ["a", "a/b"]
+    func parentPaths() -> [String] {
+        let components = name.split(separator: "/")
+        guard components.count > 1 else { return [] }
+        return (1 ..< components.count).map { depth in
+            components[0 ..< depth].joined(separator: "/")
+        }
     }
 
     private static func parentNames(in records: [ProjectRecord]) -> Set<String> {

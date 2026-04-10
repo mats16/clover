@@ -32,31 +32,27 @@ struct MeetingDetectionPopupView: View {
                     .padding(.horizontal, 16)
                     .padding(.vertical, 7)
                     .background(Capsule().fill(Color.accentColor))
-                    .foregroundColor(.white)
+                    .foregroundStyle(.white)
             }
             .buttonStyle(.plain)
             .pointerStyle(.link)
 
-            Button(action: onDismiss) {
-                Image(systemName: "xmark")
-                    .font(.system(size: 10, weight: .semibold))
-                    .foregroundStyle(.secondary)
-                    .frame(width: 22, height: 22)
-                    .background(Circle().fill(Color.primary.opacity(isHovered ? 0.1 : 0)))
-            }
-            .buttonStyle(.plain)
-            .onHover { isHovered = $0 }
-            .pointerStyle(.link)
+            Button(L10n.dismiss, systemImage: "xmark", action: onDismiss)
+                .labelStyle(.iconOnly)
+                .font(.system(size: 10, weight: .semibold))
+                .foregroundStyle(.secondary)
+                .frame(width: 22, height: 22)
+                .glassEffect(isHovered ? .regular.interactive() : .clear, in: Circle())
+                .buttonStyle(.plain)
+                .onHover { isHovered = $0 }
+                .pointerStyle(.link)
         }
         .padding(.leading, 12)
         .padding(.trailing, 8)
         .padding(.vertical, 10)
-        .background(
-            Capsule()
-                .fill(.ultraThickMaterial)
-                .shadow(color: .black.opacity(0.12), radius: 20, y: 6)
-                .shadow(color: .black.opacity(0.06), radius: 4, y: 2)
-        )
+        .glassEffect(.regular, in: Capsule())
+        .shadow(color: .black.opacity(0.12), radius: 20, y: 6)
+        .shadow(color: .black.opacity(0.06), radius: 4, y: 2)
     }
 
     private var appIcon: some View {

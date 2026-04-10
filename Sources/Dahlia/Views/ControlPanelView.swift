@@ -3,20 +3,11 @@ import UniformTypeIdentifiers
 
 /// ホバー時に背景がハイライトされるアイコンボタンスタイル。
 struct ToolbarIconButtonStyle: ButtonStyle {
-    @State private var isHovered = false
-
     func makeBody(configuration: Configuration) -> some View {
         configuration.label
             .padding(6)
-            .background(
-                RoundedRectangle(cornerRadius: 5)
-                    .fill(configuration.isPressed
-                        ? Color.primary.opacity(0.15)
-                        : isHovered ? Color.primary.opacity(0.08) : Color.clear)
-            )
-            .onHover { hovering in
-                isHovered = hovering
-            }
+            .glassEffect(.regular.interactive(), in: RoundedRectangle(cornerRadius: 5))
+            .opacity(configuration.isPressed ? 0.7 : 1.0)
             .pointerStyle(.link)
     }
 }
@@ -43,29 +34,38 @@ enum DetailTab: String, CaseIterable, Identifiable {
         switch self {
         case .summary: "text.badge.checkmark"
         case .notes: "pencil.line"
-        case .screenshots: "camera.viewfinder"
+        case .screenshots: "photo.on.rectangle.angled"
         case .transcript: "waveform.badge.microphone"
         }
     }
 }
 
-/// Notion 風タブバー。選択中はピル型背景、ホバーで薄いハイライト。
+/// Notion 風タブバー。選択中はピル型 Liquid Glass 背景がスライドする。
 private struct DetailTabBar: View {
     @Binding var selection: DetailTab
     @ObservedObject var viewModel: CaptionViewModel
     var sidebarViewModel: SidebarViewModel
+    @Namespace private var tabNamespace
+
+    /// フォルダ選択時（transcription 未選択）は transcript 以外のタブを無効化する。
+    private var isFolderOnly: Bool {
+        viewModel.currentTranscriptionId == nil
+    }
 
     var body: some View {
         HStack(spacing: 2) {
             ForEach(DetailTab.allCases) { tab in
                 DetailTabButton(
                     tab: tab,
-                    isSelected: selection == tab
-                ) {
-                    withAnimation(.easeInOut(duration: 0.15)) {
-                        selection = tab
+                    isSelected: selection == tab,
+                    namespace: tabNamespace,
+                    action: {
+                        withAnimation(.easeInOut(duration: 0.25)) {
+                            selection = tab
+                        }
                     }
-                }
+                )
+                .disabled(isFolderOnly && tab != .transcript)
             }
             Spacer()
             SessionSettingsMenu(viewModel: viewModel)
@@ -79,7 +79,6 @@ private struct DetailTabBar: View {
 private struct SessionSettingsMenu: View {
     @ObservedObject var viewModel: CaptionViewModel
     @ObservedObject private var appSettings = AppSettings.shared
-    @State private var isHovered = false
     @State private var summaryTemplates: [SummaryTemplate] = []
     private let templateService = SummaryTemplateService()
 
@@ -87,10 +86,8 @@ private struct SessionSettingsMenu: View {
         Menu {
             // ── AI Summary ──
             Section("AI Summary") {
-                Button {
+                Button("Retry summary", systemImage: "pencil.and.scribble") {
                     viewModel.triggerManualSummary()
-                } label: {
-                    Label("Retry summary", systemImage: "pencil.and.scribble")
                 }
                 .disabled(viewModel.isSummaryGenerating || !viewModel.canGenerateSummary)
 
@@ -111,11 +108,7 @@ private struct SessionSettingsMenu: View {
 
                     Divider()
 
-                    Button {
-                        createNewTemplate()
-                    } label: {
-                        Label("Add custom instructions", systemImage: "plus")
-                    }
+                    Button("Add custom instructions", systemImage: "plus", action: createNewTemplate)
                 } label: {
                     Label("Instructions", systemImage: "pencil.line")
                 }
@@ -139,10 +132,7 @@ private struct SessionSettingsMenu: View {
                 }
 
                 Menu {
-                    Picker(selection: Binding(
-                        get: { viewModel.selectedLocale },
-                        set: { viewModel.changeLocale($0) }
-                    )) {
+                    Picker(selection: $viewModel.selectedLocale) {
                         if viewModel.filteredLocales.isEmpty {
                             let id = viewModel.selectedLocale
                             let name = Locale.current.localizedString(forIdentifier: id) ?? id
@@ -159,6 +149,9 @@ private struct SessionSettingsMenu: View {
                     }
                     .pickerStyle(.inline)
                     .labelsHidden()
+                    .onChange(of: viewModel.selectedLocale) { oldValue, newValue in
+                        viewModel.handleLocaleSelectionChange(from: oldValue, to: newValue)
+                    }
                 } label: {
                     Label("Language", systemImage: "globe")
                 }
@@ -184,35 +177,38 @@ private struct SessionSettingsMenu: View {
                     .pickerStyle(.inline)
                     .labelsHidden()
                 } label: {
-                    Label("Capture source", systemImage: "inset.filled.rectangle.and.person.filled")
+                    Label("Capture source", systemImage: "photo.badge.plus")
                 }
             }
         } label: {
-            Image(systemName: "slider.horizontal.3")
-                .font(.system(size: 13))
+            Label(L10n.settings, systemImage: "slider.horizontal.3")
+                .labelStyle(.iconOnly)
+                .font(.body)
                 .foregroundStyle(.secondary)
                 .padding(5)
                 .background(
                     RoundedRectangle(cornerRadius: 14)
-                        .fill(isHovered ? Color.primary.opacity(0.04) : Color.clear)
+                        .fill(.quaternary)
                 )
         }
         .menuStyle(.borderlessButton)
         .menuIndicator(.hidden)
         .fixedSize()
         .onHover { hovering in
-            isHovered = hovering
             if hovering {
                 viewModel.refreshAvailableWindows()
             }
         }
         .pointerStyle(.link)
         .task { loadSummaryTemplates() }
-        .onChange(of: appSettings.currentVault?.id) { loadSummaryTemplates() }
+        .onChange(of: appSettings.currentVault?.id) { _, _ in loadSummaryTemplates() }
     }
 
     private func loadSummaryTemplates() {
-        guard let vaultURL = appSettings.vaultURL else { return }
+        guard let vaultURL = appSettings.vaultURL else {
+            summaryTemplates = []
+            return
+        }
         try? templateService.seedPresets(in: vaultURL)
         summaryTemplates = (try? templateService.fetchTemplates(in: vaultURL)) ?? []
     }
@@ -231,7 +227,7 @@ private struct SessionSettingsMenu: View {
         }
 
         let fileURL = dir.appendingPathComponent("\(name).md")
-        FileManager.default.createFile(atPath: fileURL.path, contents: nil)
+        _ = FileManager.default.createFile(atPath: fileURL.path, contents: nil)
 
         // テンプレート一覧を更新して新しいテンプレートを選択
         loadSummaryTemplates()
@@ -257,7 +253,7 @@ private struct TranscribeButton: View {
             }
             .padding(.horizontal, 10)
             .padding(.vertical, 5)
-            .foregroundColor(viewModel.isListening ? .white : .white)
+            .foregroundStyle(.white)
             .background(
                 RoundedRectangle(cornerRadius: 14)
                     .fill(viewModel.isListening ? Color.red : Color.accentColor)
@@ -316,10 +312,13 @@ private struct ScreenshotOverlayView: View {
     let onDismiss: () -> Void
 
     var body: some View {
-        ZStack {
-            Color.black.opacity(0.7)
-                .ignoresSafeArea()
-                .onTapGesture { onDismiss() }
+        ZStack(alignment: .topTrailing) {
+            Button(action: onDismiss) {
+                Color.black.opacity(0.7)
+                    .ignoresSafeArea()
+            }
+            .buttonStyle(.plain)
+            .accessibilityLabel(L10n.close)
 
             Image(nsImage: image)
                 .resizable()
@@ -327,7 +326,12 @@ private struct ScreenshotOverlayView: View {
                 .clipShape(RoundedRectangle(cornerRadius: 8))
                 .shadow(radius: 20)
                 .padding(24)
-                .onTapGesture { onDismiss() }
+
+            Button(L10n.close, systemImage: "xmark.circle.fill", action: onDismiss)
+                .labelStyle(.iconOnly)
+                .font(.title3)
+                .padding(16)
+                .buttonStyle(.plain)
         }
     }
 }
@@ -347,38 +351,36 @@ private struct ScreenshotThumbnailView: View {
     var body: some View {
         VStack(spacing: 4) {
             if let nsImage = NSImage(data: screenshot.imageData) {
-                Image(nsImage: nsImage)
-                    .resizable()
-                    .aspectRatio(contentMode: .fit)
-                    .clipShape(RoundedRectangle(cornerRadius: 6))
-                    .shadow(color: .black.opacity(0.1), radius: 2, y: 1)
-                    .pointerStyle(.link)
-                    .onTapGesture {
-                        withAnimation(.easeOut(duration: 0.15)) {
-                            expandedScreenshot = screenshot
-                        }
+                Button {
+                    withAnimation(.easeOut(duration: 0.15)) {
+                        expandedScreenshot = screenshot
                     }
+                } label: {
+                    Image(nsImage: nsImage)
+                        .resizable()
+                        .aspectRatio(contentMode: .fit)
+                        .clipShape(RoundedRectangle(cornerRadius: 6))
+                        .shadow(color: .black.opacity(0.1), radius: 2, y: 1)
+                }
+                .buttonStyle(.plain)
+                .pointerStyle(.link)
+                .accessibilityLabel(L10n.open)
             }
             HStack {
                 Text(Self.timeFormatter.string(from: screenshot.capturedAt))
                     .font(.caption2)
                     .foregroundStyle(.secondary)
                 Spacer()
-                Button(role: .destructive) {
+                Button(L10n.delete, systemImage: "trash", role: .destructive) {
                     viewModel.deleteScreenshot(screenshot)
-                } label: {
-                    Image(systemName: "trash")
-                        .font(.caption2)
                 }
+                .labelStyle(.iconOnly)
                 .buttonStyle(.plain)
                 .foregroundStyle(.secondary)
             }
         }
         .padding(6)
-        .background(
-            RoundedRectangle(cornerRadius: 8)
-                .fill(Color(nsColor: .controlBackgroundColor))
-        )
+        .glassEffect(.regular, in: RoundedRectangle(cornerRadius: 8))
     }
 }
 
@@ -387,17 +389,14 @@ private struct ScreenshotButton: View {
     @ObservedObject var viewModel: CaptionViewModel
 
     var body: some View {
-        Button(action: { viewModel.takeScreenshot() }) {
-            Image(systemName: "camera.viewfinder")
-                .font(.system(size: 12))
-                .padding(.horizontal, 10)
-                .padding(.vertical, 5)
-                .foregroundStyle(.primary)
-                .background(
-                    RoundedRectangle(cornerRadius: 14)
-                        .fill(Color.primary.opacity(0.08))
-                )
+        Button(L10n.screenshots, systemImage: "photo.badge.plus") {
+            viewModel.takeScreenshot()
         }
+        .labelStyle(.iconOnly)
+        .font(.body)
+        .padding(.horizontal, 10)
+        .padding(.vertical, 5)
+        .foregroundStyle(.primary)
         .buttonStyle(.plain)
         .pointerStyle(.link)
         .disabled(viewModel.currentTranscriptionId == nil)
@@ -405,10 +404,11 @@ private struct ScreenshotButton: View {
     }
 }
 
-/// Notion 風の個別タブボタン。
+/// Notion 風の個別タブボタン。選択中は Liquid Glass 背景がスライドする。
 private struct DetailTabButton: View {
     let tab: DetailTab
     let isSelected: Bool
+    var namespace: Namespace.ID
     let action: () -> Void
     @State private var isHovered = false
 
@@ -423,14 +423,19 @@ private struct DetailTabButton: View {
             .padding(.horizontal, 10)
             .padding(.vertical, 5)
             .foregroundStyle(isSelected ? .primary : .secondary)
-            .background(
-                RoundedRectangle(cornerRadius: 14)
-                    .fill(
-                        isSelected
-                            ? Color.primary.opacity(0.08)
-                            : isHovered ? Color.primary.opacity(0.04) : Color.clear
-                    )
-            )
+            .background {
+                if !isSelected, isHovered {
+                    Capsule()
+                        .fill(Color.primary.opacity(0.04))
+                }
+            }
+            .background {
+                if isSelected {
+                    Capsule()
+                        .fill(.quaternary)
+                        .matchedGeometryEffect(id: "activeTab", in: namespace)
+                }
+            }
         }
         .buttonStyle(.plain)
         .pointerStyle(.link)
@@ -444,7 +449,6 @@ private struct DetailTabButton: View {
 struct ControlPanelView: View {
     @ObservedObject var viewModel: CaptionViewModel
     var sidebarViewModel: SidebarViewModel
-    @ObservedObject private var appSettings = AppSettings.shared
     @State private var selectedTab: DetailTab = .transcript
     @State private var expandedScreenshot: ScreenshotRecord?
 
@@ -460,7 +464,7 @@ struct ControlPanelView: View {
             DetailTabBar(selection: $selectedTab, viewModel: viewModel, sidebarViewModel: sidebarViewModel)
 
             // タブコンテンツ
-            GroupBox {
+            Group {
                 switch selectedTab {
                 case .summary:
                     summaryTabContent
@@ -473,15 +477,20 @@ struct ControlPanelView: View {
                 }
             }
             .frame(minHeight: 280)
+            .clipShape(RoundedRectangle(cornerRadius: 10))
+            .background(
+                RoundedRectangle(cornerRadius: 10)
+                    .fill(.background.secondary)
+            )
 
             // エラー表示
             if let error = viewModel.errorMessage {
                 HStack {
                     Image(systemName: "exclamationmark.triangle.fill")
-                        .foregroundColor(.orange)
+                        .foregroundStyle(.orange)
                     Text(error)
                         .font(.caption)
-                        .foregroundColor(.red)
+                        .foregroundStyle(.red)
                     Spacer()
                 }
             }
@@ -489,10 +498,10 @@ struct ControlPanelView: View {
             if let summaryError = viewModel.summaryError {
                 HStack {
                     Image(systemName: "exclamationmark.triangle.fill")
-                        .foregroundColor(.orange)
+                        .foregroundStyle(.orange)
                     Text(summaryError)
                         .font(.caption)
-                        .foregroundColor(.red)
+                        .foregroundStyle(.red)
                     Spacer()
                 }
             }
@@ -500,6 +509,14 @@ struct ControlPanelView: View {
         }
         .padding()
         .frame(minWidth: 500, minHeight: 500)
+        .onChange(of: viewModel.currentTranscriptionId) {
+            // フォルダ選択時は強制的に Transcript タブへ切り替え
+            if viewModel.currentTranscriptionId == nil, selectedTab != .transcript {
+                withAnimation(.easeInOut(duration: 0.25)) {
+                    selectedTab = .transcript
+                }
+            }
+        }
         .onChange(of: viewModel.requestShowSummaryTab) {
             if viewModel.requestShowSummaryTab {
                 selectedTab = .summary
@@ -510,9 +527,10 @@ struct ControlPanelView: View {
         .toolbar {
             ToolbarItem(placement: .primaryAction) {
                 if viewModel.currentTranscriptionId != nil {
-                    Button(action: { viewModel.exportTranscript() }) {
-                        Image(systemName: "square.and.arrow.up")
+                    Button(L10n.export, systemImage: "square.and.arrow.up") {
+                        viewModel.exportTranscript()
                     }
+                    .labelStyle(.iconOnly)
                     .disabled(viewModel.store.segments.isEmpty)
                     .help(L10n.export)
                 }
@@ -549,7 +567,7 @@ struct ControlPanelView: View {
             ContentUnavailableView {
                 Label(L10n.summary, systemImage: "list.bullet.clipboard")
             } description: {
-                if viewModel.isSummaryGenerating {
+                if viewModel.summaryGeneratingTranscriptionId == viewModel.currentTranscriptionId {
                     ProgressView(L10n.generatingSummary)
                 } else {
                     Text("要約はまだ生成されていません")
@@ -559,20 +577,37 @@ struct ControlPanelView: View {
         }
     }
 
+    @ViewBuilder
     private var notesTabContent: some View {
-        ContentUnavailableView {
-            Label(L10n.notes, systemImage: "pencil.line")
-        } description: {
-            Text("ノート機能は準備中です")
+        if viewModel.currentTranscriptionId != nil {
+            TextEditor(text: $viewModel.noteText)
+                .font(.body)
+                .scrollContentBackground(.hidden)
+                .padding(12)
+                .background {
+                    if viewModel.noteText.isEmpty {
+                        ContentUnavailableView {
+                            Label(L10n.notes, systemImage: "pencil.line")
+                        } description: {
+                            Text("ノートはまだありません")
+                        }
+                    }
+                }
+        } else {
+            ContentUnavailableView {
+                Label(L10n.notes, systemImage: "pencil.line")
+            } description: {
+                Text("文字起こしを選択してください")
+            }
+            .frame(maxWidth: .infinity, maxHeight: .infinity)
         }
-        .frame(maxWidth: .infinity, maxHeight: .infinity)
     }
 
     @ViewBuilder
     private var screenshotsTabContent: some View {
         if viewModel.screenshots.isEmpty {
             ContentUnavailableView {
-                Label(L10n.screenshots, systemImage: "camera.viewfinder")
+                Label(L10n.screenshots, systemImage: "photo.on.rectangle.angled")
             } description: {
                 Text("スクリーンショットはまだありません")
             }
@@ -590,36 +625,88 @@ struct ControlPanelView: View {
     }
 
     private var transcriptTabContent: some View {
-        ScrollViewReader { proxy in
-            ScrollView {
-                LazyVStack(alignment: .leading, spacing: 2) {
-                    ForEach(viewModel.store.segments) { segment in
-                        TranscriptRowView(segment: segment)
-                    }
+        Group {
+            if viewModel.currentTranscriptionId == nil {
+                // フォルダ選択時: 新規作成ボタンを中央に表示
+                newTranscriptionPlaceholder
+            } else if viewModel.store.segments.isEmpty, !viewModel.isListening {
+                ContentUnavailableView {
+                    Label(L10n.transcript, systemImage: "waveform.badge.microphone")
+                } description: {
+                    Text("文字起こしはまだありません")
+                }
+                .frame(maxWidth: .infinity, maxHeight: .infinity)
+            } else {
+                ScrollViewReader { proxy in
+                    ScrollView {
+                        LazyVStack(alignment: .leading, spacing: 2) {
+                            ForEach(viewModel.store.segments) { segment in
+                                TranscriptRowView(segment: segment)
+                            }
 
-                    // 録音中インジケータ
-                    if viewModel.isListening {
-                        HStack(spacing: 6) {
-                            ProgressView()
-                                .scaleEffect(0.5)
-                                .frame(width: 12, height: 12)
-                            Text(L10n.recognizing)
-                                .font(.caption)
-                                .foregroundColor(.secondary)
+                            // 録音中インジケータ
+                            if viewModel.isListening {
+                                HStack(spacing: 6) {
+                                    ProgressView()
+                                        .scaleEffect(0.5)
+                                        .frame(width: 12, height: 12)
+                                    Text(L10n.recognizing)
+                                        .font(.caption)
+                                        .foregroundStyle(.secondary)
+                                }
+                                .padding(.vertical, 4)
+                                .padding(.leading, 68)
+                            }
+
+                            Color.clear.frame(height: 1).id("bottom")
                         }
-                        .padding(.vertical, 4)
-                        .padding(.leading, 68)
+                        .padding(8)
                     }
+                    .onChange(of: viewModel.store.segments.count) {
+                        withAnimation {
+                            proxy.scrollTo("bottom")
+                        }
+                    }
+                }
+            }
+        }
+    }
 
-                    Color.clear.frame(height: 1).id("bottom")
-                }
-                .padding(8)
-            }
-            .onChange(of: viewModel.store.segments.count) {
-                withAnimation {
-                    proxy.scrollTo("bottom")
-                }
-            }
+    /// フォルダ選択時に表示する新規文字起こし作成プレースホルダー。
+    private var newTranscriptionPlaceholder: some View {
+        VStack(spacing: 12) {
+            Spacer()
+            Button(L10n.newTranscription, systemImage: "plus.circle", action: createNewTranscription)
+                .labelStyle(.iconOnly)
+                .font(.largeTitle)
+                .foregroundStyle(.secondary)
+                .buttonStyle(.plain)
+                .pointerStyle(.link)
+            Text(L10n.newTranscription)
+                .font(.subheadline)
+                .foregroundStyle(.secondary)
+            Spacer()
+        }
+        .frame(maxWidth: .infinity)
+    }
+
+    private func createNewTranscription() {
+        guard let project = sidebarViewModel.selectedProject,
+              let dbQueue = sidebarViewModel.dbQueue,
+              let projectURL = sidebarViewModel.selectedProjectURL,
+              let vault = sidebarViewModel.currentVault
+        else { return }
+
+        viewModel.createEmptyTranscription(
+            dbQueue: dbQueue,
+            projectURL: projectURL,
+            projectId: project.id,
+            projectName: project.name,
+            vaultURL: vault.url
+        )
+
+        if let newId = viewModel.currentTranscriptionId {
+            sidebarViewModel.selectTranscription(newId)
         }
     }
 

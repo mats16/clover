@@ -9,6 +9,7 @@ struct ProjectRecord: Codable, FetchableRecord, PersistableRecord {
     var vaultId: UUID
     var name: String
     var createdAt: Date
+    var missingOnDisk = false
 
     // MARK: - Shared DB Helpers
 
@@ -53,6 +54,17 @@ struct ProjectRecord: Codable, FetchableRecord, PersistableRecord {
             .filter(Column("name") == prefix)
             .deleteAll(db)
         return childCount + selfCount
+    }
+
+    /// 指定プレフィクスに一致するプロジェクトの missingOnDisk を更新する。
+    static func setMissingByPrefix(_ prefix: String, missing: Bool, vaultId: UUID, in db: Database) throws {
+        try db.execute(
+            sql: """
+            UPDATE projects SET missingOnDisk = ?
+            WHERE vaultId = ? AND (name = ? OR name LIKE ? || '/%')
+            """,
+            arguments: [missing, vaultId, prefix, prefix]
+        )
     }
 
     /// パス文字列から中間パスを含む全パスを生成する。

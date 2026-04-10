@@ -2,12 +2,17 @@
 "Delete" = "削除";
 "Rename" = "名前を変更";
 "Create" = "作成";
+"Close" = "閉じる";
+"Expand" = "展開";
+"Collapse" = "折りたたむ";
 
 /* Sidebar */
 "New Project" = "新規プロジェクト";
 "Project Name" = "プロジェクト名";
 "Edit Context" = "コンテキストを編集";
 "Title" = "タイトル";
+"Delete %lld items" = "%lld 件を削除";
+"Move %lld items" = "%lld 件を移動";
 
 /* Control Panel */
 "Preparing speech recognition..." = "音声認識を準備中...";
@@ -19,10 +24,12 @@
 "Record" = "録音";
 "Export" = "書き出し";
 "Clear transcription" = "文字起こしをクリア";
+"New Transcription" = "新規文字起こし";
 
 /* Detail Tabs */
 "Summary" = "要約";
 "Notes" = "ノート";
+"NotesPlaceholder" = "メモを入力...";
 "Screenshots" = "スクリーンショット";
 "Transcript" = "文字起こし";
 

@@ -7,6 +7,7 @@ import SwiftUI
 
 private enum ScreenshotError: Error {
     case encodingFailed
+    case imageUnavailable
 }
 
 /// 音声キャプチャ → Speech フレームワーク文字起こし → UI 更新を統括するビューモデル。
@@ -35,11 +36,20 @@ final class CaptionViewModel: ObservableObject {
 
     // MARK: - Summary State
 
-    @Published var isSummaryGenerating = false
+    @Published var summaryGeneratingTranscriptionId: UUID?
+    var isSummaryGenerating: Bool { summaryGeneratingTranscriptionId != nil }
     @Published var summaryError: String?
     @Published var lastSummaryURL: URL?
     /// Summary タブへの切り替えをリクエストするフラグ。
     @Published var requestShowSummaryTab = false
+
+    // MARK: - Note State
+
+    @Published var noteText = ""
+    private var currentNoteId: UUID?
+    private var currentNoteCreatedAt: Date?
+    private var noteAutoSaveCancellable: AnyCancellable?
+    private var lastSavedNoteText: String?
 
     // MARK: - Screenshot State
 
@@ -112,6 +122,7 @@ final class CaptionViewModel: ObservableObject {
         let segments: [TranscriptSegment]
         let screenshots: [ScreenshotRecord]
         let lastSummaryURL: URL?
+        let note: NoteRecord?
     }
 
     private nonisolated static func fetchLoadedTranscriptionData(
@@ -132,7 +143,8 @@ final class CaptionViewModel: ObservableObject {
         return LoadedTranscriptionData(
             segments: segments,
             screenshots: detail.screenshots,
-            lastSummaryURL: lastSummaryURL
+            lastSummaryURL: lastSummaryURL,
+            note: detail.note
         )
     }
 
@@ -148,18 +160,15 @@ final class CaptionViewModel: ObservableObject {
         vaultURL: URL
     ) {
         guard !isListening else { return }
-        currentTranscriptionId = transcriptionId
-        currentProjectURL = projectURL
-        currentProjectId = projectId
-        currentProjectName = projectName
-        currentVaultURL = vaultURL
-        currentDbQueue = dbQueue
-
-        transcriptionLoadTask?.cancel()
-        store.clear()
-        screenshots = []
-        lastSummaryURL = nil
-        summaryError = nil
+        resetTranscriptionState()
+        setTranscriptionContext(
+            id: transcriptionId,
+            dbQueue: dbQueue,
+            projectURL: projectURL,
+            projectId: projectId,
+            projectName: projectName,
+            vaultURL: vaultURL
+        )
 
         transcriptionLoadTask = Task { [weak self, transcriptionId, dbQueue, projectURL] in
             guard let self else { return }
@@ -186,21 +195,87 @@ final class CaptionViewModel: ObservableObject {
             self.store.loadSegments(loaded.segments)
             self.screenshots = loaded.screenshots
             self.lastSummaryURL = loaded.lastSummaryURL
+            self.noteText = loaded.note?.text ?? ""
+            self.currentNoteId = loaded.note?.id
+            self.currentNoteCreatedAt = loaded.note?.createdAt
+            self.lastSavedNoteText = self.noteText
+            self.setupNoteAutoSave()
         }
+    }
+
+    /// 文字起こしを開始せずに空の TranscriptionRecord を作成し、表示対象としてセットする。
+    func createEmptyTranscription(
+        dbQueue: DatabaseQueue,
+        projectURL: URL,
+        projectId: UUID,
+        projectName: String? = nil,
+        vaultURL: URL
+    ) {
+        resetTranscriptionState()
+
+        let transcriptionId = UUID.v7()
+        let now = Date()
+        let record = TranscriptionRecord(
+            id: transcriptionId,
+            projectId: projectId,
+            title: "",
+            startedAt: now,
+            endedAt: now,
+            summaryCreated: false,
+            filePath: nil
+        )
+        try? dbQueue.write { db in
+            try record.insert(db)
+        }
+
+        setTranscriptionContext(
+            id: transcriptionId,
+            dbQueue: dbQueue,
+            projectURL: projectURL,
+            projectId: projectId,
+            projectName: projectName,
+            vaultURL: vaultURL
+        )
     }
 
     /// 現在の文字起こし表示をクリアして初期状態に戻す。
     func clearCurrentTranscription() {
-        transcriptionLoadTask?.cancel()
+        resetTranscriptionState()
         currentTranscriptionId = nil
         currentProjectURL = nil
         currentProjectId = nil
         currentProjectName = nil
         currentVaultURL = nil
+    }
+
+    // MARK: - Private Helpers
+
+    /// UI 状態をリセットし、次の文字起こし読み込みに備える。
+    private func resetTranscriptionState() {
+        saveNoteImmediately()
+        transcriptionLoadTask?.cancel()
         store.clear()
+        screenshots = []
+        resetNoteState()
         lastSummaryURL = nil
         summaryError = nil
-        screenshots = []
+    }
+
+    /// 現在の文字起こしコンテキスト（ID・プロジェクト情報）をセットする。
+    private func setTranscriptionContext(
+        id: UUID,
+        dbQueue: DatabaseQueue,
+        projectURL: URL,
+        projectId: UUID,
+        projectName: String?,
+        vaultURL: URL
+    ) {
+        currentTranscriptionId = id
+        currentProjectURL = projectURL
+        currentProjectId = projectId
+        currentProjectName = projectName
+        currentVaultURL = vaultURL
+        currentDbQueue = dbQueue
     }
 
     // MARK: - Analyzer Preparation
@@ -236,11 +311,13 @@ final class CaptionViewModel: ObservableObject {
         }
     }
 
-    /// マイク側の認識言語を変更する。
-    /// 録音中の場合はオーディオキャプチャを維持したまま Speech サービスだけ差し替える。
-    func changeLocale(_ newLocale: String) {
-        guard newLocale != selectedLocale || !analyzerReady else { return }
-        selectedLocale = newLocale
+    /// SwiftUI の selection binding 更新後に副作用だけを適用する。
+    func handleLocaleSelectionChange(from oldLocale: String, to newLocale: String) {
+        applyLocaleChange(from: oldLocale, to: newLocale)
+    }
+
+    private func applyLocaleChange(from oldLocale: String, to newLocale: String) {
+        guard newLocale != oldLocale || !analyzerReady else { return }
         AppSettings.shared.transcriptionLocale = newLocale
 
         if isListening {
@@ -477,7 +554,11 @@ final class CaptionViewModel: ObservableObject {
             return
         }
 
-        isSummaryGenerating = true
+        // 要約前にノートを即座に保存してから取得
+        saveNoteImmediately()
+        let currentNoteText = noteText
+
+        summaryGeneratingTranscriptionId = transcriptionId
         summaryError = nil
         lastSummaryURL = nil
 
@@ -496,6 +577,7 @@ final class CaptionViewModel: ObservableObject {
                 transcriptionId: transcriptionId,
                 startedAt: startedAt,
                 transcriptText: transcriptText,
+                noteText: currentNoteText.isEmpty ? nil : currentNoteText,
                 screenshots: screenshots
             )
 
@@ -510,7 +592,9 @@ final class CaptionViewModel: ObservableObject {
 
             let fileURL = try await summaryResult
             _ = await fileExport
-            lastSummaryURL = fileURL
+            if currentTranscriptionId == transcriptionId {
+                lastSummaryURL = fileURL
+            }
 
             // summaryCreated フラグを立てる
             if let dbQueue = currentDbQueue {
@@ -518,10 +602,14 @@ final class CaptionViewModel: ObservableObject {
                 try? repo.markSummaryCreated(id: transcriptionId)
             }
         } catch {
-            summaryError = error.localizedDescription
+            if currentTranscriptionId == transcriptionId {
+                summaryError = error.localizedDescription
+            }
         }
 
-        isSummaryGenerating = false
+        if summaryGeneratingTranscriptionId == transcriptionId {
+            summaryGeneratingTranscriptionId = nil
+        }
     }
 
     /// 要約なしでファイル書き出しのみ実行する。
@@ -631,15 +719,14 @@ final class CaptionViewModel: ObservableObject {
                 let content = try await SCShareableContent.excludingDesktopWindows(false, onScreenWindowsOnly: true)
 
                 let filter: SCContentFilter
-                let config = SCStreamConfiguration()
+                let config = SCScreenshotConfiguration()
                 config.showsCursor = false
+                config.dynamicRange = .sdr
 
                 if let windowID = selectedWindowID,
                    let window = content.windows.first(where: { $0.windowID == windowID }) {
                     // 選択ウィンドウをキャプチャ
                     filter = SCContentFilter(desktopIndependentWindow: window)
-                    config.width = Int(window.frame.width) * 2
-                    config.height = Int(window.frame.height) * 2
                 } else {
                     // デスクトップ全体をキャプチャ
                     guard let display = content.displays.first else {
@@ -647,11 +734,14 @@ final class CaptionViewModel: ObservableObject {
                         return
                     }
                     filter = SCContentFilter(display: display, excludingWindows: [])
-                    config.width = display.width * 2
-                    config.height = display.height * 2
                 }
 
-                let cgImage = try await SCScreenshotManager.captureImage(contentFilter: filter, configuration: config)
+                // 対象の実サイズに合わせて ScreenCaptureKit に出力サイズを決めさせる。
+                // `window.frame * 2` のような固定スケールは、非 Retina の拡張モニタで余白を生む。
+                let output = try await SCScreenshotManager.captureScreenshot(contentFilter: filter, configuration: config)
+                guard let cgImage = output.sdrImage else {
+                    throw ScreenshotError.imageUnavailable
+                }
 
                 // 画像エンコードを MainActor 外で実行（WebP → JPEG フォールバック）
                 let imageData: Data = try await Task.detached(priority: .userInitiated) {
@@ -676,6 +766,60 @@ final class CaptionViewModel: ObservableObject {
                 errorMessage = "スクリーンショットの取得に失敗しました: \(error.localizedDescription)"
             }
         }
+    }
+
+    // MARK: - Note Auto-Save
+
+    private func setupNoteAutoSave() {
+        noteAutoSaveCancellable?.cancel()
+        noteAutoSaveCancellable = $noteText
+            .dropFirst()
+            .removeDuplicates()
+            .debounce(for: .seconds(1), scheduler: RunLoop.main)
+            .sink { [weak self] text in
+                self?.saveNote(text: text)
+            }
+    }
+
+    private func resetNoteState() {
+        noteText = ""
+        currentNoteId = nil
+        currentNoteCreatedAt = nil
+        lastSavedNoteText = nil
+        noteAutoSaveCancellable?.cancel()
+    }
+
+    private func saveNote(text: String) {
+        guard let transcriptionId = currentTranscriptionId,
+              let dbQueue = currentDbQueue else { return }
+        let now = Date()
+        let isNew = currentNoteId == nil
+        let noteId = currentNoteId ?? UUID.v7()
+        let note = NoteRecord(
+            id: noteId,
+            transcriptionId: transcriptionId,
+            text: text,
+            createdAt: isNew ? now : (currentNoteCreatedAt ?? now),
+            updatedAt: now
+        )
+        let repo = TranscriptionRepository(dbQueue: dbQueue)
+        do {
+            try repo.upsertNote(note)
+            if isNew {
+                currentNoteId = noteId
+                currentNoteCreatedAt = now
+            }
+            lastSavedNoteText = text
+        } catch {
+            Logger(subsystem: "com.dahlia", category: "CaptionViewModel")
+                .error("Failed to save note: \(error)")
+        }
+    }
+
+    private func saveNoteImmediately() {
+        guard currentNoteId != nil || !noteText.isEmpty,
+              noteText != lastSavedNoteText else { return }
+        saveNote(text: noteText)
     }
 
     /// DB からスクリーンショット一覧を再読み込みする。
@@ -748,7 +892,7 @@ final class CaptionViewModel: ObservableObject {
             bridge.appendBuffer(buffer)
         }
         manager.onStreamStopped = { [weak self] error in
-            DispatchQueue.main.async {
+            Task { @MainActor in
                 self?.errorMessage = error?.localizedDescription ?? L10n.systemAudioCaptureStopped
                 if self?.audioManager == nil {
                     self?.isListening = false

@@ -12,80 +12,70 @@ struct AISummarySettingsView: View {
     }
 
     var body: some View {
-        VStack(alignment: .leading, spacing: 0) {
-            Text(L10n.aiSummary)
-                .font(.title)
-                .fontWeight(.bold)
-                .padding(.horizontal, 20)
-                .padding(.top, 20)
-                .padding(.bottom, 4)
+        Form {
+            Section {
+                Toggle(isOn: $settings.llmAutoSummaryEnabled) {
+                    Text(L10n.autoSummaryDescription)
+                }
+                .disabled(!isLLMConfigComplete)
+            }
 
-            Form {
-                Section {
-                    Toggle(isOn: $settings.llmAutoSummaryEnabled) {
-                        Text(L10n.autoSummaryDescription)
-                    }
-                    .disabled(!isLLMConfigComplete)
+            Section {
+                LabeledContent(L10n.endpointURL) {
+                    TextField("", text: $settings.llmEndpointURL, prompt: Text("https://…/mlflow/v1/chat/completions"))
+                        .textFieldStyle(.roundedBorder)
+                        .frame(maxWidth: 300)
                 }
 
-                Section {
-                    LabeledContent(L10n.endpointURL) {
-                        TextField("", text: $settings.llmEndpointURL, prompt: Text("https://…/mlflow/v1/chat/completions"))
-                            .textFieldStyle(.roundedBorder)
-                            .frame(maxWidth: 300)
-                    }
+                LabeledContent(L10n.modelName) {
+                    TextField("", text: $settings.llmModelName, prompt: Text("databricks-gpt-5-4"))
+                        .textFieldStyle(.roundedBorder)
+                }
 
-                    LabeledContent(L10n.modelName) {
-                        TextField("", text: $settings.llmModelName, prompt: Text("databricks-gpt-5-4"))
-                            .textFieldStyle(.roundedBorder)
-                    }
+                LabeledContent(L10n.apiToken) {
+                    SecureField("", text: $apiToken)
+                        .textFieldStyle(.roundedBorder)
+                        .onSubmit { settings.llmAPIToken = apiToken }
+                }
+            } footer: {
+                VStack(alignment: .leading, spacing: 8) {
+                    Text(L10n.apiTokenStoredInKeychain)
+                        .foregroundStyle(.secondary)
 
-                    LabeledContent(L10n.apiToken) {
-                        SecureField("", text: $apiToken)
-                            .textFieldStyle(.roundedBorder)
-                            .onSubmit { settings.llmAPIToken = apiToken }
-                    }
-                } footer: {
-                    VStack(alignment: .leading, spacing: 8) {
-                        Text(L10n.apiTokenStoredInKeychain)
-                            .foregroundStyle(.secondary)
-
-                        HStack {
-                            if let result = connectionTestResult {
-                                switch result {
-                                case .success:
-                                    Label(L10n.connectionSuccess, systemImage: "checkmark.circle.fill")
-                                        .foregroundColor(.green)
-                                case let .failure(message):
-                                    Label(message, systemImage: "xmark.circle.fill")
-                                        .foregroundColor(.red)
-                                }
+                    HStack {
+                        if let result = connectionTestResult {
+                            switch result {
+                            case .success:
+                                Label(L10n.connectionSuccess, systemImage: "checkmark.circle.fill")
+                                    .foregroundStyle(.green)
+                            case let .failure(message):
+                                Label(message, systemImage: "xmark.circle.fill")
+                                    .foregroundStyle(.red)
                             }
-                            Spacer()
-                            if isTestingConnection {
-                                ProgressView()
-                                    .controlSize(.small)
-                                Text(L10n.testing)
-                                    .foregroundStyle(.secondary)
-                            } else {
-                                Button(L10n.testConnection) {
-                                    testConnection()
-                                }
-                                .disabled(!isLLMConfigComplete)
+                        }
+                        Spacer()
+                        if isTestingConnection {
+                            ProgressView()
+                                .controlSize(.small)
+                            Text(L10n.testing)
+                                .foregroundStyle(.secondary)
+                        } else {
+                            Button(L10n.testConnection) {
+                                testConnection()
                             }
+                            .disabled(!isLLMConfigComplete)
                         }
                     }
                 }
             }
-            .formStyle(.grouped)
-            .task {
-                apiToken = settings.llmAPIToken
-            }
-            .onDisappear {
-                settings.llmAPIToken = apiToken
-            }
-
-        } // VStack
+        }
+        .formStyle(.grouped)
+        .task {
+            apiToken = settings.llmAPIToken
+        }
+        .onDisappear {
+            settings.llmAPIToken = apiToken
+        }
     }
 
     // MARK: - Private

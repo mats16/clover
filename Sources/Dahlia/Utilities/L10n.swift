@@ -30,6 +30,9 @@ enum L10n {
     static var delete: String { String(localized: "Delete", bundle: bundle) }
     static var rename: String { String(localized: "Rename", bundle: bundle) }
     static var create: String { String(localized: "Create", bundle: bundle) }
+    static var close: String { String(localized: "Close", bundle: bundle) }
+    static var expand: String { String(localized: "Expand", bundle: bundle) }
+    static var collapse: String { String(localized: "Collapse", bundle: bundle) }
 
     // MARK: - Sidebar
 
@@ -37,7 +40,11 @@ enum L10n {
     static var projectName: String { String(localized: "Project Name", bundle: bundle) }
     static var editContext: String { String(localized: "Edit Context", bundle: bundle) }
     static var openInFinder: String { String(localized: "Open in Finder", bundle: bundle) }
+    static var recreateFolder: String { String(localized: "Recreate Folder", bundle: bundle) }
+    static var folderMissing: String { String(localized: "Folder missing on disk", bundle: bundle) }
     static var title: String { String(localized: "Title", bundle: bundle) }
+    static func deleteCount(_ count: Int) -> String { String(localized: "Delete \(count) items", bundle: bundle) }
+    static func moveCount(_ count: Int) -> String { String(localized: "Move \(count) items", bundle: bundle) }
 
     // MARK: - Control Panel
 
@@ -50,11 +57,13 @@ enum L10n {
     static var record: String { String(localized: "Record", bundle: bundle) }
     static var export: String { String(localized: "Export", bundle: bundle) }
     static var clearTranscription: String { String(localized: "Clear transcription", bundle: bundle) }
+    static var newTranscription: String { String(localized: "New Transcription", bundle: bundle) }
 
     // MARK: - Detail Tabs
 
     static var summary: String { String(localized: "Summary", bundle: bundle) }
     static var notes: String { String(localized: "Notes", bundle: bundle) }
+    static var notesPlaceholder: String { String(localized: "NotesPlaceholder", bundle: bundle) }
     static var screenshots: String { String(localized: "Screenshots", bundle: bundle) }
     static var transcript: String { String(localized: "Transcript", bundle: bundle) }
 

@@ -72,8 +72,7 @@ struct VaultPickerView: View {
                     .buttonStyle(.borderedProminent)
                 }
             }
-            .background(Color(nsColor: .controlBackgroundColor))
-            .clipShape(RoundedRectangle(cornerRadius: 8))
+            .glassEffect(.regular, in: RoundedRectangle(cornerRadius: 8))
             .padding(.horizontal, 40)
 
             Spacer()
@@ -101,7 +100,7 @@ struct VaultPickerView: View {
                     .font(.headline)
                 Text(description)
                     .font(.caption)
-                    .foregroundColor(.secondary)
+                    .foregroundStyle(.secondary)
             }
             Spacer()
             action()
@@ -144,25 +143,26 @@ private struct VaultRow: View {
     @State private var isHovered = false
 
     var body: some View {
-        VStack(alignment: .leading, spacing: 2) {
-            Text(vault.name)
-                .font(.headline)
-            Text(vault.path)
-                .font(.caption)
-                .foregroundColor(.secondary)
-                .lineLimit(1)
-                .truncationMode(.middle)
+        Button(action: onOpen) {
+            VStack(alignment: .leading, spacing: 2) {
+                Text(vault.name)
+                    .font(.headline)
+                Text(vault.path)
+                    .font(.caption)
+                    .foregroundStyle(.secondary)
+                    .lineLimit(1)
+                    .truncationMode(.middle)
+            }
+            .frame(maxWidth: .infinity, alignment: .leading)
+            .padding(.vertical, 4)
+            .contentShape(Rectangle())
         }
-        .frame(maxWidth: .infinity, alignment: .leading)
-        .padding(.vertical, 4)
-        .contentShape(Rectangle())
-        .pointerStyle(.link)
+        .buttonStyle(.plain)
         .onHover { isHovered = $0 }
+        .pointerStyle(.link)
         .background(
             RoundedRectangle(cornerRadius: 4)
                 .fill(isHovered ? Color.primary.opacity(0.06) : Color.clear)
         )
-        .onTapGesture(count: 2) { onOpen() }
-        .onTapGesture(count: 1) { onOpen() }
     }
 }

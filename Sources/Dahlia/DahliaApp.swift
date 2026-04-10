@@ -29,24 +29,25 @@ struct DahliaApp: App {
                     )
                 }
             }
-            .onAppear {
-                initializeApp()
-            }
+            .task { initializeAppIfNeeded() }
         }
         .windowResizability(.contentMinSize)
+        .windowStyle(.automatic)
 
         Window(L10n.vault, id: WindowID.vaultManager) {
             VaultPickerView(appDatabase: appDatabase) { vault in
                 openVault(vault)
             }
         }
+        .windowStyle(.automatic)
 
         Settings {
             SettingsView()
         }
     }
 
-    private func initializeApp() {
+    private func initializeAppIfNeeded() {
+        guard appDatabase == nil else { return }
         guard let db = try? AppDatabaseManager() else { return }
         appDatabase = db
 

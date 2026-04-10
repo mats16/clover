@@ -22,6 +22,7 @@ enum SummaryService {
         transcriptionId: UUID,
         startedAt: Date,
         transcriptText: String,
+        noteText: String? = nil,
         screenshots: [ScreenshotRecord] = []
     ) async throws -> URL {
         let settings = AppSettings.shared
@@ -50,7 +51,10 @@ enum SummaryService {
             messages.append(.init(role: "user", content: contextContent))
         }
 
-        let transcriptContent = "<transcript_id>\(transcriptionId.uuidString)</transcript_id>\n<transcript>\n\(transcriptText)\n</transcript>"
+        var transcriptContent = "<transcript_id>\(transcriptionId.uuidString)</transcript_id>\n<transcript>\n\(transcriptText)\n</transcript>"
+        if let noteText, !noteText.isEmpty {
+            transcriptContent += "\n<note>\n\(noteText)\n</note>"
+        }
 
         if screenshots.isEmpty {
             messages.append(.init(role: "user", content: transcriptContent))
@@ -133,6 +137,7 @@ enum SummaryService {
                 ? "\(datePrefix)-summary_\(transcriptionId.uuidString)"
                 : "\(datePrefix)-\(sanitized)"
         }
+        try FileManager.default.createDirectory(at: projectURL, withIntermediateDirectories: true)
         let fileURL = projectURL.appendingPathComponent("\(fileName).md")
         try Data(markdown.utf8).write(to: fileURL, options: .atomic)
 

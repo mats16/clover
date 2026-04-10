@@ -126,6 +126,12 @@ final class AppDatabaseManager: Sendable {
             )
         }
 
+        migrator.registerMigration("v4_addMissingOnDisk") { db in
+            try db.alter(table: "projects") { t in
+                t.add(column: "missingOnDisk", .boolean).notNull().defaults(to: false)
+            }
+        }
+
         return migrator
     }
 }
