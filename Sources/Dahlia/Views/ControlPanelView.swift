@@ -566,13 +566,21 @@ struct ControlPanelView: View {
         }
     }
 
+    @ViewBuilder
     private var notesTabContent: some View {
-        ContentUnavailableView {
-            Label(L10n.notes, systemImage: "pencil.line")
-        } description: {
-            Text("ノート機能は準備中です")
+        if viewModel.currentTranscriptionId != nil {
+            TextEditor(text: $viewModel.noteText)
+                .font(.body)
+                .scrollContentBackground(.hidden)
+                .padding(12)
+        } else {
+            ContentUnavailableView {
+                Label(L10n.notes, systemImage: "pencil.line")
+            } description: {
+                Text("文字起こしを選択してください")
+            }
+            .frame(maxWidth: .infinity, maxHeight: .infinity)
         }
-        .frame(maxWidth: .infinity, maxHeight: .infinity)
     }
 
     @ViewBuilder

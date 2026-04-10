@@ -42,6 +42,14 @@ final class CaptionViewModel: ObservableObject {
     /// Summary タブへの切り替えをリクエストするフラグ。
     @Published var requestShowSummaryTab = false
 
+    // MARK: - Note State
+
+    @Published var noteText: String = ""
+    private var currentNoteId: UUID?
+    private var currentNoteCreatedAt: Date?
+    private var noteAutoSaveCancellable: AnyCancellable?
+    private var lastSavedNoteText: String?
+
     // MARK: - Screenshot State
 
     @Published var screenshots: [ScreenshotRecord] = []
@@ -113,6 +121,7 @@ final class CaptionViewModel: ObservableObject {
         let segments: [TranscriptSegment]
         let screenshots: [ScreenshotRecord]
         let lastSummaryURL: URL?
+        let note: NoteRecord?
     }
 
     private nonisolated static func fetchLoadedTranscriptionData(
@@ -133,7 +142,8 @@ final class CaptionViewModel: ObservableObject {
         return LoadedTranscriptionData(
             segments: segments,
             screenshots: detail.screenshots,
-            lastSummaryURL: lastSummaryURL
+            lastSummaryURL: lastSummaryURL,
+            note: detail.note
         )
     }
 
@@ -149,6 +159,8 @@ final class CaptionViewModel: ObservableObject {
         vaultURL: URL
     ) {
         guard !isListening else { return }
+        saveNoteImmediately()
+
         currentTranscriptionId = transcriptionId
         currentProjectURL = projectURL
         currentProjectId = projectId
@@ -159,6 +171,7 @@ final class CaptionViewModel: ObservableObject {
         transcriptionLoadTask?.cancel()
         store.clear()
         screenshots = []
+        resetNoteState()
         lastSummaryURL = nil
         summaryError = nil
 
@@ -187,11 +200,17 @@ final class CaptionViewModel: ObservableObject {
             self.store.loadSegments(loaded.segments)
             self.screenshots = loaded.screenshots
             self.lastSummaryURL = loaded.lastSummaryURL
+            self.noteText = loaded.note?.text ?? ""
+            self.currentNoteId = loaded.note?.id
+            self.currentNoteCreatedAt = loaded.note?.createdAt
+            self.lastSavedNoteText = self.noteText
+            self.setupNoteAutoSave()
         }
     }
 
     /// 現在の文字起こし表示をクリアして初期状態に戻す。
     func clearCurrentTranscription() {
+        saveNoteImmediately()
         transcriptionLoadTask?.cancel()
         currentTranscriptionId = nil
         currentProjectURL = nil
@@ -202,6 +221,7 @@ final class CaptionViewModel: ObservableObject {
         lastSummaryURL = nil
         summaryError = nil
         screenshots = []
+        resetNoteState()
     }
 
     // MARK: - Analyzer Preparation
@@ -478,6 +498,10 @@ final class CaptionViewModel: ObservableObject {
             return
         }
 
+        // 要約前にノートを即座に保存してから取得
+        saveNoteImmediately()
+        let currentNoteText = noteText
+
         summaryGeneratingTranscriptionId = transcriptionId
         summaryError = nil
         lastSummaryURL = nil
@@ -497,6 +521,7 @@ final class CaptionViewModel: ObservableObject {
                 transcriptionId: transcriptionId,
                 startedAt: startedAt,
                 transcriptText: transcriptText,
+                noteText: currentNoteText.isEmpty ? nil : currentNoteText,
                 screenshots: screenshots
             )
 
@@ -683,6 +708,60 @@ final class CaptionViewModel: ObservableObject {
                 errorMessage = "スクリーンショットの取得に失敗しました: \(error.localizedDescription)"
             }
         }
+    }
+
+    // MARK: - Note Auto-Save
+
+    private func setupNoteAutoSave() {
+        noteAutoSaveCancellable?.cancel()
+        noteAutoSaveCancellable = $noteText
+            .dropFirst()
+            .removeDuplicates()
+            .debounce(for: .seconds(1), scheduler: RunLoop.main)
+            .sink { [weak self] text in
+                self?.saveNote(text: text)
+            }
+    }
+
+    private func resetNoteState() {
+        noteText = ""
+        currentNoteId = nil
+        currentNoteCreatedAt = nil
+        lastSavedNoteText = nil
+        noteAutoSaveCancellable?.cancel()
+    }
+
+    private func saveNote(text: String) {
+        guard let transcriptionId = currentTranscriptionId,
+              let dbQueue = currentDbQueue else { return }
+        let now = Date()
+        let isNew = currentNoteId == nil
+        let noteId = currentNoteId ?? UUID.v7()
+        let note = NoteRecord(
+            id: noteId,
+            transcriptionId: transcriptionId,
+            text: text,
+            createdAt: isNew ? now : (currentNoteCreatedAt ?? now),
+            updatedAt: now
+        )
+        let repo = TranscriptionRepository(dbQueue: dbQueue)
+        do {
+            try repo.upsertNote(note)
+            if isNew {
+                currentNoteId = noteId
+                currentNoteCreatedAt = now
+            }
+            lastSavedNoteText = text
+        } catch {
+            Logger(subsystem: "com.dahlia", category: "CaptionViewModel")
+                .error("Failed to save note: \(error)")
+        }
+    }
+
+    private func saveNoteImmediately() {
+        guard currentNoteId != nil || !noteText.isEmpty,
+              noteText != lastSavedNoteText else { return }
+        saveNote(text: noteText)
     }
 
     /// DB からスクリーンショット一覧を再読み込みする。

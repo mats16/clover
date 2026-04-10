@@ -182,6 +182,32 @@ final class TranscriptionRepository {
         }
     }
 
+    // MARK: - Notes
+
+    /// 指定文字起こしに紐づくノートを取得する（1 transcript = 1 note 運用）。
+    func fetchNote(forTranscriptionId transcriptionId: UUID) throws -> NoteRecord? {
+        try dbQueue.read { db in
+            try NoteRecord
+                .filter(Column("transcriptionId") == transcriptionId)
+                .order(Column("createdAt").asc)
+                .fetchOne(db)
+        }
+    }
+
+    /// ノートを保存する（insert or update）。
+    nonisolated func upsertNote(_ note: NoteRecord) throws {
+        try dbQueue.write { db in
+            try note.save(db)
+        }
+    }
+
+    /// ノートを削除する。
+    func deleteNote(id: UUID) throws {
+        try dbQueue.write { db in
+            _ = try NoteRecord.deleteOne(db, key: id)
+        }
+    }
+
     // MARK: - Screenshots
 
     func fetchScreenshots(forTranscriptionId transcriptionId: UUID) throws -> [ScreenshotRecord] {
@@ -204,6 +230,7 @@ final class TranscriptionRepository {
         let transcription: TranscriptionRecord?
         let segments: [SegmentRecord]
         let screenshots: [ScreenshotRecord]
+        let note: NoteRecord?
     }
 
     nonisolated func fetchTranscriptionDetail(id transcriptionId: UUID) throws -> TranscriptionDetail {
@@ -217,7 +244,11 @@ final class TranscriptionRepository {
                 .filter(Column("transcriptionId") == transcriptionId)
                 .order(Column("capturedAt").asc)
                 .fetchAll(db)
-            return TranscriptionDetail(transcription: transcription, segments: segments, screenshots: screenshots)
+            let note = try NoteRecord
+                .filter(Column("transcriptionId") == transcriptionId)
+                .order(Column("createdAt").asc)
+                .fetchOne(db)
+            return TranscriptionDetail(transcription: transcription, segments: segments, screenshots: screenshots, note: note)
         }
     }
 
