@@ -174,6 +174,10 @@ final class AppSettings: ObservableObject {
 
     @AppStorage("meetingDetectionEnabled") var meetingDetectionEnabled = true
 
+    // MARK: - Agent 設定
+
+    @AppStorage("agentEnabled") var agentEnabled = false
+
     // MARK: - LLM 設定
 
     @AppStorage("llmEndpointURL") var llmEndpointURL = ""

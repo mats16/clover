@@ -48,6 +48,7 @@ private struct DetailTabBar: View {
     @Binding var selection: DetailTab
     @ObservedObject var viewModel: CaptionViewModel
     var sidebarViewModel: SidebarViewModel
+    @ObservedObject private var appSettings = AppSettings.shared
     @Namespace private var tabNamespace
 
     /// フォルダ選択時（transcription 未選択）は全タブを無効化する。
@@ -55,9 +56,16 @@ private struct DetailTabBar: View {
         viewModel.currentTranscriptionId == nil
     }
 
+    /// Agent が無効の場合は agent タブを除外する。
+    private var visibleTabs: [DetailTab] {
+        DetailTab.allCases.filter { tab in
+            tab != .agent || appSettings.agentEnabled
+        }
+    }
+
     var body: some View {
         HStack(spacing: 2) {
-            ForEach(DetailTab.allCases) { tab in
+            ForEach(visibleTabs) { tab in
                 DetailTabButton(
                     tab: tab,
                     isSelected: !isFolderOnly && selection == tab,

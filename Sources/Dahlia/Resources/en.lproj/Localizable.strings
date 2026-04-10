@@ -34,6 +34,10 @@
 "Transcript" = "Transcript";
 "Agent" = "Agent";
 
+/* Settings (Agent) */
+"Enable Agent (Beta)" = "Enable Agent (Beta)";
+"Enable the Agent tab to interact with Claude during transcription. This is a beta feature." = "Enable the Agent tab to interact with Claude during transcription. This is a beta feature.";
+
 /* Audio Source Mode */
 "Mic" = "Mic";
 "System" = "System";

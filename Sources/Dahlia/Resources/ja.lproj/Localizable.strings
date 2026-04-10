@@ -34,6 +34,10 @@
 "Transcript" = "文字起こし";
 "Agent" = "エージェント";
 
+/* Settings (Agent) */
+"Enable Agent (Beta)" = "エージェントを有効にする（ベータ）";
+"Enable the Agent tab to interact with Claude during transcription. This is a beta feature." = "文字起こし中に Claude と対話できるエージェントタブを有効にします。これはベータ機能です。";
+
 /* Audio Source Mode */
 "Mic" = "マイク";
 "System" = "システム";

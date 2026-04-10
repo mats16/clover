@@ -68,6 +68,14 @@ enum L10n {
     static var transcript: String { String(localized: "Transcript", bundle: bundle) }
     static var agent: String { String(localized: "Agent", bundle: bundle) }
 
+    // MARK: - Settings (Agent)
+
+    static var agentEnabled: String { String(localized: "Enable Agent (Beta)", bundle: bundle) }
+    static var agentEnabledDescription: String { String(
+        localized: "Enable the Agent tab to interact with Claude during transcription. This is a beta feature.",
+        bundle: bundle
+    ) }
+
     // MARK: - Audio Source Mode
 
     static var mic: String { String(localized: "Mic", bundle: bundle) }
