@@ -34,12 +34,14 @@ struct DahliaApp: App {
             }
         }
         .windowResizability(.contentMinSize)
+        .windowStyle(.automatic)
 
         Window(L10n.vault, id: WindowID.vaultManager) {
             VaultPickerView(appDatabase: appDatabase) { vault in
                 openVault(vault)
             }
         }
+        .windowStyle(.automatic)
 
         Settings {
             SettingsView()

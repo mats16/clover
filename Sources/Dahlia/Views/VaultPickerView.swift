@@ -72,8 +72,7 @@ struct VaultPickerView: View {
                     .buttonStyle(.borderedProminent)
                 }
             }
-            .background(Color(nsColor: .controlBackgroundColor))
-            .clipShape(RoundedRectangle(cornerRadius: 8))
+            .glassEffect(.regular, in: RoundedRectangle(cornerRadius: 8))
             .padding(.horizontal, 40)
 
             Spacer()

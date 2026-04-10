@@ -8,12 +8,8 @@ struct ToolbarIconButtonStyle: ButtonStyle {
     func makeBody(configuration: Configuration) -> some View {
         configuration.label
             .padding(6)
-            .background(
-                RoundedRectangle(cornerRadius: 5)
-                    .fill(configuration.isPressed
-                        ? Color.primary.opacity(0.15)
-                        : isHovered ? Color.primary.opacity(0.08) : Color.clear)
-            )
+            .glassEffect(.regular.interactive(), in: RoundedRectangle(cornerRadius: 5))
+            .opacity(configuration.isPressed ? 0.7 : 1.0)
             .onHover { hovering in
                 isHovered = hovering
             }
@@ -192,10 +188,7 @@ private struct SessionSettingsMenu: View {
                 .font(.system(size: 13))
                 .foregroundStyle(.secondary)
                 .padding(5)
-                .background(
-                    RoundedRectangle(cornerRadius: 14)
-                        .fill(isHovered ? Color.primary.opacity(0.04) : Color.clear)
-                )
+                .glassEffect(.regular.interactive(), in: RoundedRectangle(cornerRadius: 14))
         }
         .menuStyle(.borderlessButton)
         .menuIndicator(.hidden)
@@ -257,11 +250,12 @@ private struct TranscribeButton: View {
             }
             .padding(.horizontal, 10)
             .padding(.vertical, 5)
-            .foregroundColor(viewModel.isListening ? .white : .white)
+            .foregroundColor(.white)
             .background(
                 RoundedRectangle(cornerRadius: 14)
                     .fill(viewModel.isListening ? Color.red : Color.accentColor)
             )
+            .glassEffect(.regular.interactive(), in: RoundedRectangle(cornerRadius: 14))
         }
         .buttonStyle(.plain)
         .pointerStyle(.link)
@@ -375,10 +369,7 @@ private struct ScreenshotThumbnailView: View {
             }
         }
         .padding(6)
-        .background(
-            RoundedRectangle(cornerRadius: 8)
-                .fill(Color(nsColor: .controlBackgroundColor))
-        )
+        .glassEffect(.regular, in: RoundedRectangle(cornerRadius: 8))
     }
 }
 
@@ -393,10 +384,7 @@ private struct ScreenshotButton: View {
                 .padding(.horizontal, 10)
                 .padding(.vertical, 5)
                 .foregroundStyle(.primary)
-                .background(
-                    RoundedRectangle(cornerRadius: 14)
-                        .fill(Color.primary.opacity(0.08))
-                )
+                .glassEffect(.regular.interactive(), in: RoundedRectangle(cornerRadius: 14))
         }
         .buttonStyle(.plain)
         .pointerStyle(.link)
@@ -427,10 +415,11 @@ private struct DetailTabButton: View {
                 RoundedRectangle(cornerRadius: 14)
                     .fill(
                         isSelected
-                            ? Color.primary.opacity(0.08)
+                            ? Color.clear
                             : isHovered ? Color.primary.opacity(0.04) : Color.clear
                     )
             )
+            .glassEffect(isSelected ? .regular.interactive() : .clear, in: Capsule())
         }
         .buttonStyle(.plain)
         .pointerStyle(.link)
@@ -449,86 +438,90 @@ struct ControlPanelView: View {
     @State private var expandedScreenshot: ScreenshotRecord?
 
     var body: some View {
-        VStack(spacing: 12) {
-            // 準備中プログレス
-            if viewModel.isPreparingAnalyzer {
-                ProgressView(L10n.preparingSpeechRecognition)
-                    .progressViewStyle(.linear)
-            }
-
-            // タブ切り替え
-            DetailTabBar(selection: $selectedTab, viewModel: viewModel, sidebarViewModel: sidebarViewModel)
-
-            // タブコンテンツ
-            GroupBox {
-                switch selectedTab {
-                case .summary:
-                    summaryTabContent
-                case .notes:
-                    notesTabContent
-                case .screenshots:
-                    screenshotsTabContent
-                case .transcript:
-                    transcriptTabContent
+        GlassEffectContainer {
+            VStack(spacing: 12) {
+                // 準備中プログレス
+                if viewModel.isPreparingAnalyzer {
+                    ProgressView(L10n.preparingSpeechRecognition)
+                        .progressViewStyle(.linear)
                 }
-            }
-            .frame(minHeight: 280)
 
-            // エラー表示
-            if let error = viewModel.errorMessage {
-                HStack {
-                    Image(systemName: "exclamationmark.triangle.fill")
-                        .foregroundColor(.orange)
-                    Text(error)
-                        .font(.caption)
-                        .foregroundColor(.red)
-                    Spacer()
-                }
-            }
+                // タブ切り替え
+                DetailTabBar(selection: $selectedTab, viewModel: viewModel, sidebarViewModel: sidebarViewModel)
 
-            if let summaryError = viewModel.summaryError {
-                HStack {
-                    Image(systemName: "exclamationmark.triangle.fill")
-                        .foregroundColor(.orange)
-                    Text(summaryError)
-                        .font(.caption)
-                        .foregroundColor(.red)
-                    Spacer()
-                }
-            }
-
-        }
-        .padding()
-        .frame(minWidth: 500, minHeight: 500)
-        .onChange(of: viewModel.requestShowSummaryTab) {
-            if viewModel.requestShowSummaryTab {
-                selectedTab = .summary
-                viewModel.requestShowSummaryTab = false
-            }
-        }
-        .navigationTitle(headerTitle)
-        .toolbar {
-            ToolbarItem(placement: .primaryAction) {
-                if viewModel.currentTranscriptionId != nil {
-                    Button(action: { viewModel.exportTranscript() }) {
-                        Image(systemName: "square.and.arrow.up")
-                    }
-                    .disabled(viewModel.store.segments.isEmpty)
-                    .help(L10n.export)
-                }
-            }
-        }
-        .overlay {
-            if let screenshot = expandedScreenshot,
-               let nsImage = NSImage(data: screenshot.imageData) {
-                ScreenshotOverlayView(image: nsImage) {
-                    withAnimation(.easeOut(duration: 0.15)) {
-                        expandedScreenshot = nil
+                // タブコンテンツ
+                Group {
+                    switch selectedTab {
+                    case .summary:
+                        summaryTabContent
+                    case .notes:
+                        notesTabContent
+                    case .screenshots:
+                        screenshotsTabContent
+                    case .transcript:
+                        transcriptTabContent
                     }
                 }
-                .transition(.opacity)
+                .frame(minHeight: 280)
+                .clipShape(RoundedRectangle(cornerRadius: 10))
+                .glassEffect(.regular, in: RoundedRectangle(cornerRadius: 10))
+
+                // エラー表示
+                if let error = viewModel.errorMessage {
+                    HStack {
+                        Image(systemName: "exclamationmark.triangle.fill")
+                            .foregroundColor(.orange)
+                        Text(error)
+                            .font(.caption)
+                            .foregroundColor(.red)
+                        Spacer()
+                    }
+                }
+
+                if let summaryError = viewModel.summaryError {
+                    HStack {
+                        Image(systemName: "exclamationmark.triangle.fill")
+                            .foregroundColor(.orange)
+                        Text(summaryError)
+                            .font(.caption)
+                            .foregroundColor(.red)
+                        Spacer()
+                    }
+                }
+
             }
-        }
+            .padding()
+            .frame(minWidth: 500, minHeight: 500)
+            .onChange(of: viewModel.requestShowSummaryTab) {
+                if viewModel.requestShowSummaryTab {
+                    selectedTab = .summary
+                    viewModel.requestShowSummaryTab = false
+                }
+            }
+            .navigationTitle(headerTitle)
+            .toolbar {
+                ToolbarItem(placement: .primaryAction) {
+                    if viewModel.currentTranscriptionId != nil {
+                        Button(action: { viewModel.exportTranscript() }) {
+                            Image(systemName: "square.and.arrow.up")
+                        }
+                        .disabled(viewModel.store.segments.isEmpty)
+                        .help(L10n.export)
+                    }
+                }
+            }
+            .overlay {
+                if let screenshot = expandedScreenshot,
+                   let nsImage = NSImage(data: screenshot.imageData) {
+                    ScreenshotOverlayView(image: nsImage) {
+                        withAnimation(.easeOut(duration: 0.15)) {
+                            expandedScreenshot = nil
+                        }
+                    }
+                    .transition(.opacity)
+                }
+            }
+        } // GlassEffectContainer
     }
 
     // MARK: - Tab Contents
