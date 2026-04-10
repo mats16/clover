@@ -48,7 +48,7 @@ private struct DetailTabBar: View {
     @Binding var selection: DetailTab
     @ObservedObject var viewModel: CaptionViewModel
     var sidebarViewModel: SidebarViewModel
-    @ObservedObject private var appSettings = AppSettings.shared
+    @AppStorage("agentEnabled") private var agentEnabled = false
     @Namespace private var tabNamespace
 
     /// フォルダ選択時（transcription 未選択）は全タブを無効化する。
@@ -56,10 +56,9 @@ private struct DetailTabBar: View {
         viewModel.currentTranscriptionId == nil
     }
 
-    /// Agent が無効の場合は agent タブを除外する。
     private var visibleTabs: [DetailTab] {
         DetailTab.allCases.filter { tab in
-            tab != .agent || appSettings.agentEnabled
+            tab != .agent || agentEnabled
         }
     }
 
@@ -462,6 +461,7 @@ struct ControlPanelView: View {
     var sidebarViewModel: SidebarViewModel
     @State private var selectedTab: DetailTab = .transcript
     @State private var expandedScreenshot: ScreenshotRecord?
+    @AppStorage("agentEnabled") private var agentEnabled = false
 
     var body: some View {
         VStack(spacing: 12) {
@@ -526,6 +526,11 @@ struct ControlPanelView: View {
         }
         .padding()
         .frame(minWidth: 500, minHeight: 500)
+        .onChange(of: agentEnabled) {
+            if !agentEnabled, selectedTab == .agent {
+                selectedTab = .transcript
+            }
+        }
         .onChange(of: viewModel.requestShowSummaryTab) {
             if viewModel.requestShowSummaryTab {
                 selectedTab = .summary
