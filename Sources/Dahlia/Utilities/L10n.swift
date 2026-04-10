@@ -30,6 +30,9 @@ enum L10n {
     static var delete: String { String(localized: "Delete", bundle: bundle) }
     static var rename: String { String(localized: "Rename", bundle: bundle) }
     static var create: String { String(localized: "Create", bundle: bundle) }
+    static var close: String { String(localized: "Close", bundle: bundle) }
+    static var expand: String { String(localized: "Expand", bundle: bundle) }
+    static var collapse: String { String(localized: "Collapse", bundle: bundle) }
 
     // MARK: - Sidebar
 

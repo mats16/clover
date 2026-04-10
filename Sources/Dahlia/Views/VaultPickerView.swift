@@ -100,7 +100,7 @@ struct VaultPickerView: View {
                     .font(.headline)
                 Text(description)
                     .font(.caption)
-                    .foregroundColor(.secondary)
+                    .foregroundStyle(.secondary)
             }
             Spacer()
             action()
@@ -148,7 +148,7 @@ private struct VaultRow: View {
                 .font(.headline)
             Text(vault.path)
                 .font(.caption)
-                .foregroundColor(.secondary)
+                .foregroundStyle(.secondary)
                 .lineLimit(1)
                 .truncationMode(.middle)
         }
@@ -161,7 +161,6 @@ private struct VaultRow: View {
             RoundedRectangle(cornerRadius: 4)
                 .fill(isHovered ? Color.primary.opacity(0.06) : Color.clear)
         )
-        .onTapGesture(count: 2) { onOpen() }
-        .onTapGesture(count: 1) { onOpen() }
+        .onTapGesture { onOpen() }
     }
 }

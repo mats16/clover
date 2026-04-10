@@ -3,16 +3,11 @@ import UniformTypeIdentifiers
 
 /// ホバー時に背景がハイライトされるアイコンボタンスタイル。
 struct ToolbarIconButtonStyle: ButtonStyle {
-    @State private var isHovered = false
-
     func makeBody(configuration: Configuration) -> some View {
         configuration.label
             .padding(6)
             .glassEffect(.regular.interactive(), in: RoundedRectangle(cornerRadius: 5))
             .opacity(configuration.isPressed ? 0.7 : 1.0)
-            .onHover { hovering in
-                isHovered = hovering
-            }
             .pointerStyle(.link)
     }
 }
@@ -78,7 +73,6 @@ private struct DetailTabBar: View {
 private struct SessionSettingsMenu: View {
     @ObservedObject var viewModel: CaptionViewModel
     @ObservedObject private var appSettings = AppSettings.shared
-    @State private var isHovered = false
     @State private var summaryTemplates: [SummaryTemplate] = []
     private let templateService = SummaryTemplateService()
 
@@ -200,7 +194,6 @@ private struct SessionSettingsMenu: View {
         .menuIndicator(.hidden)
         .fixedSize()
         .onHover { hovering in
-            isHovered = hovering
             if hovering {
                 viewModel.refreshAvailableWindows()
             }
@@ -256,7 +249,7 @@ private struct TranscribeButton: View {
             }
             .padding(.horizontal, 10)
             .padding(.vertical, 5)
-            .foregroundColor(.white)
+            .foregroundStyle(.white)
             .background(
                 RoundedRectangle(cornerRadius: 14)
                     .fill(viewModel.isListening ? Color.red : Color.accentColor)
@@ -319,6 +312,8 @@ private struct ScreenshotOverlayView: View {
             Color.black.opacity(0.7)
                 .ignoresSafeArea()
                 .onTapGesture { onDismiss() }
+                .accessibilityAddTraits(.isButton)
+                .accessibilityLabel(L10n.close)
 
             Image(nsImage: image)
                 .resizable()
@@ -327,6 +322,8 @@ private struct ScreenshotOverlayView: View {
                 .shadow(radius: 20)
                 .padding(24)
                 .onTapGesture { onDismiss() }
+                .accessibilityAddTraits(.isButton)
+                .accessibilityLabel(L10n.close)
         }
     }
 }
@@ -485,10 +482,10 @@ struct ControlPanelView: View {
                 if let error = viewModel.errorMessage {
                     HStack {
                         Image(systemName: "exclamationmark.triangle.fill")
-                            .foregroundColor(.orange)
+                            .foregroundStyle(.orange)
                         Text(error)
                             .font(.caption)
-                            .foregroundColor(.red)
+                            .foregroundStyle(.red)
                         Spacer()
                     }
                 }
@@ -496,10 +493,10 @@ struct ControlPanelView: View {
                 if let summaryError = viewModel.summaryError {
                     HStack {
                         Image(systemName: "exclamationmark.triangle.fill")
-                            .foregroundColor(.orange)
+                            .foregroundStyle(.orange)
                         Text(summaryError)
                             .font(.caption)
-                            .foregroundColor(.red)
+                            .foregroundStyle(.red)
                         Spacer()
                     }
                 }
@@ -620,7 +617,7 @@ struct ControlPanelView: View {
                                 .frame(width: 12, height: 12)
                             Text(L10n.recognizing)
                                 .font(.caption)
-                                .foregroundColor(.secondary)
+                                .foregroundStyle(.secondary)
                         }
                         .padding(.vertical, 4)
                         .padding(.leading, 68)

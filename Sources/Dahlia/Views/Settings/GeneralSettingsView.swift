@@ -7,10 +7,7 @@ struct GeneralSettingsView: View {
     var body: some View {
         Form {
             Section {
-                Picker(selection: Binding(
-                    get: { settings.appLanguage },
-                    set: { settings.appLanguage = $0 }
-                )) {
+                Picker(selection: $settings.appLanguage) {
                     ForEach(AppLanguage.allCases) { language in
                         Text(language.displayName).tag(language)
                     }
@@ -22,19 +19,13 @@ struct GeneralSettingsView: View {
             }
 
             Section {
-                Toggle(isOn: Binding(
-                    get: { settings.meetingDetectionEnabled },
-                    set: { settings.meetingDetectionEnabled = $0 }
-                )) {
+                Toggle(isOn: $settings.meetingDetectionEnabled) {
                     Text(L10n.meetingDetection)
                     Text(L10n.meetingDetectionDescription)
                         .foregroundStyle(.secondary)
                 }
 
-                Picker(selection: Binding(
-                    get: { settings.markdownEditor },
-                    set: { settings.markdownEditor = $0 }
-                )) {
+                Picker(selection: $settings.markdownEditor) {
                     ForEach(MarkdownEditor.availableEditors) { editor in
                         Text(editor.displayName).tag(editor)
                     }

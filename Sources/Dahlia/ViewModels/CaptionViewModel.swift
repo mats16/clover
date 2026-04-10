@@ -834,7 +834,7 @@ final class CaptionViewModel: ObservableObject {
             bridge.appendBuffer(buffer)
         }
         manager.onStreamStopped = { [weak self] error in
-            DispatchQueue.main.async {
+            Task { @MainActor in
                 self?.errorMessage = error?.localizedDescription ?? L10n.systemAudioCaptureStopped
                 if self?.audioManager == nil {
                     self?.isListening = false

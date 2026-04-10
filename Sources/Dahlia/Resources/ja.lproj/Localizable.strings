@@ -2,6 +2,9 @@
 "Delete" = "削除";
 "Rename" = "名前を変更";
 "Create" = "作成";
+"Close" = "閉じる";
+"Expand" = "展開";
+"Collapse" = "折りたたむ";
 
 /* Sidebar */
 "New Project" = "新規プロジェクト";

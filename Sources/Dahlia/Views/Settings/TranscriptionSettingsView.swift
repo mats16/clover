@@ -22,7 +22,7 @@ struct TranscriptionSettingsView: View {
                     if searchedLocales.isEmpty {
                         Text(L10n.noMatchingLanguages)
                             .font(.caption)
-                            .foregroundColor(.secondary)
+                            .foregroundStyle(.secondary)
                     } else {
                         ScrollView {
                             LazyVStack(alignment: .leading, spacing: 0) {
@@ -34,13 +34,13 @@ struct TranscriptionSettingsView: View {
                                     } label: {
                                         HStack {
                                             Image(systemName: isEnabled ? "checkmark.circle.fill" : "circle")
-                                                .foregroundColor(isEnabled ? .accentColor : .secondary)
+                                                .foregroundStyle(isEnabled ? Color.accentColor : Color.secondary)
                                             Text(locale.localizedString(forIdentifier: id) ?? id)
-                                                .foregroundColor(.primary)
+                                                .foregroundStyle(.primary)
                                             Spacer()
                                             Text(id)
                                                 .font(.caption)
-                                                .foregroundColor(.secondary)
+                                                .foregroundStyle(.secondary)
                                         }
                                         .padding(.vertical, 4)
                                         .padding(.horizontal, 4)
@@ -59,7 +59,7 @@ struct TranscriptionSettingsView: View {
                             ? L10n.allLanguagesShown
                             : L10n.languagesSelected(enabled.count))
                             .font(.caption)
-                            .foregroundColor(.secondary)
+                            .foregroundStyle(.secondary)
                         Spacer()
                         if !enabled.isEmpty {
                             Button(L10n.uncheckAll) {

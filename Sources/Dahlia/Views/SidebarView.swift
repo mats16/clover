@@ -234,6 +234,7 @@ private struct ProjectSectionView: View {
                         sidebarViewModel.ensureProjectSelected(id: row.id, name: row.name)
                         sidebarViewModel.selectedTranscriptionId = transcription.id
                     }
+                    .accessibilityAddTraits(.isButton)
                     .draggable(transcription.id.uuidString)
                     .contextMenu {
                         transcriptionContextMenu(transcription)
@@ -381,13 +382,15 @@ private struct ProjectHeaderRow: View {
     var body: some View {
         HStack {
             Image(systemName: "chevron.right")
-                .font(.caption2)
+                .font(.caption)
                 .foregroundStyle(.tertiary)
                 .rotationEffect(.degrees(isCollapsed ? 0 : 90))
                 .animation(.easeInOut(duration: 0.15), value: isCollapsed)
                 .frame(width: 10)
                 .contentShape(Rectangle())
                 .onTapGesture { onToggleCollapse() }
+                .accessibilityAddTraits(.isButton)
+                .accessibilityLabel(isCollapsed ? L10n.expand : L10n.collapse)
             if row.missingOnDisk {
                 Image(systemName: "exclamationmark.triangle.fill")
                     .font(.caption2)
@@ -413,6 +416,7 @@ private struct ProjectHeaderRow: View {
         )
         .contentShape(Rectangle())
         .onTapGesture { onSelect() }
+        .accessibilityAddTraits(.isButton)
         .dropDestination(for: String.self) { items, _ in
             guard let first = items.first, let transcriptionId = UUID(uuidString: first) else {
                 return false

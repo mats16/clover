@@ -2,6 +2,9 @@
 "Delete" = "Delete";
 "Rename" = "Rename";
 "Create" = "Create";
+"Close" = "Close";
+"Expand" = "Expand";
+"Collapse" = "Collapse";
 
 /* Sidebar */
 "New Project" = "New Project";

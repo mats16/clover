@@ -47,10 +47,10 @@ struct AISummarySettingsView: View {
                             switch result {
                             case .success:
                                 Label(L10n.connectionSuccess, systemImage: "checkmark.circle.fill")
-                                    .foregroundColor(.green)
+                                    .foregroundStyle(.green)
                             case let .failure(message):
                                 Label(message, systemImage: "xmark.circle.fill")
-                                    .foregroundColor(.red)
+                                    .foregroundStyle(.red)
                             }
                         }
                         Spacer()

@@ -32,7 +32,7 @@ struct MeetingDetectionPopupView: View {
                     .padding(.horizontal, 16)
                     .padding(.vertical, 7)
                     .background(Capsule().fill(Color.accentColor))
-                    .foregroundColor(.white)
+                    .foregroundStyle(.white)
             }
             .buttonStyle(.plain)
             .pointerStyle(.link)
