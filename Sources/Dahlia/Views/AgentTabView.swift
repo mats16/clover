@@ -95,6 +95,10 @@ private struct ChatInputBar: View {
     @Binding var text: String
     let onSend: () -> Void
 
+    private var hasContent: Bool {
+        !text.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty
+    }
+
     var body: some View {
         HStack(spacing: 8) {
             TextField("メッセージを入力...", text: $text)
@@ -105,10 +109,10 @@ private struct ChatInputBar: View {
             Button(action: onSend) {
                 Image(systemName: "arrow.up.circle.fill")
                     .font(.system(size: 22))
-                    .foregroundStyle(text.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty ? Color.secondary : Color.accentColor)
+                    .foregroundStyle(hasContent ? Color.accentColor : Color.secondary)
             }
             .buttonStyle(.plain)
-            .disabled(text.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty)
+            .disabled(!hasContent)
         }
         .padding(.horizontal, 12)
         .padding(.vertical, 8)
@@ -206,15 +210,18 @@ private struct ChatBubbleView: View {
 /// WKWebView を使わないため高さの問題が発生しない。
 private struct MarkdownContentView: View {
     let markdown: String
+    @State private var blocks: [Block] = []
 
     var body: some View {
         VStack(alignment: .leading, spacing: 4) {
-            let blocks = Self.parseBlocks(markdown)
             ForEach(Array(blocks.enumerated()), id: \.offset) { _, block in
                 blockView(block)
             }
         }
         .textSelection(.enabled)
+        .task(id: markdown) {
+            blocks = Self.parseBlocks(markdown)
+        }
     }
 
     // MARK: - Block Model

@@ -48,7 +48,6 @@ final class CaptionViewModel: ObservableObject {
     // MARK: - Agent State
 
     @Published var agentService: AgentService?
-    private var agentHasBeenActivated = false
 
     // MARK: - Note State
 
@@ -522,10 +521,9 @@ final class CaptionViewModel: ObservableObject {
 
     /// Agent タブへの初回切り替え時に Claude Code プロセスを起動する。
     func activateAgentIfNeeded() {
-        guard !agentHasBeenActivated,
+        guard agentService == nil,
               isListening,
               let projectURL = currentProjectURL else { return }
-        agentHasBeenActivated = true
         let service = AgentService()
         self.agentService = service
         service.start(workingDirectory: projectURL, store: store)
@@ -534,7 +532,6 @@ final class CaptionViewModel: ObservableObject {
     private func stopAgent() {
         agentService?.stop()
         agentService = nil
-        agentHasBeenActivated = false
     }
 
     // MARK: - Summary Generation

@@ -95,34 +95,15 @@ final class AgentService: ObservableObject {
 
     /// ユーザーが手動で入力したメッセージを送信する。
     func sendUserMessage(_ text: String) {
-        guard !text.isEmpty, let pipe = stdinPipe else { return }
-
+        guard !text.isEmpty else { return }
         messages.append(AgentMessage(role: .user, content: text))
-
-        let payload: [String: Any] = [
-            "type": "user",
-            "message": [
-                "role": "user",
-                "content": text,
-            ] as [String: String],
-        ]
-        guard let data = try? JSONSerialization.data(withJSONObject: payload),
-              var line = String(data: data, encoding: .utf8) else { return }
-        line += "\n"
-
-        let handle = pipe.fileHandleForWriting
-        Task.detached {
-            if let lineData = line.data(using: .utf8) {
-                try? handle.write(contentsOf: lineData)
-            }
-        }
+        writeToStdin(content: text)
     }
 
     func stop() {
         cancellable = nil
         readTask?.cancel()
 
-        // stdin を閉じて EOF を送信
         try? stdinPipe?.fileHandleForWriting.close()
 
         let proc = process
@@ -138,42 +119,16 @@ final class AgentService: ObservableObject {
         stdoutPipe = nil
     }
 
-    // MARK: - Segment Observation
+    // MARK: - Stdin Writing
 
-    private func startObservingSegments(store: TranscriptStore) {
-        // 既存の確定済みセグメントを送信
-        let existingConfirmed = store.segments.filter { $0.isConfirmed }
-        if !existingConfirmed.isEmpty {
-            sendSegments(existingConfirmed)
-        }
-
-        // 新規確定セグメントを監視
-        cancellable = store.$segments
-            .debounce(for: .milliseconds(500), scheduler: RunLoop.main)
-            .sink { [weak self] segments in
-                guard let self else { return }
-                let newConfirmed = segments.filter {
-                    $0.isConfirmed && !self.sentSegmentIds.contains($0.id)
-                }
-                guard !newConfirmed.isEmpty else { return }
-                self.sendSegments(newConfirmed)
-            }
-    }
-
-    private func sendSegments(_ segments: [TranscriptSegment]) {
-        let text = segments.map(\.displayText).joined(separator: "\n")
-        let newIds = Set(segments.map(\.id))
-        sentSegmentIds.formUnion(newIds)
-
-
+    private func writeToStdin(content: String) {
         guard let pipe = stdinPipe else { return }
 
-        // stream-json 形式: {"type":"user","message":{"role":"user","content":"<transcript>...</transcript>"}}\n
         let payload: [String: Any] = [
             "type": "user",
             "message": [
                 "role": "user",
-                "content": "<transcript>\(text)</transcript>",
+                "content": content,
             ] as [String: String],
         ]
         guard let data = try? JSONSerialization.data(withJSONObject: payload),
@@ -188,6 +143,32 @@ final class AgentService: ObservableObject {
         }
     }
 
+    // MARK: - Segment Observation
+
+    private func startObservingSegments(store: TranscriptStore) {
+        let existingConfirmed = store.segments.filter { $0.isConfirmed }
+        if !existingConfirmed.isEmpty {
+            sendSegments(existingConfirmed)
+        }
+
+        cancellable = store.$segments
+            .debounce(for: .milliseconds(500), scheduler: RunLoop.main)
+            .sink { [weak self] segments in
+                guard let self else { return }
+                let newConfirmed = segments.filter {
+                    $0.isConfirmed && !self.sentSegmentIds.contains($0.id)
+                }
+                guard !newConfirmed.isEmpty else { return }
+                self.sendSegments(newConfirmed)
+            }
+    }
+
+    private func sendSegments(_ segments: [TranscriptSegment]) {
+        let text = segments.map(\.displayText).joined(separator: "\n")
+        sentSegmentIds.formUnion(Set(segments.map(\.id)))
+        writeToStdin(content: "<transcript>\(text)</transcript>")
+    }
+
     // MARK: - Stdout Reading
 
     private func startReadingStdout(_ pipe: Pipe) {
@@ -198,10 +179,9 @@ final class AgentService: ObservableObject {
 
             while !Task.isCancelled {
                 let chunk = handle.availableData
-                if chunk.isEmpty { break } // EOF
+                if chunk.isEmpty { break }
                 buffer.append(chunk)
 
-                // 改行で分割して行単位で処理
                 while let newlineRange = buffer.range(of: Data([0x0A])) {
                     let lineData = buffer.subdata(in: buffer.startIndex ..< newlineRange.lowerBound)
                     buffer.removeSubrange(buffer.startIndex ... newlineRange.lowerBound)
@@ -213,7 +193,6 @@ final class AgentService: ObservableObject {
                 }
             }
 
-            // 残りのバッファを処理
             if !buffer.isEmpty, let line = String(data: buffer, encoding: .utf8),
                !line.trimmingCharacters(in: .whitespaces).isEmpty {
                 await self?.handleOutputLine(line)
@@ -225,6 +204,7 @@ final class AgentService: ObservableObject {
         guard let data = line.data(using: .utf8),
               let json = try? JSONSerialization.jsonObject(with: data) as? [String: Any],
               let type = json["type"] as? String else {
+            logger.debug("Failed to parse stream-json line")
             return
         }
 
@@ -244,7 +224,6 @@ final class AgentService: ObservableObject {
             if let delta = json["delta"] as? [String: Any],
                let text = delta["text"] as? String,
                !text.isEmpty {
-                // 最後の assistant メッセージに追記
                 if let lastIndex = messages.indices.last, messages[lastIndex].role == .assistant {
                     messages[lastIndex].content += text
                 } else {
