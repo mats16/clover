@@ -532,6 +532,14 @@ struct ControlPanelView: View {
                 }
             }
         }
+        .overlay(alignment: .bottomTrailing) {
+            if viewModel.summaryProgress.isVisible {
+                SummaryProgressToastView(state: viewModel.summaryProgress)
+                    .padding(16)
+                    .transition(.move(edge: .bottom).combined(with: .opacity))
+                    .animation(.easeInOut(duration: 0.3), value: viewModel.summaryProgress.isVisible)
+            }
+        }
         .overlay {
             if let screenshot = expandedScreenshot,
                let nsImage = NSImage(data: screenshot.imageData) {

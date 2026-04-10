@@ -124,7 +124,7 @@ enum SummaryService {
 
         let markdown = frontmatter + "\n\n" + result.summary + "\n"
 
-        let datePrefix = dateFormatter.string(from: Date())
+        let datePrefix = dateFormatter.string(from: startedAt)
         let fileName: String
         if result.title.isEmpty {
             fileName = "\(datePrefix)-summary_\(transcriptionId.uuidString)"

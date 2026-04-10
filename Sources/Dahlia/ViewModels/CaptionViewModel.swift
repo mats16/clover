@@ -42,6 +42,8 @@ final class CaptionViewModel: ObservableObject {
     @Published var lastSummaryURL: URL?
     /// Summary タブへの切り替えをリクエストするフラグ。
     @Published var requestShowSummaryTab = false
+    /// 要約生成の進捗トースト状態。
+    let summaryProgress = SummaryProgressState()
 
     // MARK: - Note State
 
@@ -561,6 +563,7 @@ final class CaptionViewModel: ObservableObject {
         summaryGeneratingTranscriptionId = transcriptionId
         summaryError = nil
         lastSummaryURL = nil
+        summaryProgress.show()
 
         do {
             var screenshots: [ScreenshotRecord] = []
@@ -570,6 +573,15 @@ final class CaptionViewModel: ObservableObject {
             }
 
             let screenshotsForExport = screenshots
+
+            // Screenshots の書き出し
+            summaryProgress.screenshotExport = screenshots.isEmpty ? nil : .running
+
+            // Transcript の書き出し
+            summaryProgress.transcriptExport = .running
+
+            // LLM 要約
+            summaryProgress.summaryGeneration = .running
 
             // LLM 要約とファイル書き出しを並行実行
             async let summaryResult = SummaryService.generateSummary(
@@ -581,7 +593,7 @@ final class CaptionViewModel: ObservableObject {
                 screenshots: screenshots
             )
 
-            async let fileExport: Void = exportTranscriptAndScreenshots(
+            async let fileExport: Void = exportTranscriptAndScreenshotsWithProgress(
                 vaultURL: vaultURL,
                 transcriptionId: transcriptionId,
                 projectName: projectName,
@@ -591,6 +603,8 @@ final class CaptionViewModel: ObservableObject {
             )
 
             let fileURL = try await summaryResult
+            summaryProgress.summaryGeneration = .completed
+
             _ = await fileExport
             if currentTranscriptionId == transcriptionId {
                 lastSummaryURL = fileURL
@@ -605,10 +619,19 @@ final class CaptionViewModel: ObservableObject {
             if currentTranscriptionId == transcriptionId {
                 summaryError = error.localizedDescription
             }
+            summaryProgress.summaryGeneration = .failed(error.localizedDescription)
         }
 
         if summaryGeneratingTranscriptionId == transcriptionId {
             summaryGeneratingTranscriptionId = nil
+        }
+
+        // 全完了後に自動で非表示
+        if summaryProgress.isAllDone {
+            try? await Task.sleep(for: .seconds(2))
+            withAnimation(.easeOut(duration: 0.3)) {
+                summaryProgress.dismiss()
+            }
         }
     }
 
@@ -669,6 +692,47 @@ final class CaptionViewModel: ObservableObject {
             try? repo.updateTranscriptFilePath(id: transcriptionId, path: path)
         }
         _ = await screenshotExport
+    }
+
+    /// transcript と screenshot をファイルに書き出し、進捗トーストを更新する。
+    private func exportTranscriptAndScreenshotsWithProgress(
+        vaultURL: URL,
+        transcriptionId: UUID,
+        projectName: String,
+        startedAt: Date,
+        segments: [TranscriptSegment],
+        screenshots: [ScreenshotRecord]
+    ) async {
+        let dbQueue = currentDbQueue
+
+        async let transcriptPath = Task.detached {
+            try? TranscriptExportService.exportTranscript(
+                vaultURL: vaultURL,
+                transcriptionId: transcriptionId,
+                projectName: projectName,
+                startedAt: startedAt,
+                segments: segments
+            )
+        }.value
+
+        async let screenshotExport: Void = Task.detached {
+            guard !screenshots.isEmpty else { return }
+            _ = try? ScreenshotExportService.exportScreenshots(
+                vaultURL: vaultURL,
+                screenshots: screenshots
+            )
+        }.value
+
+        if let path = await transcriptPath, let dbQueue {
+            let repo = TranscriptionRepository(dbQueue: dbQueue)
+            try? repo.updateTranscriptFilePath(id: transcriptionId, path: path)
+        }
+        summaryProgress.transcriptExport = .completed
+
+        _ = await screenshotExport
+        if !screenshots.isEmpty {
+            summaryProgress.screenshotExport = .completed
+        }
     }
 
     func clearText() {
@@ -846,7 +910,7 @@ final class CaptionViewModel: ObservableObject {
 
         let panel = NSSavePanel()
         panel.allowedContentTypes = [.plainText]
-        panel.nameFieldStringValue = "transcript_\(Self.fileDateFormatter.string(from: Date())).txt"
+        panel.nameFieldStringValue = "transcript_\(Self.fileDateFormatter.string(from: store.recordingStartTime ?? Date())).txt"
 
         panel.begin { response in
             guard response == .OK, let url = panel.url else { return }
