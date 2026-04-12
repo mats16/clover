@@ -4,17 +4,27 @@ import SwiftUI
 struct AgentSidebarView: View {
     @ObservedObject var viewModel: CaptionViewModel
     var sidebarViewModel: SidebarViewModel
-    @State private var selectedMode: AgentStartMode = .project
+
+    /// Picker 用の簡易モード（associated value なし）。
+    private enum PickerMode: String, CaseIterable {
+        case project
+        case transcript
+    }
+
+    private var pickerSelection: Binding<PickerMode> {
+        Binding(
+            get: { viewModel.selectedAgentMode.isTranscript ? .transcript : .project },
+            set: { viewModel.selectedAgentMode = $0 == .project ? .project : .transcript(store: viewModel.store) }
+        )
+    }
 
     var body: some View {
         VStack(spacing: 0) {
             if let service = viewModel.agentService {
-                // ── Agent 起動中 ──
                 agentHeader(service: service)
                 Divider()
                 AgentChatView(service: service)
             } else {
-                // ── Agent 未起動: モード選択 ──
                 agentModePicker
             }
         }
@@ -27,7 +37,7 @@ struct AgentSidebarView: View {
         HStack {
             Image(systemName: "sparkles")
                 .foregroundStyle(.purple)
-            Text(service.mode == .project ? L10n.agentProjectMode : L10n.agentTranscriptMode)
+            Text(service.mode.isTranscript ? L10n.agentTranscriptMode : L10n.agentProjectMode)
                 .font(.caption)
                 .foregroundStyle(.secondary)
             Spacer()
@@ -59,22 +69,24 @@ struct AgentSidebarView: View {
             Text(L10n.agent)
                 .font(.headline)
 
-            Picker(L10n.agent, selection: $selectedMode) {
-                Text(L10n.agentProjectMode).tag(AgentStartMode.project)
-                Text(L10n.agentTranscriptMode).tag(AgentStartMode.transcript)
+            Picker(L10n.agent, selection: pickerSelection) {
+                Text(L10n.agentProjectMode).tag(PickerMode.project)
+                Text(L10n.agentTranscriptMode).tag(PickerMode.transcript)
             }
             .pickerStyle(.segmented)
             .labelsHidden()
             .padding(.horizontal, 20)
 
-            Text(selectedMode == .project ? L10n.agentProjectModeDescription : L10n.agentTranscriptModeDescription)
+            Text(viewModel.selectedAgentMode.isTranscript
+                ? L10n.agentTranscriptModeDescription
+                : L10n.agentProjectModeDescription)
                 .font(.caption)
                 .foregroundStyle(.secondary)
                 .multilineTextAlignment(.center)
                 .padding(.horizontal, 20)
 
             Button {
-                viewModel.startAgent(mode: selectedMode)
+                viewModel.startAgent(mode: viewModel.selectedAgentMode)
             } label: {
                 Label(L10n.startAgent, systemImage: "play.fill")
                     .frame(maxWidth: .infinity)

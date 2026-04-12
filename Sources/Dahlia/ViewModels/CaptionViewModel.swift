@@ -48,6 +48,8 @@ final class CaptionViewModel: ObservableObject {
     // MARK: - Agent State
 
     @Published var agentService: AgentService?
+    /// Inspector のモード選択を保持（inspector 開閉でリセットされない）。
+    var selectedAgentMode: AgentStartMode = .project
 
     // MARK: - Note State
 
@@ -523,14 +525,19 @@ final class CaptionViewModel: ObservableObject {
               let projectURL = currentProjectURL else { return }
         let service = AgentService()
         self.agentService = service
-        let transcriptStore: TranscriptStore? = mode == .transcript ? store : nil
-        service.start(workingDirectory: projectURL, mode: mode, store: transcriptStore)
+        service.start(workingDirectory: projectURL, mode: mode)
     }
 
     /// Agent を明示的に停止する。
     func stopAgent() {
         agentService?.stop()
         agentService = nil
+    }
+
+    /// transcript 切替時に Agent のセグメント追跡をリセットする（transcript モードのみ）。
+    func resetAgentSegmentTrackingIfNeeded() {
+        guard let service = agentService, service.mode.isTranscript else { return }
+        service.resetSegmentTracking(store: store)
     }
 
     // MARK: - Summary Generation

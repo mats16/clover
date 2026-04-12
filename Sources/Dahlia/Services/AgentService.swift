@@ -3,11 +3,16 @@ import Foundation
 import os
 
 /// Agent の開始モード。
-enum AgentStartMode: String, CaseIterable {
+enum AgentStartMode {
     /// プロジェクトディレクトリで Claude Code を実行（transcript 入力なし）。
     case project
     /// 文字起こしを継続的に Claude Code に入力として渡す。
-    case transcript
+    case transcript(store: TranscriptStore)
+
+    var isTranscript: Bool {
+        if case .transcript = self { return true }
+        return false
+    }
 }
 
 /// Claude Code CLI プロセスのメッセージロール。
@@ -50,7 +55,7 @@ final class AgentService: ObservableObject {
 
     // MARK: - Lifecycle
 
-    func start(workingDirectory: URL, mode: AgentStartMode, store: TranscriptStore?) {
+    func start(workingDirectory: URL, mode: AgentStartMode) {
         self.mode = mode
         guard !isRunning else { return }
 
@@ -102,7 +107,7 @@ final class AgentService: ObservableObject {
         self.isRunning = true
 
         startReadingStdout(stdout)
-        if let store {
+        if case let .transcript(store) = mode {
             startObservingSegments(store: store)
         }
     }

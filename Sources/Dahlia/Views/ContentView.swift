@@ -7,7 +7,7 @@ struct ContentView: View {
     var onSelectVault: (VaultRecord) -> Void = { _ in }
     @State private var columnVisibility: NavigationSplitViewVisibility = .all
     @State private var isInspectorPresented = false
-    @AppStorage("agentEnabled") private var agentEnabled = false
+    @ObservedObject private var appSettings = AppSettings.shared
 
     var body: some View {
         NavigationSplitView(columnVisibility: $columnVisibility) {
@@ -27,7 +27,7 @@ struct ContentView: View {
         }
         .toolbar {
             ToolbarItem(placement: .primaryAction) {
-                if agentEnabled {
+                if appSettings.agentEnabled {
                     Button {
                         isInspectorPresented.toggle()
                     } label: {
@@ -37,10 +37,9 @@ struct ContentView: View {
                 }
             }
         }
-        .onChange(of: viewModel.currentTranscriptionId) { _, _ in
-            if let service = viewModel.agentService, service.mode == .transcript {
-                service.resetSegmentTracking(store: viewModel.store)
-            }
+        .onChange(of: viewModel.currentTranscriptionId) { oldId, newId in
+            guard oldId != newId else { return }
+            viewModel.resetAgentSegmentTrackingIfNeeded()
         }
     }
 }
