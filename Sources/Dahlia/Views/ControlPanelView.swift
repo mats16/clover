@@ -18,6 +18,7 @@ enum DetailTab: String, CaseIterable, Identifiable {
     case notes
     case screenshots
     case transcript
+    case agent
 
     var id: String { rawValue }
 
@@ -27,6 +28,7 @@ enum DetailTab: String, CaseIterable, Identifiable {
         case .notes: L10n.notes
         case .screenshots: L10n.screenshots
         case .transcript: L10n.transcript
+        case .agent: L10n.agent
         }
     }
 
@@ -36,6 +38,7 @@ enum DetailTab: String, CaseIterable, Identifiable {
         case .notes: "pencil.line"
         case .screenshots: "photo.on.rectangle.angled"
         case .transcript: "waveform.badge.microphone"
+        case .agent: "sparkles"
         }
     }
 }
@@ -45,6 +48,7 @@ private struct DetailTabBar: View {
     @Binding var selection: DetailTab
     @ObservedObject var viewModel: CaptionViewModel
     var sidebarViewModel: SidebarViewModel
+    @AppStorage("agentEnabled") private var agentEnabled = false
     @Namespace private var tabNamespace
 
     /// フォルダ選択時（transcription 未選択）は全タブを無効化する。
@@ -52,9 +56,15 @@ private struct DetailTabBar: View {
         viewModel.currentTranscriptionId == nil
     }
 
+    private var visibleTabs: [DetailTab] {
+        DetailTab.allCases.filter { tab in
+            tab != .agent || agentEnabled
+        }
+    }
+
     var body: some View {
         HStack(spacing: 2) {
-            ForEach(DetailTab.allCases) { tab in
+            ForEach(visibleTabs) { tab in
                 DetailTabButton(
                     tab: tab,
                     isSelected: !isFolderOnly && selection == tab,
@@ -451,6 +461,7 @@ struct ControlPanelView: View {
     var sidebarViewModel: SidebarViewModel
     @State private var selectedTab: DetailTab = .transcript
     @State private var expandedScreenshot: ScreenshotRecord?
+    @AppStorage("agentEnabled") private var agentEnabled = false
 
     var body: some View {
         VStack(spacing: 12) {
@@ -477,6 +488,8 @@ struct ControlPanelView: View {
                         screenshotsTabContent
                     case .transcript:
                         transcriptTabContent
+                    case .agent:
+                        AgentTabView(viewModel: viewModel)
                     }
                 }
             }
@@ -513,6 +526,11 @@ struct ControlPanelView: View {
         }
         .padding()
         .frame(minWidth: 500, minHeight: 500)
+        .onChange(of: agentEnabled) {
+            if !agentEnabled, selectedTab == .agent {
+                selectedTab = .transcript
+            }
+        }
         .onChange(of: viewModel.requestShowSummaryTab) {
             if viewModel.requestShowSummaryTab {
                 selectedTab = .summary
