@@ -6,10 +6,16 @@ struct ContentView: View {
     var sidebarViewModel: SidebarViewModel
     var onSelectVault: (VaultRecord) -> Void = { _ in }
     @State private var columnVisibility: NavigationSplitViewVisibility = .all
-    @State private var isInspectorPresented = false
+    @State private var isAgentSidebarPresented = false
     @ObservedObject private var appSettings = AppSettings.shared
 
     var body: some View {
+        let controlPanel = ControlPanelView(
+            viewModel: viewModel,
+            sidebarViewModel: sidebarViewModel,
+            isAgentSidebarPresented: $isAgentSidebarPresented
+        )
+
         NavigationSplitView(columnVisibility: $columnVisibility) {
             SidebarView(
                 viewModel: viewModel,
@@ -19,39 +25,27 @@ struct ContentView: View {
             )
             .navigationSplitViewColumnWidth(min: 220, ideal: 260, max: 360)
         } detail: {
-            ControlPanelView(viewModel: viewModel, sidebarViewModel: sidebarViewModel)
-        }
-        .inspector(isPresented: $isInspectorPresented) {
-            AgentSidebarView(viewModel: viewModel, sidebarViewModel: sidebarViewModel)
-                .inspectorColumnWidth(min: 280, ideal: 340, max: 480)
-        }
-        .toolbar {
-            ToolbarItem(placement: .primaryAction) {
-                if viewModel.currentTranscriptionId != nil {
-                    Button(L10n.export, systemImage: "square.and.arrow.up") {
-                        viewModel.exportTranscript()
-                    }
-                    .labelStyle(.iconOnly)
-                    .disabled(viewModel.store.segments.isEmpty)
-                    .help(L10n.export)
+            if appSettings.agentEnabled, isAgentSidebarPresented {
+                HSplitView {
+                    controlPanel
+                        .frame(maxWidth: .infinity, maxHeight: .infinity)
+
+                    AgentSidebarView(viewModel: viewModel, sidebarViewModel: sidebarViewModel)
+                        .frame(minWidth: 280, idealWidth: 340, maxWidth: 480, maxHeight: .infinity)
+                        .background(.background)
                 }
-            }
-            ToolbarItem(placement: .primaryAction) {
-                if appSettings.agentEnabled {
-                    let isAgentRunning = viewModel.agentService?.isRunning == true
-                    Button {
-                        isInspectorPresented.toggle()
-                    } label: {
-                        Label(L10n.agent, systemImage: "sparkles")
-                            .foregroundStyle(isAgentRunning ? .purple : .secondary)
-                    }
-                    .help(L10n.agent)
-                }
+            } else {
+                controlPanel
             }
         }
         .onChange(of: viewModel.currentTranscriptionId) { oldId, newId in
             guard oldId != newId else { return }
             viewModel.resetAgentSegmentTrackingIfNeeded()
+        }
+        .onChange(of: appSettings.agentEnabled) { _, isEnabled in
+            if !isEnabled {
+                isAgentSidebarPresented = false
+            }
         }
     }
 }

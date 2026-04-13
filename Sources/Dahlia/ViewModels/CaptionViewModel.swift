@@ -48,7 +48,7 @@ final class CaptionViewModel: ObservableObject {
     // MARK: - Agent State
 
     @Published var agentService: AgentService?
-    /// Inspector のモード選択を保持（inspector 開閉でリセットされない）。
+    /// 右サイドバーのモード選択を保持（開閉でリセットされない）。
     var selectedAgentMode: AgentStartMode = .project
 
     // MARK: - Note State

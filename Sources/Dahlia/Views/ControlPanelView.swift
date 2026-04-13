@@ -1,17 +1,6 @@
 import SwiftUI
 import UniformTypeIdentifiers
 
-/// ホバー時に背景がハイライトされるアイコンボタンスタイル。
-struct ToolbarIconButtonStyle: ButtonStyle {
-    func makeBody(configuration: Configuration) -> some View {
-        configuration.label
-            .padding(6)
-            .glassEffect(.regular.interactive(), in: RoundedRectangle(cornerRadius: 5))
-            .opacity(configuration.isPressed ? 0.7 : 1.0)
-            .pointerStyle(.link)
-    }
-}
-
 /// メイン領域のタブ種別。
 enum DetailTab: String, CaseIterable, Identifiable {
     case summary
@@ -449,8 +438,10 @@ private struct DetailTabButton: View {
 struct ControlPanelView: View {
     @ObservedObject var viewModel: CaptionViewModel
     var sidebarViewModel: SidebarViewModel
+    @Binding var isAgentSidebarPresented: Bool
     @State private var selectedTab: DetailTab = .transcript
     @State private var expandedScreenshot: ScreenshotRecord?
+    @ObservedObject private var appSettings = AppSettings.shared
 
     var body: some View {
         VStack(spacing: 12) {
@@ -520,7 +511,24 @@ struct ControlPanelView: View {
             }
         }
         .navigationTitle(headerTitle)
-        .toolbar {}
+        .toolbar {
+            ToolbarItemGroup(placement: .primaryAction) {
+                if viewModel.currentTranscriptionId != nil {
+                    Button(L10n.export, systemImage: "square.and.arrow.up", action: exportTranscript)
+                        .labelStyle(.iconOnly)
+                        .disabled(viewModel.store.segments.isEmpty)
+                        .help(L10n.export)
+                }
+
+                if appSettings.agentEnabled {
+                    Button(action: toggleAgentSidebar) {
+                        Label(L10n.agent, systemImage: "sparkles")
+                            .foregroundStyle(isAgentRunning ? .purple : .secondary)
+                    }
+                    .help(L10n.agent)
+                }
+            }
+        }
         .overlay(alignment: .bottomTrailing) {
             if viewModel.summaryProgress.isVisible {
                 SummaryProgressToastView(state: viewModel.summaryProgress)
@@ -692,6 +700,10 @@ struct ControlPanelView: View {
 
     // MARK: - Computed
 
+    private var isAgentRunning: Bool {
+        viewModel.agentService?.isRunning == true
+    }
+
     /// ヘッダーに表示する「プロジェクト名 - トランスクリプション名」。
     private var headerTitle: String {
         guard let project = sidebarViewModel.selectedProject else { return "" }
@@ -711,5 +723,13 @@ struct ControlPanelView: View {
         f.dateFormat = "yyyy/MM/dd HH:mm"
         return f
     }()
+
+    private func exportTranscript() {
+        viewModel.exportTranscript()
+    }
+
+    private func toggleAgentSidebar() {
+        isAgentSidebarPresented.toggle()
+    }
 
 }
