@@ -41,6 +41,7 @@
 "Continuously feed transcript to Claude Code." = "Continuously feed transcript to Claude Code.";
 "Start Agent" = "Start";
 "Stop Agent" = "Stop";
+"Thinking…" = "Thinking…";
 
 /* Settings (Agent) */
 "Enable Agent (Beta)" = "Enable Agent (Beta)";

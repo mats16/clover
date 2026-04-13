@@ -38,6 +38,7 @@ final class AgentService: ObservableObject {
 
     @Published var messages: [AgentMessage] = []
     @Published var isRunning = false
+    @Published var isProcessing = false
 
     /// 起動時に選択されたモード。
     private(set) var mode: AgentStartMode = .project
@@ -83,7 +84,8 @@ final class AgentService: ObservableObject {
             "--input-format", "stream-json",
             "--output-format", "stream-json",
             "--verbose",
-            "--permission-mode", "bypassPermissions",
+            "--permission-mode", "auto",
+            "--allowedTools", "Read(/*) Glob(/*) Grep(/*) TodoWrite",
             "--no-session-persistence",
             "--model", "sonnet",
             "--system-prompt", systemPrompt,
@@ -134,6 +136,7 @@ final class AgentService: ObservableObject {
 
     func stop() {
         isRunning = false
+        isProcessing = false
         cancellable = nil
         readTask?.cancel()
 
@@ -283,9 +286,12 @@ final class AgentService: ObservableObject {
                     messages.append(AgentMessage(role: .assistant, content: text))
                 }
             }
+        case "system":
+            if let subtype = json["subtype"] as? String, subtype == "init" {
+                isProcessing = true
+            }
         case "result":
-            // UI には `assistant` / `content_block_delta` のみ反映する（`result` はメタ用の重複になりがち）
-            break
+            isProcessing = false
         case "error":
             let errorMsg = (json["error"] as? [String: Any])?["message"] as? String
                 ?? json["error"] as? String

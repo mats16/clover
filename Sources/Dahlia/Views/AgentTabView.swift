@@ -123,12 +123,16 @@ private struct AgentLauncherView: View {
     private func launchProjectMode() {
         let message = inputText.trimmingCharacters(in: .whitespacesAndNewlines)
         guard !message.isEmpty else { return }
-        viewModel.startAgent(mode: .project, initialMessage: message)
+        viewModel.startAgent(mode: .project, initialMessage: message, workingDirectory: sidebarViewModel.selectedProjectURL)
         inputText = ""
     }
 
     private func launchTranscriptMode() {
-        viewModel.startAgent(mode: .transcript(store: viewModel.store))
+        viewModel.startAgent(
+            mode: .transcript(store: viewModel.store),
+            initialMessage: "文字起こしモードを開始します。リアルタイムの文字起こしが随時送信されます。準備ができたら教えてください。",
+            workingDirectory: sidebarViewModel.selectedProjectURL,
+        )
     }
 }
 
@@ -162,6 +166,18 @@ private struct AgentChatView: View {
                         LazyVStack(spacing: 12) {
                             ForEach(service.messages) { message in
                                 ChatBubbleView(message: message)
+                            }
+
+                            if service.isProcessing {
+                                HStack(spacing: 8) {
+                                    ProgressView()
+                                        .controlSize(.small)
+                                    Text(L10n.agentProcessing)
+                                        .font(.caption)
+                                        .foregroundStyle(.secondary)
+                                }
+                                .frame(maxWidth: .infinity, alignment: .leading)
+                                .padding(.leading, 36)
                             }
 
                             // スクロールアンカー

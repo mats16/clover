@@ -518,9 +518,10 @@ final class CaptionViewModel: ObservableObject {
     // MARK: - Agent
 
     /// 指定モードで Agent を起動する。初期メッセージを渡すとプロジェクトモードで即座に送信する。
-    func startAgent(mode: AgentStartMode, initialMessage: String? = nil) {
+    /// `workingDirectory` を渡すと `currentProjectURL` より優先して使用する。
+    func startAgent(mode: AgentStartMode, initialMessage: String? = nil, workingDirectory: URL? = nil) {
         guard agentService == nil,
-              let projectURL = currentProjectURL else { return }
+              let projectURL = workingDirectory ?? currentProjectURL else { return }
         let service = AgentService()
         self.agentService = service
         service.start(workingDirectory: projectURL, mode: mode, initialMessage: initialMessage)
