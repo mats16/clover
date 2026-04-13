@@ -48,8 +48,6 @@ final class CaptionViewModel: ObservableObject {
     // MARK: - Agent State
 
     @Published var agentService: AgentService?
-    /// 右サイドバーのモード選択を保持（開閉でリセットされない）。
-    var selectedAgentMode: AgentStartMode = .project
 
     // MARK: - Note State
 
@@ -519,13 +517,13 @@ final class CaptionViewModel: ObservableObject {
 
     // MARK: - Agent
 
-    /// 指定モードで Agent を起動する。
-    func startAgent(mode: AgentStartMode) {
+    /// 指定モードで Agent を起動する。初期メッセージを渡すとプロジェクトモードで即座に送信する。
+    func startAgent(mode: AgentStartMode, initialMessage: String? = nil) {
         guard agentService == nil,
               let projectURL = currentProjectURL else { return }
         let service = AgentService()
         self.agentService = service
-        service.start(workingDirectory: projectURL, mode: mode)
+        service.start(workingDirectory: projectURL, mode: mode, initialMessage: initialMessage)
     }
 
     /// Agent を明示的に停止する。

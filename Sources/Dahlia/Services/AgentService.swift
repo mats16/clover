@@ -55,7 +55,7 @@ final class AgentService: ObservableObject {
 
     // MARK: - Lifecycle
 
-    func start(workingDirectory: URL, mode: AgentStartMode) {
+    func start(workingDirectory: URL, mode: AgentStartMode, initialMessage: String? = nil) {
         self.mode = mode
         guard !isRunning else { return }
 
@@ -119,6 +119,9 @@ final class AgentService: ObservableObject {
         startReadingStdout(stdout)
         if case let .transcript(store) = mode {
             startObservingSegments(store: store)
+        }
+        if let initialMessage, !initialMessage.isEmpty {
+            sendUserMessage(initialMessage)
         }
     }
 

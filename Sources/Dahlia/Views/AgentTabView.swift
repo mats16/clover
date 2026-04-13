@@ -1,22 +1,9 @@
 import SwiftUI
 
-/// Agent 右サイドバーのコンテンツビュー。モード選択 UI またはチャット UI を表示する。
+/// Agent 右サイドバーのコンテンツビュー。初期チャット入力画面またはチャット UI を表示する。
 struct AgentSidebarView: View {
     @ObservedObject var viewModel: CaptionViewModel
     var sidebarViewModel: SidebarViewModel
-
-    /// Picker 用の簡易モード（associated value なし）。
-    private enum PickerMode: String, CaseIterable {
-        case project
-        case transcript
-    }
-
-    private var pickerSelection: Binding<PickerMode> {
-        Binding(
-            get: { viewModel.selectedAgentMode.isTranscript ? .transcript : .project },
-            set: { viewModel.selectedAgentMode = $0 == .project ? .project : .transcript(store: viewModel.store) }
-        )
-    }
 
     var body: some View {
         VStack(spacing: 0) {
@@ -25,7 +12,7 @@ struct AgentSidebarView: View {
                 Divider()
                 AgentChatView(service: service)
             } else {
-                agentModePicker
+                AgentLauncherView(viewModel: viewModel, sidebarViewModel: sidebarViewModel)
             }
         }
     }
@@ -54,50 +41,94 @@ struct AgentSidebarView: View {
         .padding(.horizontal, 12)
         .padding(.vertical, 8)
     }
+}
 
-    // MARK: - Mode Picker
+/// Agent 起動前のランチャー画面。テキスト入力でプロジェクトモード、空入力で Transcript ボタンを表示。
+private struct AgentLauncherView: View {
+    @ObservedObject var viewModel: CaptionViewModel
+    var sidebarViewModel: SidebarViewModel
+    @State private var inputText = ""
+    @FocusState private var isTextFieldFocused: Bool
 
-    private var agentModePicker: some View {
-        VStack(spacing: 16) {
+    private var hasContent: Bool {
+        !inputText.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty
+    }
+
+    private var isDisabled: Bool {
+        sidebarViewModel.selectedProjectURL == nil
+    }
+
+    var body: some View {
+        VStack(spacing: 0) {
             Spacer()
 
             Image(systemName: "sparkles")
-                .font(.largeTitle)
+                .font(.system(size: 36))
                 .foregroundStyle(.purple)
+                .padding(.bottom, 8)
 
             Text(L10n.agent)
                 .font(.headline)
+                .padding(.bottom, 4)
 
-            Picker(L10n.agent, selection: pickerSelection) {
-                Text(L10n.agentProjectMode).tag(PickerMode.project)
-                Text(L10n.agentTranscriptMode).tag(PickerMode.transcript)
-            }
-            .pickerStyle(.segmented)
-            .labelsHidden()
-            .padding(.horizontal, 20)
-
-            Text(viewModel.selectedAgentMode.isTranscript
-                ? L10n.agentTranscriptModeDescription
-                : L10n.agentProjectModeDescription)
+            Text(hasContent ? L10n.agentProjectModeDescription : L10n.agentTranscriptModeDescription)
                 .font(.caption)
                 .foregroundStyle(.secondary)
                 .multilineTextAlignment(.center)
                 .padding(.horizontal, 20)
 
-            Button {
-                viewModel.startAgent(mode: viewModel.selectedAgentMode)
-            } label: {
-                Label(L10n.startAgent, systemImage: "play.fill")
-                    .frame(maxWidth: .infinity)
-            }
-            .buttonStyle(.borderedProminent)
-            .controlSize(.large)
-            .padding(.horizontal, 20)
-            .disabled(sidebarViewModel.selectedProjectURL == nil)
-
             Spacer()
+
+            Divider()
+            agentLauncherInputBar
         }
         .frame(maxWidth: .infinity, maxHeight: .infinity)
+    }
+
+    private var agentLauncherInputBar: some View {
+        HStack(spacing: 8) {
+            TextField("メッセージを入力...", text: $inputText)
+                .textFieldStyle(.plain)
+                .font(.body)
+                .focused($isTextFieldFocused)
+                .onSubmit {
+                    guard hasContent else { return }
+                    launchProjectMode()
+                }
+
+            Button {
+                if hasContent {
+                    launchProjectMode()
+                } else {
+                    launchTranscriptMode()
+                }
+            } label: {
+                Image(systemName: hasContent ? "arrow.up.circle.fill" : "waveform.badge.microphone")
+                    .font(.system(size: 22))
+                    .foregroundStyle(hasContent ? Color.accentColor : .purple)
+            }
+            .buttonStyle(.plain)
+            .help(hasContent ? L10n.agentProjectMode : L10n.agentTranscriptMode)
+        }
+        .padding(.horizontal, 12)
+        .padding(.vertical, 8)
+        .disabled(isDisabled)
+        .onAppear {
+            DispatchQueue.main.async {
+                isTextFieldFocused = true
+            }
+        }
+    }
+
+    private func launchProjectMode() {
+        let message = inputText.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard !message.isEmpty else { return }
+        viewModel.startAgent(mode: .project, initialMessage: message)
+        inputText = ""
+    }
+
+    private func launchTranscriptMode() {
+        viewModel.startAgent(mode: .transcript(store: viewModel.store))
     }
 }
 
