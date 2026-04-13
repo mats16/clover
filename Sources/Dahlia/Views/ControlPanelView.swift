@@ -37,8 +37,9 @@ private struct DetailTabBar: View {
     @Namespace private var tabNamespace
 
     /// フォルダ選択時（transcription 未選択）は全タブを無効化する。
+    /// 録音中は録音対象が存在するためタブを無効化しない。
     private var isFolderOnly: Bool {
-        viewModel.currentTranscriptionId == nil
+        viewModel.currentTranscriptionId == nil && !viewModel.isListening
     }
 
     var body: some View {
@@ -632,8 +633,8 @@ struct ControlPanelView: View {
                                 TranscriptRowView(segment: segment)
                             }
 
-                            // 録音中インジケータ
-                            if viewModel.isListening {
+                            // 録音中インジケータ（録音対象のトランスクリプト表示中のみ）
+                            if viewModel.isListening, !viewModel.isViewingOtherWhileRecording {
                                 HStack(spacing: 6) {
                                     ProgressView()
                                         .scaleEffect(0.5)

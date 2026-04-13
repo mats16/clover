@@ -164,8 +164,6 @@ struct SidebarView: View {
             viewModel.clearCurrentTranscription()
             return
         }
-        if viewModel.isListening, viewModel.currentTranscriptionId == transcriptionId { return }
-        guard !viewModel.isListening else { return }
 
         guard let dbQueue = sidebarViewModel.dbQueue,
               let projectURL = sidebarViewModel.selectedProjectURL,
@@ -321,8 +319,12 @@ private struct ProjectSectionView: View {
     }
 
     private func selectRow(_ row: FlatProjectRow) {
+        let hadSelection = sidebarViewModel.selectedTranscriptionId != nil
         sidebarViewModel.selectProject(id: row.id, name: row.name)
-        viewModel.clearCurrentTranscription()
+        // selectedTranscriptionId が nil → nil の場合 onChange が発火しないため直接呼ぶ
+        if !hadSelection {
+            viewModel.clearCurrentTranscription()
+        }
     }
 
     // MARK: - Transcription Row

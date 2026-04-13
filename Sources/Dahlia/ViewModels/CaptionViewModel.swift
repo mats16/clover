@@ -10,6 +10,17 @@ private enum ScreenshotError: Error {
     case imageUnavailable
 }
 
+/// 録音中のナビゲーション時に保持する録音コンテキスト。
+private struct RecordingContext {
+    let transcriptionId: UUID?
+    let store: TranscriptStore
+    let projectURL: URL?
+    let projectId: UUID?
+    let projectName: String?
+    let vaultURL: URL?
+    let dbQueue: DatabaseQueue?
+}
+
 /// 音声キャプチャ → Speech フレームワーク文字起こし → UI 更新を統括するビューモデル。
 @MainActor
 final class CaptionViewModel: ObservableObject {
@@ -76,6 +87,19 @@ final class CaptionViewModel: ObservableObject {
     /// システム音声が有効か（audioSourceMode から導出）。
     var isSystemAudioEnabled: Bool { audioSourceMode == .systemAudio || audioSourceMode == .both }
 
+    // MARK: - Recording Context (録音中のナビゲーション時に保持)
+
+    /// 録音中に別トランスクリプトへナビゲーションした際の録音コンテキスト。
+    private var recordingContext: RecordingContext?
+
+    /// 録音対象の文字起こし ID。
+    var recordingTranscriptionId: UUID? { recordingContext?.transcriptionId }
+
+    /// 録音中かつ録音対象とは別のトランスクリプトを閲覧中。
+    var isViewingOtherWhileRecording: Bool {
+        isListening && recordingContext != nil
+    }
+
     // MARK: - Private
 
     private var currentDbQueue: DatabaseQueue?
@@ -88,11 +112,7 @@ final class CaptionViewModel: ObservableObject {
     private var transcriptionLoadTask: Task<Void, Never>?
 
     init() {
-        storeCancellable = store.objectWillChange
-            .throttle(for: .milliseconds(100), scheduler: RunLoop.main, latest: true)
-            .sink { [weak self] _ in
-                self?.objectWillChange.send()
-            }
+        resubscribeStoreCancellable()
 
         // AppSettings の表示言語設定変更を監視
         settingsCancellable = UserDefaults.standard
@@ -159,6 +179,7 @@ final class CaptionViewModel: ObservableObject {
     // MARK: - Transcription Loading
 
     /// DB から文字起こしのセグメントを読み込んで表示する。
+    /// 録音中でも呼び出し可能。録音パイプラインはバックグラウンドで継続する。
     func loadTranscription(
         _ transcriptionId: UUID,
         dbQueue: DatabaseQueue,
@@ -167,8 +188,23 @@ final class CaptionViewModel: ObservableObject {
         projectName: String? = nil,
         vaultURL: URL
     ) {
-        guard !isListening else { return }
-        resetTranscriptionState()
+        // 録音中に録音対象のトランスクリプトを選択した場合はライブ表示に復帰
+        if isListening, transcriptionId == recordingTranscriptionId {
+            returnToRecordingTranscription()
+            return
+        }
+
+        // 録音中の場合、録音コンテキストをバックアップして表示用ストアを差し替え
+        if isListening {
+            saveRecordingContextIfNeeded()
+            transcriptionLoadTask?.cancel()
+            saveNoteImmediately()
+            store = TranscriptStore()
+            resubscribeStoreCancellable()
+        } else {
+            resetTranscriptionState()
+        }
+
         setTranscriptionContext(
             id: transcriptionId,
             dbQueue: dbQueue,
@@ -202,13 +238,7 @@ final class CaptionViewModel: ObservableObject {
 
             self.store.recordingStartTime = loaded.startedAt
             self.store.loadSegments(loaded.segments)
-            self.screenshots = loaded.screenshots
-            self.lastSummaryURL = loaded.lastSummaryURL
-            self.noteText = loaded.note?.text ?? ""
-            self.currentNoteId = loaded.note?.id
-            self.currentNoteCreatedAt = loaded.note?.createdAt
-            self.lastSavedNoteText = self.noteText
-            self.setupNoteAutoSave()
+            self.applyLoadedDetail(loaded)
         }
     }
 
@@ -248,8 +278,19 @@ final class CaptionViewModel: ObservableObject {
     }
 
     /// 現在の文字起こし表示をクリアして初期状態に戻す。
+    /// 録音中はバックグラウンド録音を維持したまま表示のみクリアする。
     func clearCurrentTranscription() {
-        resetTranscriptionState()
+        if isListening {
+            saveRecordingContextIfNeeded()
+            store = TranscriptStore()
+            resubscribeStoreCancellable()
+            screenshots = []
+            resetNoteState()
+            lastSummaryURL = nil
+            summaryError = nil
+        } else {
+            resetTranscriptionState()
+        }
         currentTranscriptionId = nil
         currentProjectURL = nil
         currentProjectId = nil
@@ -257,7 +298,87 @@ final class CaptionViewModel: ObservableObject {
         currentVaultURL = nil
     }
 
+    /// 録音対象のトランスクリプトに表示を復帰する。
+    func returnToRecordingTranscription() {
+        guard let ctx = recordingContext else { return }
+        transcriptionLoadTask?.cancel()
+        saveNoteImmediately()
+
+        // コンテキストを先に復元（store 代入時の objectWillChange で SwiftUI が再評価する際に
+        // currentTranscriptionId 等が正しい値を返すようにする）
+        currentTranscriptionId = ctx.transcriptionId
+        currentProjectURL = ctx.projectURL
+        currentProjectId = ctx.projectId
+        currentProjectName = ctx.projectName
+        currentVaultURL = ctx.vaultURL
+        currentDbQueue = ctx.dbQueue
+
+        store = ctx.store
+        resubscribeStoreCancellable()
+        recordingContext = nil
+
+        reloadTranscriptionDetail()
+    }
+
+    /// 現在の transcriptionId のノート・スクリーンショット・サマリーを DB から読み込み直す。
+    private func reloadTranscriptionDetail() {
+        guard let transcriptionId = currentTranscriptionId,
+              let dbQueue = currentDbQueue,
+              let projectURL = currentProjectURL else { return }
+        transcriptionLoadTask = Task { [weak self, transcriptionId, dbQueue, projectURL] in
+            guard let self else { return }
+            let loaded: LoadedTranscriptionData
+            do {
+                loaded = try await Task.detached(priority: .userInitiated) {
+                    try Self.fetchLoadedTranscriptionData(
+                        transcriptionId: transcriptionId,
+                        dbQueue: dbQueue,
+                        projectURL: projectURL
+                    )
+                }.value
+            } catch {
+                return
+            }
+            guard !Task.isCancelled, self.currentTranscriptionId == transcriptionId else { return }
+            self.applyLoadedDetail(loaded)
+        }
+    }
+
+    /// 読み込み済みデータのノート・スクリーンショット・サマリーを UI 状態に反映する。
+    private func applyLoadedDetail(_ loaded: LoadedTranscriptionData) {
+        screenshots = loaded.screenshots
+        lastSummaryURL = loaded.lastSummaryURL
+        noteText = loaded.note?.text ?? ""
+        currentNoteId = loaded.note?.id
+        currentNoteCreatedAt = loaded.note?.createdAt
+        lastSavedNoteText = noteText
+        setupNoteAutoSave()
+    }
+
     // MARK: - Private Helpers
+
+    /// 録音コンテキストをバックアップする（初回ナビゲーション時のみ）。
+    private func saveRecordingContextIfNeeded() {
+        guard recordingContext == nil else { return }
+        recordingContext = RecordingContext(
+            transcriptionId: currentTranscriptionId,
+            store: store,
+            projectURL: currentProjectURL,
+            projectId: currentProjectId,
+            projectName: currentProjectName,
+            vaultURL: currentVaultURL,
+            dbQueue: currentDbQueue
+        )
+    }
+
+    /// storeCancellable を現在の store に再接続する。
+    private func resubscribeStoreCancellable() {
+        storeCancellable = store.objectWillChange
+            .throttle(for: .milliseconds(100), scheduler: RunLoop.main, latest: true)
+            .sink { [weak self] _ in
+                self?.objectWillChange.send()
+            }
+    }
 
     /// UI 状態をリセットし、次の文字起こし読み込みに備える。
     private func resetTranscriptionState() {
@@ -467,13 +588,19 @@ final class CaptionViewModel: ObservableObject {
         systemAudioManager = nil
         isListening = false
 
-        let transcriptionId = currentTranscriptionId
-        let projectName = selectedProjectName
-        let transcriptText = store.exportForSummary()
-        let projectURL = currentProjectURL
-        let recordingStart = store.recordingStartTime ?? Date()
-        let segments = store.segments
-        guard let vaultURL = currentVaultURL else { return }
+        // ナビゲーション済みの場合、録音コンテキストからデータを取得
+        let ctx = recordingContext
+        let activeStore = ctx?.store ?? store
+        let transcriptionId = ctx?.transcriptionId ?? currentTranscriptionId
+        let projectName = ctx?.projectName ?? selectedProjectName
+        let projectURL = ctx?.projectURL ?? currentProjectURL
+        let vaultURL = ctx?.vaultURL ?? currentVaultURL
+        let transcriptText = activeStore.exportForSummary()
+        let recordingStart = activeStore.recordingStartTime ?? Date()
+        let segments = activeStore.segments
+        recordingContext = nil
+
+        guard let vaultURL else { return }
 
         Task {
             for pipeline in pipelines {

@@ -21,6 +21,21 @@ enum AgentMessageRole {
     case assistant
     case system
     case error
+    case toolUse
+}
+
+/// ツール実行結果の情報。
+struct ToolResultInfo {
+    let content: String
+    let isError: Bool
+}
+
+/// ツール呼び出しの詳細情報。
+struct ToolCallInfo {
+    let toolName: String
+    let toolUseId: String
+    let toolInput: [String: Any]
+    var toolResult: ToolResultInfo?
 }
 
 /// Claude Code CLI プロセスからの出力メッセージ。
@@ -28,6 +43,7 @@ struct AgentMessage: Identifiable {
     let id: UUID = .v7()
     let role: AgentMessageRole
     var content: String
+    var toolCallInfo: ToolCallInfo?
 }
 
 /// Claude Code CLI をサブプロセスとして管理し、確定済み文字起こしセグメントをストリーミングで送信するサービス。
@@ -53,6 +69,11 @@ final class AgentService: ObservableObject {
     private var readTask: Task<Void, Never>?
 
     private let logger = Logger(subsystem: "com.dahlia", category: "AgentService")
+
+    /// 結果を UI に表示しないツール。
+    static let toolsOmitResult: Set<String> = ["Glob", "Grep", "Read", "Write", "Edit", "TodoWrite"]
+    /// 入力サマリーを省略するツール。
+    static let toolsOmitInputSummary: Set<String> = ["TodoWrite"]
 
     // MARK: - Lifecycle
 
@@ -275,6 +296,17 @@ final class AgentService: ObservableObject {
                 if !text.isEmpty, !isDuplicateAssistantBubble(comparedTo: text) {
                     messages.append(AgentMessage(role: .assistant, content: text))
                 }
+                // tool_use ブロックを抽出
+                for block in content where block["type"] as? String == "tool_use" {
+                    guard let toolName = block["name"] as? String,
+                          let toolUseId = block["id"] as? String else { continue }
+                    // 重複チェック
+                    if messages.contains(where: { $0.toolCallInfo?.toolUseId == toolUseId }) { continue }
+                    let toolInput = block["input"] as? [String: Any] ?? [:]
+                    let summary = Self.toolInputSummary(toolName: toolName, input: toolInput)
+                    let info = ToolCallInfo(toolName: toolName, toolUseId: toolUseId, toolInput: toolInput)
+                    messages.append(AgentMessage(role: .toolUse, content: summary, toolCallInfo: info))
+                }
             }
         case "content_block_delta":
             if let delta = json["delta"] as? [String: Any],
@@ -284,6 +316,22 @@ final class AgentService: ObservableObject {
                     messages[lastIndex].content += text
                 } else {
                     messages.append(AgentMessage(role: .assistant, content: text))
+                }
+            }
+        case "user":
+            // tool_result ブロックをマッチする tool_use メッセージにマージ
+            if let message = json["message"] as? [String: Any],
+               let content = message["content"] as? [[String: Any]] {
+                for block in content where block["type"] as? String == "tool_result" {
+                    guard let toolUseId = block["tool_use_id"] as? String else { continue }
+                    let resultContent = (block["content"] as? String) ?? ""
+                    let isError = block["is_error"] as? Bool ?? false
+                    let resultInfo = ToolResultInfo(content: resultContent, isError: isError)
+                    if let idx = messages.lastIndex(where: {
+                        $0.role == .toolUse && $0.toolCallInfo?.toolUseId == toolUseId
+                    }) {
+                        messages[idx].toolCallInfo?.toolResult = resultInfo
+                    }
                 }
             }
         case "system":
@@ -299,6 +347,35 @@ final class AgentService: ObservableObject {
             messages.append(AgentMessage(role: .error, content: errorMsg))
         default:
             break
+        }
+    }
+
+    // MARK: - Tool Input Summary
+
+    /// ツール名と入力パラメータから人間可読なサマリー文字列を返す。
+    static func toolInputSummary(toolName: String, input: [String: Any]) -> String {
+        switch toolName {
+        case "Bash":
+            return (input["command"] as? String) ?? toolName
+        case "Read", "Write", "Edit":
+            return (input["file_path"] as? String) ?? toolName
+        case "Grep", "Glob":
+            return (input["pattern"] as? String) ?? toolName
+        case "WebSearch":
+            return (input["query"] as? String) ?? toolName
+        case "WebFetch":
+            return (input["url"] as? String) ?? toolName
+        case "Agent":
+            return (input["subagent_type"] as? String) ?? toolName
+        case "Skill":
+            return (input["skill"] as? String) ?? toolName
+        default:
+            if Self.toolsOmitInputSummary.contains(toolName) { return toolName }
+            if let data = try? JSONSerialization.data(withJSONObject: input, options: [.sortedKeys]),
+               let str = String(data: data, encoding: .utf8) {
+                return String(str.prefix(120))
+            }
+            return toolName
         }
     }
 }

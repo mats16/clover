@@ -13,7 +13,8 @@ swift build
 BINARY=".build/debug/${APP_NAME}"
 
 # エンタイトルメント付きで署名（Data Protection Keychain + Touch ID が有効になる）
-codesign --force --sign - --entitlements "${PROJECT_DIR}/Dahlia.entitlements" "$BINARY"
+SIGN_IDENTITY="${CODESIGN_IDENTITY:-Developer ID Application: Kazuki Matsuda (XCHHYPN52N)}"
+codesign --force --sign "$SIGN_IDENTITY" --entitlements "${PROJECT_DIR}/Dahlia.entitlements" "$BINARY"
 
 echo "=== Running ${APP_NAME} ==="
 exec "$BINARY"
