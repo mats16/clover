@@ -59,21 +59,20 @@ final class AgentService: ObservableObject {
         self.mode = mode
         guard !isRunning else { return }
 
-        let systemPrompt: String
-        switch mode {
+        let systemPrompt = switch mode {
         case .transcript:
-            systemPrompt = """
-                あなたはミーティングアシスタントです。\
-                ディレクトリ配下には過去の議事録が格納されています。\
-                リアルタイムの文字起こしを受け取り、要点の整理や質問への回答を行ってください。\
-                文字起こしは随時送られてくるため、新規の情報がない場合など、応答の必要がない場合は対応不要です。
-                """
+            """
+            あなたはミーティングアシスタントです。\
+            ディレクトリ配下には過去の議事録が格納されています。\
+            リアルタイムの文字起こしを受け取り、要点の整理や質問への回答を行ってください。\
+            文字起こしは随時送られてくるため、新規の情報がない場合など、応答の必要がない場合は対応不要です。
+            """
         case .project:
-            systemPrompt = """
-                あなたはミーティングアシスタントです。\
-                ディレクトリ配下には過去の議事録が格納されています。\
-                要点の整理や質問への回答など、ユーザーの質問に回答してください。
-                """
+            """
+            あなたはミーティングアシスタントです。\
+            ディレクトリ配下には過去の議事録が格納されています。\
+            要点の整理や質問への回答など、ユーザーの質問に回答してください。
+            """
         }
 
         let proc = Process()
@@ -190,7 +189,7 @@ final class AgentService: ObservableObject {
     // MARK: - Segment Observation
 
     private func startObservingSegments(store: TranscriptStore) {
-        let existingConfirmed = store.segments.filter { $0.isConfirmed }
+        let existingConfirmed = store.segments.filter(\.isConfirmed)
         if !existingConfirmed.isEmpty {
             sendSegments(existingConfirmed)
         }

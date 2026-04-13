@@ -32,7 +32,6 @@ struct AgentSidebarView: View {
 
     // MARK: - Agent Header
 
-    @ViewBuilder
     private func agentHeader(service: AgentService) -> some View {
         HStack {
             Image(systemName: "sparkles")
@@ -407,7 +406,6 @@ private struct MarkdownContentView: View {
         }
     }
 
-    @ViewBuilder
     private func tableView(headers: [String], rows: [[String]]) -> some View {
         Grid(alignment: .leading, horizontalSpacing: 0, verticalSpacing: 0) {
             // ヘッダー行
@@ -484,7 +482,7 @@ private struct MarkdownContentView: View {
             }
 
             // 水平線
-            if trimmed.allSatisfy({ $0 == "-" || $0 == " " }), trimmed.filter({ $0 == "-" }).count >= 3 {
+            if trimmed.allSatisfy({ $0 == "-" || $0 == " " }), trimmed.count(where: { $0 == "-" }) >= 3 {
                 blocks.append(.horizontalRule)
                 i += 1
                 continue

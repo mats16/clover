@@ -570,7 +570,6 @@ struct ControlPanelView: View {
         }
     }
 
-    @ViewBuilder
     private var notesTabContent: some View {
         TextEditor(text: $viewModel.noteText)
             .font(.body)
