@@ -152,15 +152,17 @@ private struct AgentChatView: View {
                 }
             }
 
-            // 入力欄
+            // 入力欄（インスペクター内では初回フォーカスが当たらないことがあるため明示的にフォーカスする）
             Divider()
-            ChatInputBar(text: $inputText) {
+            ChatInputBar(
+                text: $inputText,
+                isEnabled: service.isRunning
+            ) {
                 let message = inputText.trimmingCharacters(in: .whitespacesAndNewlines)
                 guard !message.isEmpty else { return }
                 service.sendUserMessage(message)
                 inputText = ""
             }
-            .disabled(!service.isRunning)
         }
     }
 }
@@ -168,7 +170,10 @@ private struct AgentChatView: View {
 /// チャット入力バー。
 private struct ChatInputBar: View {
     @Binding var text: String
+    var isEnabled: Bool
     let onSend: () -> Void
+
+    @FocusState private var isTextFieldFocused: Bool
 
     private var hasContent: Bool {
         !text.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty
@@ -179,6 +184,7 @@ private struct ChatInputBar: View {
             TextField("メッセージを入力...", text: $text)
                 .textFieldStyle(.plain)
                 .font(.body)
+                .focused($isTextFieldFocused)
                 .onSubmit(onSend)
 
             Button(action: onSend) {
@@ -191,6 +197,19 @@ private struct ChatInputBar: View {
         }
         .padding(.horizontal, 12)
         .padding(.vertical, 8)
+        .disabled(!isEnabled)
+        .onAppear {
+            guard isEnabled else { return }
+            DispatchQueue.main.async {
+                isTextFieldFocused = true
+            }
+        }
+        .onChange(of: isEnabled) { _, enabled in
+            guard enabled else { return }
+            DispatchQueue.main.async {
+                isTextFieldFocused = true
+            }
+        }
     }
 }
 

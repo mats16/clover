@@ -520,18 +520,7 @@ struct ControlPanelView: View {
             }
         }
         .navigationTitle(headerTitle)
-        .toolbar {
-            ToolbarItem(placement: .primaryAction) {
-                if viewModel.currentTranscriptionId != nil {
-                    Button(L10n.export, systemImage: "square.and.arrow.up") {
-                        viewModel.exportTranscript()
-                    }
-                    .labelStyle(.iconOnly)
-                    .disabled(viewModel.store.segments.isEmpty)
-                    .help(L10n.export)
-                }
-            }
-        }
+        .toolbar {}
         .overlay(alignment: .bottomTrailing) {
             if viewModel.summaryProgress.isVisible {
                 SummaryProgressToastView(state: viewModel.summaryProgress)

@@ -27,6 +27,16 @@ struct ContentView: View {
         }
         .toolbar {
             ToolbarItem(placement: .primaryAction) {
+                if viewModel.currentTranscriptionId != nil {
+                    Button(L10n.export, systemImage: "square.and.arrow.up") {
+                        viewModel.exportTranscript()
+                    }
+                    .labelStyle(.iconOnly)
+                    .disabled(viewModel.store.segments.isEmpty)
+                    .help(L10n.export)
+                }
+            }
+            ToolbarItem(placement: .primaryAction) {
                 if appSettings.agentEnabled {
                     let isAgentRunning = viewModel.agentService?.isRunning == true
                     Button {

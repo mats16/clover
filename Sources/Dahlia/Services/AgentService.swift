@@ -59,11 +59,22 @@ final class AgentService: ObservableObject {
         self.mode = mode
         guard !isRunning else { return }
 
-        let systemPrompt = """
-            あなたはミーティングアシスタントです。\
-            リアルタイムの文字起こしを受け取り、要点の整理や質問への回答を行ってください。\
-            日本語で応答してください。
-            """
+        let systemPrompt: String
+        switch mode {
+        case .transcript:
+            systemPrompt = """
+                あなたはミーティングアシスタントです。\
+                ディレクトリ配下には過去の議事録が格納されています。\
+                リアルタイムの文字起こしを受け取り、要点の整理や質問への回答を行ってください。\
+                文字起こしは随時送られてくるため、新規の情報がない場合など、応答の必要がない場合は対応不要です。
+                """
+        case .project:
+            systemPrompt = """
+                あなたはミーティングアシスタントです。\
+                ディレクトリ配下には過去の議事録が格納されています。\
+                要点の整理や質問への回答など、ユーザーの質問に回答してください。
+                """
+        }
 
         let proc = Process()
         proc.executableURL = URL(fileURLWithPath: "/usr/bin/env")
@@ -120,6 +131,7 @@ final class AgentService: ObservableObject {
     }
 
     func stop() {
+        isRunning = false
         cancellable = nil
         readTask?.cancel()
 
@@ -232,6 +244,13 @@ final class AgentService: ObservableObject {
         }
     }
 
+    /// `assistant` 確定イベントが、直前に `content_block_delta` で組み立てた本文と重複することがあるため、同一なら追加しない。
+    private func isDuplicateAssistantBubble(comparedTo text: String) -> Bool {
+        guard let last = messages.last, last.role == .assistant else { return false }
+        return last.content.trimmingCharacters(in: .whitespacesAndNewlines)
+            == text.trimmingCharacters(in: .whitespacesAndNewlines)
+    }
+
     private func handleOutputLine(_ line: String) {
         guard let data = line.data(using: .utf8),
               let json = try? JSONSerialization.jsonObject(with: data) as? [String: Any],
@@ -248,7 +267,7 @@ final class AgentService: ObservableObject {
                     guard block["type"] as? String == "text" else { return nil }
                     return block["text"] as? String
                 }.joined()
-                if !text.isEmpty {
+                if !text.isEmpty, !isDuplicateAssistantBubble(comparedTo: text) {
                     messages.append(AgentMessage(role: .assistant, content: text))
                 }
             }
@@ -263,9 +282,8 @@ final class AgentService: ObservableObject {
                 }
             }
         case "result":
-            if let result = json["result"] as? String, !result.isEmpty {
-                messages.append(AgentMessage(role: .assistant, content: result))
-            }
+            // UI には `assistant` / `content_block_delta` のみ反映する（`result` はメタ用の重複になりがち）
+            break
         case "error":
             let errorMsg = (json["error"] as? [String: Any])?["message"] as? String
                 ?? json["error"] as? String
