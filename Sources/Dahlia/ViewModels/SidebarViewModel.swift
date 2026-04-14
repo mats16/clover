@@ -406,6 +406,7 @@ final class SidebarViewModel {
             try transcriptionRepository?.deleteProjectsByPrefix(name: name, vaultId: vault.id)
         } catch {
             lastError = "データベースの更新に失敗しました: \(error.localizedDescription)"
+            ErrorReportingService.capture(error, context: ["source": "deleteProject"])
         }
     }
 

@@ -47,7 +47,7 @@ if [ -d "$RESOURCE_BUNDLE" ]; then
 fi
 
 # コード署名（CODESIGN_IDENTITY 環境変数で署名 ID をオーバーライド可能）
-SIGN_IDENTITY="${CODESIGN_IDENTITY:--}"
+SIGN_IDENTITY="${CODESIGN_IDENTITY:-Developer ID Application: Kazuki Matsuda (XCHHYPN52N)}"
 codesign --force --sign "$SIGN_IDENTITY" --entitlements "${PROJECT_DIR}/Dahlia.entitlements" "${APP_BUNDLE}"
 
 echo "=== Build complete: ${APP_BUNDLE} ==="

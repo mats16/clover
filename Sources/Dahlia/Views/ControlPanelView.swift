@@ -1,24 +1,12 @@
 import SwiftUI
 import UniformTypeIdentifiers
 
-/// ホバー時に背景がハイライトされるアイコンボタンスタイル。
-struct ToolbarIconButtonStyle: ButtonStyle {
-    func makeBody(configuration: Configuration) -> some View {
-        configuration.label
-            .padding(6)
-            .glassEffect(.regular.interactive(), in: RoundedRectangle(cornerRadius: 5))
-            .opacity(configuration.isPressed ? 0.7 : 1.0)
-            .pointerStyle(.link)
-    }
-}
-
 /// メイン領域のタブ種別。
 enum DetailTab: String, CaseIterable, Identifiable {
     case summary
     case notes
     case screenshots
     case transcript
-    case agent
 
     var id: String { rawValue }
 
@@ -28,7 +16,6 @@ enum DetailTab: String, CaseIterable, Identifiable {
         case .notes: L10n.notes
         case .screenshots: L10n.screenshots
         case .transcript: L10n.transcript
-        case .agent: L10n.agent
         }
     }
 
@@ -38,7 +25,6 @@ enum DetailTab: String, CaseIterable, Identifiable {
         case .notes: "pencil.line"
         case .screenshots: "photo.on.rectangle.angled"
         case .transcript: "waveform.badge.microphone"
-        case .agent: "sparkles"
         }
     }
 }
@@ -48,23 +34,17 @@ private struct DetailTabBar: View {
     @Binding var selection: DetailTab
     @ObservedObject var viewModel: CaptionViewModel
     var sidebarViewModel: SidebarViewModel
-    @AppStorage("agentEnabled") private var agentEnabled = false
     @Namespace private var tabNamespace
 
     /// フォルダ選択時（transcription 未選択）は全タブを無効化する。
+    /// 録音中は録音対象が存在するためタブを無効化しない。
     private var isFolderOnly: Bool {
-        viewModel.currentTranscriptionId == nil
-    }
-
-    private var visibleTabs: [DetailTab] {
-        DetailTab.allCases.filter { tab in
-            tab != .agent || agentEnabled
-        }
+        viewModel.currentTranscriptionId == nil && !viewModel.isListening
     }
 
     var body: some View {
         HStack(spacing: 2) {
-            ForEach(visibleTabs) { tab in
+            ForEach(DetailTab.allCases) { tab in
                 DetailTabButton(
                     tab: tab,
                     isSelected: !isFolderOnly && selection == tab,
@@ -459,9 +439,10 @@ private struct DetailTabButton: View {
 struct ControlPanelView: View {
     @ObservedObject var viewModel: CaptionViewModel
     var sidebarViewModel: SidebarViewModel
+    @Binding var isAgentSidebarPresented: Bool
     @State private var selectedTab: DetailTab = .transcript
     @State private var expandedScreenshot: ScreenshotRecord?
-    @AppStorage("agentEnabled") private var agentEnabled = false
+    @ObservedObject private var appSettings = AppSettings.shared
 
     var body: some View {
         VStack(spacing: 12) {
@@ -488,8 +469,6 @@ struct ControlPanelView: View {
                         screenshotsTabContent
                     case .transcript:
                         transcriptTabContent
-                    case .agent:
-                        AgentTabView(viewModel: viewModel)
                     }
                 }
             }
@@ -526,11 +505,6 @@ struct ControlPanelView: View {
         }
         .padding()
         .frame(minWidth: 500, minHeight: 500)
-        .onChange(of: agentEnabled) {
-            if !agentEnabled, selectedTab == .agent {
-                selectedTab = .transcript
-            }
-        }
         .onChange(of: viewModel.requestShowSummaryTab) {
             if viewModel.requestShowSummaryTab {
                 selectedTab = .summary
@@ -539,14 +513,20 @@ struct ControlPanelView: View {
         }
         .navigationTitle(headerTitle)
         .toolbar {
-            ToolbarItem(placement: .primaryAction) {
+            ToolbarItemGroup(placement: .primaryAction) {
                 if viewModel.currentTranscriptionId != nil {
-                    Button(L10n.export, systemImage: "square.and.arrow.up") {
-                        viewModel.exportTranscript()
+                    Button(L10n.export, systemImage: "square.and.arrow.up", action: exportTranscript)
+                        .labelStyle(.iconOnly)
+                        .disabled(viewModel.store.segments.isEmpty)
+                        .help(L10n.export)
+                }
+
+                if appSettings.agentEnabled {
+                    Button(action: toggleAgentSidebar) {
+                        Label(L10n.agent, systemImage: "sparkles")
+                            .foregroundStyle(isAgentRunning ? .purple : .secondary)
                     }
-                    .labelStyle(.iconOnly)
-                    .disabled(viewModel.store.segments.isEmpty)
-                    .help(L10n.export)
+                    .help(L10n.agent)
                 }
             }
         }
@@ -599,7 +579,6 @@ struct ControlPanelView: View {
         }
     }
 
-    @ViewBuilder
     private var notesTabContent: some View {
         TextEditor(text: $viewModel.noteText)
             .font(.body)
@@ -654,8 +633,8 @@ struct ControlPanelView: View {
                                 TranscriptRowView(segment: segment)
                             }
 
-                            // 録音中インジケータ
-                            if viewModel.isListening {
+                            // 録音中インジケータ（録音対象のトランスクリプト表示中のみ）
+                            if viewModel.isListening, !viewModel.isViewingOtherWhileRecording {
                                 HStack(spacing: 6) {
                                     ProgressView()
                                         .scaleEffect(0.5)
@@ -722,6 +701,10 @@ struct ControlPanelView: View {
 
     // MARK: - Computed
 
+    private var isAgentRunning: Bool {
+        viewModel.agentService?.isRunning == true
+    }
+
     /// ヘッダーに表示する「プロジェクト名 - トランスクリプション名」。
     private var headerTitle: String {
         guard let project = sidebarViewModel.selectedProject else { return "" }
@@ -741,5 +724,13 @@ struct ControlPanelView: View {
         f.dateFormat = "yyyy/MM/dd HH:mm"
         return f
     }()
+
+    private func exportTranscript() {
+        viewModel.exportTranscript()
+    }
+
+    private func toggleAgentSidebar() {
+        isAgentSidebarPresented.toggle()
+    }
 
 }

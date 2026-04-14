@@ -68,11 +68,27 @@ enum L10n {
     static var transcript: String { String(localized: "Transcript", bundle: bundle) }
     static var agent: String { String(localized: "Agent", bundle: bundle) }
 
+    // MARK: - Agent
+
+    static var agentProjectMode: String { String(localized: "Project Mode", bundle: bundle) }
+    static var agentTranscriptMode: String { String(localized: "Transcript Mode", bundle: bundle) }
+    static var agentProjectModeDescription: String { String(
+        localized: "Run Claude Code in the project directory.",
+        bundle: bundle
+    ) }
+    static var agentTranscriptModeDescription: String { String(
+        localized: "Continuously feed transcript to Claude Code.",
+        bundle: bundle
+    ) }
+    static var startAgent: String { String(localized: "Start Agent", bundle: bundle) }
+    static var stopAgent: String { String(localized: "Stop Agent", bundle: bundle) }
+    static var agentProcessing: String { String(localized: "Thinking…", bundle: bundle) }
+
     // MARK: - Settings (Agent)
 
     static var agentEnabled: String { String(localized: "Enable Agent (Beta)", bundle: bundle) }
     static var agentEnabledDescription: String { String(
-        localized: "Enable the Agent tab to interact with Claude during transcription. This is a beta feature.",
+        localized: "Enable the Agent sidebar to interact with Claude. This is a beta feature.",
         bundle: bundle
     ) }
 

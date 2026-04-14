@@ -7,13 +7,21 @@ PROJECT_DIR="$(dirname "$SCRIPT_DIR")"
 
 cd "$PROJECT_DIR"
 
+# .env.local から環境変数を読み込む（SENTRY_DSN など）
+if [ -f .env.local ]; then
+    set -a
+    source .env.local
+    set +a
+fi
+
 echo "=== Building ${APP_NAME} (debug) ==="
 swift build
 
 BINARY=".build/debug/${APP_NAME}"
 
 # エンタイトルメント付きで署名（Data Protection Keychain + Touch ID が有効になる）
-codesign --force --sign - --entitlements "${PROJECT_DIR}/Dahlia.entitlements" "$BINARY"
+SIGN_IDENTITY="${CODESIGN_IDENTITY:-Developer ID Application: Kazuki Matsuda (XCHHYPN52N)}"
+codesign --force --sign "$SIGN_IDENTITY" --entitlements "${PROJECT_DIR}/Dahlia.entitlements" "$BINARY"
 
 echo "=== Running ${APP_NAME} ==="
 exec "$BINARY"

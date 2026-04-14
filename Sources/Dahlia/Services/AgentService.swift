@@ -2,12 +2,40 @@ import Combine
 import Foundation
 import os
 
+/// Agent の開始モード。
+enum AgentStartMode {
+    /// プロジェクトディレクトリで Claude Code を実行（transcript 入力なし）。
+    case project
+    /// 文字起こしを継続的に Claude Code に入力として渡す。
+    case transcript(store: TranscriptStore)
+
+    var isTranscript: Bool {
+        if case .transcript = self { return true }
+        return false
+    }
+}
+
 /// Claude Code CLI プロセスのメッセージロール。
 enum AgentMessageRole {
     case user
     case assistant
     case system
     case error
+    case toolUse
+}
+
+/// ツール実行結果の情報。
+struct ToolResultInfo {
+    let content: String
+    let isError: Bool
+}
+
+/// ツール呼び出しの詳細情報。
+struct ToolCallInfo {
+    let toolName: String
+    let toolUseId: String
+    let toolInput: [String: Any]
+    var toolResult: ToolResultInfo?
 }
 
 /// Claude Code CLI プロセスからの出力メッセージ。
@@ -15,6 +43,7 @@ struct AgentMessage: Identifiable {
     let id: UUID = .v7()
     let role: AgentMessageRole
     var content: String
+    var toolCallInfo: ToolCallInfo?
 }
 
 /// Claude Code CLI をサブプロセスとして管理し、確定済み文字起こしセグメントをストリーミングで送信するサービス。
@@ -25,6 +54,10 @@ final class AgentService: ObservableObject {
 
     @Published var messages: [AgentMessage] = []
     @Published var isRunning = false
+    @Published var isProcessing = false
+
+    /// 起動時に選択されたモード。
+    private(set) var mode: AgentStartMode = .project
 
     // MARK: - Private State
 
@@ -37,16 +70,32 @@ final class AgentService: ObservableObject {
 
     private let logger = Logger(subsystem: "com.dahlia", category: "AgentService")
 
+    /// 結果を UI に表示しないツール。
+    static let toolsOmitResult: Set = ["Glob", "Grep", "Read", "Write", "Edit", "TodoWrite"]
+    /// 入力サマリーを省略するツール。
+    static let toolsOmitInputSummary: Set = ["TodoWrite"]
+
     // MARK: - Lifecycle
 
-    func start(workingDirectory: URL, store: TranscriptStore) {
+    func start(workingDirectory: URL, mode: AgentStartMode, initialMessage: String? = nil) {
+        self.mode = mode
         guard !isRunning else { return }
 
-        let systemPrompt = """
-            あなたはミーティングアシスタントです。\
-            リアルタイムの文字起こしを受け取り、要点の整理や質問への回答を行ってください。\
-            日本語で応答してください。
+        let systemPrompt = switch mode {
+        case .transcript:
             """
+            あなたはミーティングアシスタントです。\
+            ディレクトリ配下には過去の議事録が格納されています。\
+            リアルタイムの文字起こしを受け取り、要点の整理や質問への回答を行ってください。\
+            文字起こしは随時送られてくるため、新規の情報がない場合など、応答の必要がない場合は対応不要です。
+            """
+        case .project:
+            """
+            あなたはミーティングアシスタントです。\
+            ディレクトリ配下には過去の議事録が格納されています。\
+            要点の整理や質問への回答など、ユーザーの質問に回答してください。
+            """
+        }
 
         let proc = Process()
         proc.executableURL = URL(fileURLWithPath: "/usr/bin/env")
@@ -56,7 +105,8 @@ final class AgentService: ObservableObject {
             "--input-format", "stream-json",
             "--output-format", "stream-json",
             "--verbose",
-            "--permission-mode", "bypassPermissions",
+            "--permission-mode", "auto",
+            "--allowedTools", "Read(/*) Glob(/*) Grep(/*) TodoWrite",
             "--no-session-persistence",
             "--model", "sonnet",
             "--system-prompt", systemPrompt,
@@ -80,6 +130,7 @@ final class AgentService: ObservableObject {
             try proc.run()
         } catch {
             logger.error("Failed to launch claude process: \(error.localizedDescription)")
+            ErrorReportingService.capture(error, context: ["source": "agentProcessLaunch"])
             messages.append(AgentMessage(role: .error, content: "Claude Code の起動に失敗しました: \(error.localizedDescription)"))
             return
         }
@@ -90,7 +141,12 @@ final class AgentService: ObservableObject {
         self.isRunning = true
 
         startReadingStdout(stdout)
-        startObservingSegments(store: store)
+        if case let .transcript(store) = mode {
+            startObservingSegments(store: store)
+        }
+        if let initialMessage, !initialMessage.isEmpty {
+            sendUserMessage(initialMessage)
+        }
     }
 
     /// ユーザーが手動で入力したメッセージを送信する。
@@ -101,6 +157,8 @@ final class AgentService: ObservableObject {
     }
 
     func stop() {
+        isRunning = false
+        isProcessing = false
         cancellable = nil
         readTask?.cancel()
 
@@ -108,15 +166,28 @@ final class AgentService: ObservableObject {
 
         let proc = process
         Task.detached {
+            // stdin を閉じた後、プロセスの自発的終了を待つ
             try? await Task.sleep(for: .milliseconds(500))
+            guard proc?.isRunning == true else { return }
+            // SIGTERM を送信
+            proc?.terminate()
+            try? await Task.sleep(for: .seconds(2))
             if proc?.isRunning == true {
-                proc?.terminate()
+                // 応答しない場合は SIGKILL で強制終了
+                kill(proc!.processIdentifier, SIGKILL)
             }
         }
 
         process = nil
         stdinPipe = nil
         stdoutPipe = nil
+    }
+
+    /// transcript 切替時にセグメント追跡をリセットし、新しい store を再観測する。
+    func resetSegmentTracking(store: TranscriptStore) {
+        cancellable = nil
+        sentSegmentIds.removeAll()
+        startObservingSegments(store: store)
     }
 
     // MARK: - Stdin Writing
@@ -146,7 +217,7 @@ final class AgentService: ObservableObject {
     // MARK: - Segment Observation
 
     private func startObservingSegments(store: TranscriptStore) {
-        let existingConfirmed = store.segments.filter { $0.isConfirmed }
+        let existingConfirmed = store.segments.filter(\.isConfirmed)
         if !existingConfirmed.isEmpty {
             sendSegments(existingConfirmed)
         }
@@ -200,6 +271,13 @@ final class AgentService: ObservableObject {
         }
     }
 
+    /// `assistant` 確定イベントが、直前に `content_block_delta` で組み立てた本文と重複することがあるため、同一なら追加しない。
+    private func isDuplicateAssistantBubble(comparedTo text: String) -> Bool {
+        guard let last = messages.last, last.role == .assistant else { return false }
+        return last.content.trimmingCharacters(in: .whitespacesAndNewlines)
+            == text.trimmingCharacters(in: .whitespacesAndNewlines)
+    }
+
     private func handleOutputLine(_ line: String) {
         guard let data = line.data(using: .utf8),
               let json = try? JSONSerialization.jsonObject(with: data) as? [String: Any],
@@ -216,8 +294,19 @@ final class AgentService: ObservableObject {
                     guard block["type"] as? String == "text" else { return nil }
                     return block["text"] as? String
                 }.joined()
-                if !text.isEmpty {
+                if !text.isEmpty, !isDuplicateAssistantBubble(comparedTo: text) {
                     messages.append(AgentMessage(role: .assistant, content: text))
+                }
+                // tool_use ブロックを抽出
+                for block in content where block["type"] as? String == "tool_use" {
+                    guard let toolName = block["name"] as? String,
+                          let toolUseId = block["id"] as? String else { continue }
+                    // 重複チェック
+                    if messages.contains(where: { $0.toolCallInfo?.toolUseId == toolUseId }) { continue }
+                    let toolInput = block["input"] as? [String: Any] ?? [:]
+                    let summary = Self.toolInputSummary(toolName: toolName, input: toolInput)
+                    let info = ToolCallInfo(toolName: toolName, toolUseId: toolUseId, toolInput: toolInput)
+                    messages.append(AgentMessage(role: .toolUse, content: summary, toolCallInfo: info))
                 }
             }
         case "content_block_delta":
@@ -230,10 +319,28 @@ final class AgentService: ObservableObject {
                     messages.append(AgentMessage(role: .assistant, content: text))
                 }
             }
-        case "result":
-            if let result = json["result"] as? String, !result.isEmpty {
-                messages.append(AgentMessage(role: .assistant, content: result))
+        case "user":
+            // tool_result ブロックをマッチする tool_use メッセージにマージ
+            if let message = json["message"] as? [String: Any],
+               let content = message["content"] as? [[String: Any]] {
+                for block in content where block["type"] as? String == "tool_result" {
+                    guard let toolUseId = block["tool_use_id"] as? String else { continue }
+                    let resultContent = (block["content"] as? String) ?? ""
+                    let isError = block["is_error"] as? Bool ?? false
+                    let resultInfo = ToolResultInfo(content: resultContent, isError: isError)
+                    if let idx = messages.lastIndex(where: {
+                        $0.role == .toolUse && $0.toolCallInfo?.toolUseId == toolUseId
+                    }) {
+                        messages[idx].toolCallInfo?.toolResult = resultInfo
+                    }
+                }
             }
+        case "system":
+            if let subtype = json["subtype"] as? String, subtype == "init" {
+                isProcessing = true
+            }
+        case "result":
+            isProcessing = false
         case "error":
             let errorMsg = (json["error"] as? [String: Any])?["message"] as? String
                 ?? json["error"] as? String
@@ -241,6 +348,35 @@ final class AgentService: ObservableObject {
             messages.append(AgentMessage(role: .error, content: errorMsg))
         default:
             break
+        }
+    }
+
+    // MARK: - Tool Input Summary
+
+    /// ツール名と入力パラメータから人間可読なサマリー文字列を返す。
+    static func toolInputSummary(toolName: String, input: [String: Any]) -> String {
+        switch toolName {
+        case "Bash":
+            return (input["command"] as? String) ?? toolName
+        case "Read", "Write", "Edit":
+            return (input["file_path"] as? String) ?? toolName
+        case "Grep", "Glob":
+            return (input["pattern"] as? String) ?? toolName
+        case "WebSearch":
+            return (input["query"] as? String) ?? toolName
+        case "WebFetch":
+            return (input["url"] as? String) ?? toolName
+        case "Agent":
+            return (input["subagent_type"] as? String) ?? toolName
+        case "Skill":
+            return (input["skill"] as? String) ?? toolName
+        default:
+            if toolsOmitInputSummary.contains(toolName) { return toolName }
+            if let data = try? JSONSerialization.data(withJSONObject: input, options: [.sortedKeys]),
+               let str = String(data: data, encoding: .utf8) {
+                return String(str.prefix(120))
+            }
+            return toolName
         }
     }
 }

@@ -3,7 +3,7 @@ import Foundation
 /// 要約生成の各ステップの進捗状態を管理する。
 @MainActor @Observable
 final class SummaryProgressState {
-    enum StepStatus: Sendable {
+    enum StepStatus {
         case pending
         case running
         case completed

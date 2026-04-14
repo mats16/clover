@@ -34,9 +34,18 @@
 "Transcript" = "文字起こし";
 "Agent" = "エージェント";
 
+/* Agent */
+"Project Mode" = "プロジェクトモード";
+"Transcript Mode" = "文字起こしモード";
+"Run Claude Code in the project directory." = "プロジェクトディレクトリで Claude Code を実行します。";
+"Continuously feed transcript to Claude Code." = "文字起こしを継続的に Claude Code に入力します。";
+"Start Agent" = "開始";
+"Stop Agent" = "停止";
+"Thinking…" = "考え中…";
+
 /* Settings (Agent) */
 "Enable Agent (Beta)" = "エージェントを有効にする（ベータ）";
-"Enable the Agent tab to interact with Claude during transcription. This is a beta feature." = "文字起こし中に Claude と対話できるエージェントタブを有効にします。これはベータ機能です。";
+"Enable the Agent sidebar to interact with Claude. This is a beta feature." = "Claude と対話できるエージェントサイドバーを有効にします。これはベータ機能です。";
 
 /* Audio Source Mode */
 "Mic" = "マイク";
