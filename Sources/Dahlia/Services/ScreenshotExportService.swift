@@ -11,7 +11,7 @@ enum ScreenshotExportService {
     /// - Returns: vault 相対パスの配列
     static func exportScreenshots(
         vaultURL: URL,
-        screenshots: [ScreenshotRecord]
+        screenshots: [MeetingScreenshotRecord]
     ) throws -> [String] {
         guard !screenshots.isEmpty else { return [] }
 

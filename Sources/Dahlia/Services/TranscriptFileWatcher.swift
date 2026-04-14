@@ -2,8 +2,7 @@ import CoreServices
 import Foundation
 import GRDB
 
-/// `_transcripts/` ディレクトリを FSEvents で監視し、
-/// ファイル削除時に `transcripts.filePath` を nil に更新する。
+/// `_transcripts/` ディレクトリを FSEvents で監視する。
 final class TranscriptFileWatcher: Sendable {
     let dbQueue: DatabaseQueue
     private let vaultURL: URL
@@ -17,8 +16,6 @@ final class TranscriptFileWatcher: Sendable {
 
     func startMonitoring() {
         stopMonitoring()
-
-        let vaultURL = self.vaultURL
 
         let transcriptsDir = TranscriptExportService.transcriptsDirectoryURL(in: vaultURL)
         try? FileManager.default.createDirectory(at: transcriptsDir, withIntermediateDirectories: true)
@@ -60,37 +57,8 @@ final class TranscriptFileWatcher: Sendable {
         stopMonitoring()
     }
 
-    /// DB 内の filePath が非 nil のレコードについてファイル存在を確認し、
-    /// 存在しないものは filePath を nil に更新する。
-    fileprivate func reconcileFilePaths() {
-        do {
-            // Read: ファイルパスと ID を取得（write ロック不要）
-            let records = try dbQueue.read { db in
-                try TranscriptionRecord
-                    .filter(Column("filePath") != nil)
-                    .fetchAll(db)
-            }
-
-            // ファイル存在チェック（DB ロック外）
-            let missingIds = records.compactMap { record -> UUID? in
-                guard let relativePath = record.filePath else { return nil }
-                let absoluteURL = vaultURL.appendingPathComponent(relativePath)
-                return FileManager.default.fileExists(atPath: absoluteURL.path) ? nil : record.id
-            }
-
-            // Write: 欠落分のみ更新
-            guard !missingIds.isEmpty else { return }
-            try dbQueue.write { db in
-                for id in missingIds {
-                    if var record = try TranscriptionRecord.fetchOne(db, key: id) {
-                        record.filePath = nil
-                        try record.update(db)
-                    }
-                }
-            }
-        } catch {
-            print("[TranscriptFileWatcher] reconciliation error: \(error)")
-        }
+    fileprivate func handleFileSystemEvent() {
+        // 将来の拡張用: ファイル変更イベントのハンドリング
     }
 }
 
@@ -109,7 +77,7 @@ private func transcriptFileWatcherCallback(
 
     for i in 0 ..< numEvents {
         if eventFlags[i] & UInt32(kFSEventStreamEventFlagItemRemoved) != 0 {
-            watcher.reconcileFilePaths()
+            watcher.handleFileSystemEvent()
             return
         }
     }

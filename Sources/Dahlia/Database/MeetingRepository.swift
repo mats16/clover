@@ -1,9 +1,9 @@
 import Foundation
 import GRDB
 
-/// 文字起こし・セグメント・プロジェクト・保管庫の DB クエリを集約するリポジトリ。
+/// ミーティング・セグメント・プロジェクト・保管庫の DB クエリを集約するリポジトリ。
 @MainActor
-final class TranscriptionRepository {
+final class MeetingRepository {
     private let dbQueue: DatabaseQueue
 
     nonisolated init(dbQueue: DatabaseQueue) {
@@ -33,7 +33,7 @@ final class TranscriptionRepository {
         }
     }
 
-    /// 保管庫を登録解除する（関連プロジェクト・文字起こしもカスケード削除）。
+    /// 保管庫を登録解除する（関連プロジェクト・ミーティングもカスケード削除）。
     func deleteVault(id: UUID) throws {
         try dbQueue.write { db in
             _ = try VaultRecord.deleteOne(db, key: id)
@@ -112,126 +112,116 @@ final class TranscriptionRepository {
         }
     }
 
-    // MARK: - Transcriptions
+    // MARK: - Meetings
 
-    func fetchTranscriptions(forProjectId projectId: UUID) throws -> [TranscriptionRecord] {
+    func fetchMeetings(forProjectId projectId: UUID) throws -> [MeetingRecord] {
         try dbQueue.read { db in
-            try TranscriptionRecord
+            try MeetingRecord
                 .filter(Column("projectId") == projectId)
                 .order(Column("startedAt").desc)
                 .fetchAll(db)
         }
     }
 
-    func fetchTranscription(id: UUID) throws -> TranscriptionRecord? {
+    func fetchMeeting(id: UUID) throws -> MeetingRecord? {
         try dbQueue.read { db in
-            try TranscriptionRecord.fetchOne(db, key: id)
+            try MeetingRecord.fetchOne(db, key: id)
         }
     }
 
-    func renameTranscription(id: UUID, newTitle: String) throws {
+    func renameMeeting(id: UUID, newName: String) throws {
         try dbQueue.write { db in
-            if var record = try TranscriptionRecord.fetchOne(db, key: id) {
-                record.title = newTitle
+            if var record = try MeetingRecord.fetchOne(db, key: id) {
+                record.name = newName
                 try record.update(db)
             }
         }
     }
 
-    func deleteTranscription(id: UUID) throws {
+    func deleteMeeting(id: UUID) throws {
         try dbQueue.write { db in
-            _ = try TranscriptionRecord.deleteOne(db, key: id)
+            _ = try MeetingRecord.deleteOne(db, key: id)
         }
     }
 
-    /// 複数の文字起こしを一括削除する。
-    func deleteTranscriptions(ids: Set<UUID>) throws {
+    /// 複数のミーティングを一括削除する。
+    func deleteMeetings(ids: Set<UUID>) throws {
         guard !ids.isEmpty else { return }
         try dbQueue.write { db in
-            _ = try TranscriptionRecord.filter(ids.contains(Column("id"))).deleteAll(db)
+            _ = try MeetingRecord.filter(ids.contains(Column("id"))).deleteAll(db)
         }
     }
 
-    func moveTranscription(id: UUID, toProjectId: UUID) throws {
+    func moveMeeting(id: UUID, toProjectId: UUID) throws {
         try dbQueue.write { db in
-            if var record = try TranscriptionRecord.fetchOne(db, key: id) {
+            if var record = try MeetingRecord.fetchOne(db, key: id) {
                 record.projectId = toProjectId
                 try record.update(db)
             }
         }
     }
 
-    /// 複数の文字起こしを一括移動する。
-    func moveTranscriptions(ids: Set<UUID>, toProjectId: UUID) throws {
+    /// 複数のミーティングを一括移動する。
+    func moveMeetings(ids: Set<UUID>, toProjectId: UUID) throws {
         guard !ids.isEmpty else { return }
         try dbQueue.write { db in
-            _ = try TranscriptionRecord
+            _ = try MeetingRecord
                 .filter(ids.contains(Column("id")))
                 .updateAll(db, Column("projectId").set(to: toProjectId))
         }
     }
 
-    func markSummaryCreated(id: UUID) throws {
-        try dbQueue.write { db in
-            if var record = try TranscriptionRecord.fetchOne(db, key: id) {
-                record.summaryCreated = true
-                try record.update(db)
-            }
-        }
-    }
-
-    func updateTranscriptFilePath(id: UUID, path: String) throws {
-        try dbQueue.write { db in
-            if var record = try TranscriptionRecord.fetchOne(db, key: id) {
-                record.filePath = path
-                try record.update(db)
-            }
-        }
-    }
-
     // MARK: - Segments
 
-    func fetchSegments(forTranscriptionId transcriptionId: UUID) throws -> [SegmentRecord] {
+    func fetchSegments(forMeetingId meetingId: UUID) throws -> [TranscriptSegmentRecord] {
         try dbQueue.read { db in
-            try SegmentRecord
-                .filter(Column("transcriptionId") == transcriptionId)
+            try TranscriptSegmentRecord
+                .filter(Column("meetingId") == meetingId)
                 .order(Column("startTime").asc)
                 .fetchAll(db)
         }
     }
 
+    func fetchSegmentIds(forMeetingId meetingId: UUID) throws -> Set<UUID> {
+        try dbQueue.read { db in
+            let ids = try TranscriptSegmentRecord
+                .select(Column("id"))
+                .filter(Column("meetingId") == meetingId)
+                .asRequest(of: UUID.self)
+                .fetchAll(db)
+            return Set(ids)
+        }
+    }
+
     // MARK: - Notes
 
-    /// 指定文字起こしに紐づくノートを取得する（1 transcript = 1 note 運用）。
-    func fetchNote(forTranscriptionId transcriptionId: UUID) throws -> NoteRecord? {
+    /// 指定ミーティングに紐づくノートを取得する（1 meeting = 1 note）。
+    func fetchNote(forMeetingId meetingId: UUID) throws -> MeetingNoteRecord? {
         try dbQueue.read { db in
-            try NoteRecord
-                .filter(Column("transcriptionId") == transcriptionId)
-                .order(Column("createdAt").asc)
-                .fetchOne(db)
+            try MeetingNoteRecord.fetchOne(db, key: meetingId)
         }
     }
 
     /// ノートを保存する（insert or update）。
-    nonisolated func upsertNote(_ note: NoteRecord) throws {
+    nonisolated func upsertNote(_ note: MeetingNoteRecord) throws {
         try dbQueue.write { db in
             try note.save(db)
         }
     }
 
     /// ノートを削除する。
-    func deleteNote(id: UUID) throws {
+    func deleteNote(meetingId: UUID) throws {
         try dbQueue.write { db in
-            _ = try NoteRecord.deleteOne(db, key: id)
+            _ = try MeetingNoteRecord.deleteOne(db, key: meetingId)
         }
     }
 
     // MARK: - Screenshots
 
-    func fetchScreenshots(forTranscriptionId transcriptionId: UUID) throws -> [ScreenshotRecord] {
+    func fetchScreenshots(forMeetingId meetingId: UUID) throws -> [MeetingScreenshotRecord] {
         try dbQueue.read { db in
-            try ScreenshotRecord
-                .filter(Column("transcriptionId") == transcriptionId)
+            try MeetingScreenshotRecord
+                .filter(Column("meetingId") == meetingId)
                 .order(Column("capturedAt").asc)
                 .fetchAll(db)
         }
@@ -239,45 +229,54 @@ final class TranscriptionRepository {
 
     func deleteScreenshot(id: UUID) throws {
         try dbQueue.write { db in
-            _ = try ScreenshotRecord.deleteOne(db, key: id)
+            _ = try MeetingScreenshotRecord.deleteOne(db, key: id)
         }
     }
 
-    /// 文字起こし詳細をまとめて取得する（単一トランザクション）。
-    struct TranscriptionDetail {
-        let transcription: TranscriptionRecord?
-        let segments: [SegmentRecord]
-        let screenshots: [ScreenshotRecord]
-        let note: NoteRecord?
+    // MARK: - Summaries
+
+    func fetchSummary(forMeetingId meetingId: UUID) throws -> MeetingSummaryRecord? {
+        try dbQueue.read { db in
+            try MeetingSummaryRecord
+                .filter(Column("meetingId") == meetingId)
+                .fetchOne(db)
+        }
     }
 
-    nonisolated func fetchTranscriptionDetail(id transcriptionId: UUID) throws -> TranscriptionDetail {
+    /// サマリーを保存する（insert or update）。
+    nonisolated func upsertSummary(_ summary: MeetingSummaryRecord) throws {
+        try dbQueue.write { db in
+            try summary.save(db)
+        }
+    }
+
+    // MARK: - Composite
+
+    /// ミーティング詳細をまとめて取得する（単一トランザクション）。
+    struct MeetingDetail {
+        let meeting: MeetingRecord?
+        let segments: [TranscriptSegmentRecord]
+        let screenshots: [MeetingScreenshotRecord]
+        let note: MeetingNoteRecord?
+        let summary: MeetingSummaryRecord?
+    }
+
+    nonisolated func fetchMeetingDetail(id meetingId: UUID) throws -> MeetingDetail {
         try dbQueue.read { db in
-            let transcription = try TranscriptionRecord.fetchOne(db, key: transcriptionId)
-            let segments = try SegmentRecord
-                .filter(Column("transcriptionId") == transcriptionId)
+            let meeting = try MeetingRecord.fetchOne(db, key: meetingId)
+            let segments = try TranscriptSegmentRecord
+                .filter(Column("meetingId") == meetingId)
                 .order(Column("startTime").asc)
                 .fetchAll(db)
-            let screenshots = try ScreenshotRecord
-                .filter(Column("transcriptionId") == transcriptionId)
+            let screenshots = try MeetingScreenshotRecord
+                .filter(Column("meetingId") == meetingId)
                 .order(Column("capturedAt").asc)
                 .fetchAll(db)
-            let note = try NoteRecord
-                .filter(Column("transcriptionId") == transcriptionId)
-                .order(Column("createdAt").asc)
+            let note = try MeetingNoteRecord.fetchOne(db, key: meetingId)
+            let summary = try MeetingSummaryRecord
+                .filter(Column("meetingId") == meetingId)
                 .fetchOne(db)
-            return TranscriptionDetail(transcription: transcription, segments: segments, screenshots: screenshots, note: note)
-        }
-    }
-
-    func fetchSegmentIds(forTranscriptionId transcriptionId: UUID) throws -> Set<UUID> {
-        try dbQueue.read { db in
-            let ids = try SegmentRecord
-                .select(Column("id"))
-                .filter(Column("transcriptionId") == transcriptionId)
-                .asRequest(of: UUID.self)
-                .fetchAll(db)
-            return Set(ids)
+            return MeetingDetail(meeting: meeting, segments: segments, screenshots: screenshots, note: note, summary: summary)
         }
     }
 }

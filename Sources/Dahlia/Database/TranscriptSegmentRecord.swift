@@ -2,11 +2,11 @@ import Foundation
 import GRDB
 
 /// 文字起こしセグメントを表す GRDB レコード。
-struct SegmentRecord: Codable, FetchableRecord, PersistableRecord {
-    static let databaseTableName = "segments"
+struct TranscriptSegmentRecord: Codable, FetchableRecord, PersistableRecord {
+    static let databaseTableName = "transcript_segments"
 
     var id: UUID
-    var transcriptionId: UUID
+    var meetingId: UUID
     var startTime: Date
     var endTime: Date?
     var text: String
@@ -14,11 +14,11 @@ struct SegmentRecord: Codable, FetchableRecord, PersistableRecord {
     var speakerLabel: String?
 }
 
-extension SegmentRecord {
-    /// TranscriptSegment から SegmentRecord を生成する。
-    init(from segment: TranscriptSegment, transcriptionId: UUID) {
+extension TranscriptSegmentRecord {
+    /// TranscriptSegment から TranscriptSegmentRecord を生成する。
+    init(from segment: TranscriptSegment, meetingId: UUID) {
         self.id = segment.id
-        self.transcriptionId = transcriptionId
+        self.meetingId = meetingId
         self.startTime = segment.startTime
         self.endTime = segment.endTime
         self.text = segment.text

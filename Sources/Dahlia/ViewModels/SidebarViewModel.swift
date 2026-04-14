@@ -12,18 +12,18 @@ final class SidebarViewModel {
 
     var flatProjects: [FlatProjectRow] = []
     var selectedProject: ProjectRecord?
-    var selectedTranscriptionId: UUID?
+    var selectedMeetingId: UUID?
     /// 複数選択中の文字起こし ID。
-    var selectedTranscriptionIds: Set<UUID> = []
+    var selectedMeetingIds: Set<UUID> = []
     /// 展開中のプロジェクトごとの文字起こし一覧（プロジェクトID → レコード配列）。
-    var transcriptionsForProject: [UUID: [TranscriptionRecord]] = [:]
+    var meetingsForProject: [UUID: [MeetingRecord]] = [:]
     var lastError: String?
     var allVaults: [VaultRecord] = []
 
     /// 後方互換: 選択中プロジェクトの文字起こし一覧。
-    var transcriptionsForSelectedProject: [TranscriptionRecord] {
+    var meetingsForSelectedProject: [MeetingRecord] {
         guard let project = selectedProject else { return [] }
-        return transcriptionsForProject[project.id] ?? []
+        return meetingsForProject[project.id] ?? []
     }
 
     // MARK: - Collapse State
@@ -64,7 +64,7 @@ final class SidebarViewModel {
         if updated != collapsedProjectNames {
             collapsedProjectNames = updated
         }
-        refreshTranscriptionObservations()
+        refreshMeetingObservations()
     }
 
     /// 折りたたまれた祖先を持つ行を除外した、表示用プロジェクト一覧。
@@ -75,24 +75,14 @@ final class SidebarViewModel {
         }
     }
 
-    /// フォルダの折りたたみ状態をトグルする。
+    /// フォルダの折りたたみ状態をトグルする（サブフォルダの階層表示用）。
     func toggleCollapse(name: String) {
         if collapsedProjectNames.contains(name) {
-            // 展開
             collapsedProjectNames.remove(name)
             expandedProjectNames.insert(name)
-            if let row = flatProjects.first(where: { $0.name == name }) {
-                startTranscriptionObservation(projectId: row.id)
-            }
         } else {
-            // 折りたたみ
             collapsedProjectNames.insert(name)
             expandedProjectNames.remove(name)
-            // 選択中プロジェクトの監視は維持
-            if let row = flatProjects.first(where: { $0.name == name }),
-               selectedProject?.id != row.id {
-                stopTranscriptionObservation(projectId: row.id)
-            }
         }
         saveExpandedNames()
     }
@@ -121,23 +111,23 @@ final class SidebarViewModel {
     }
 
     @ObservationIgnored private let folderService = FolderProjectService()
-    @ObservationIgnored private var transcriptionRepository: TranscriptionRepository?
+    @ObservationIgnored private var meetingRepository: MeetingRepository?
     @ObservationIgnored private var fileWatcher: TranscriptFileWatcher?
-    @ObservationIgnored private var transcriptionObservations: [UUID: AnyDatabaseCancellable] = [:]
+    @ObservationIgnored private var meetingObservations: [UUID: AnyDatabaseCancellable] = [:]
     @ObservationIgnored private var projectObservation: AnyDatabaseCancellable?
     @ObservationIgnored private var vaultObservation: AnyDatabaseCancellable?
     @ObservationIgnored private var vaultSyncService: VaultSyncService?
 
     /// 保管庫の最終オープン日時を更新する。
     func updateVaultLastOpened(_ id: UUID) {
-        try? transcriptionRepository?.updateVaultLastOpened(id: id)
+        try? meetingRepository?.updateVaultLastOpened(id: id)
     }
 
     /// アプリ起動時に AppDatabaseManager と保管庫を設定する。
     /// 呼び出し前に AppSettings.shared.currentVault を設定しておくこと。
     func setAppDatabase(_ database: AppDatabaseManager?) {
         appDatabase = database
-        transcriptionRepository = database.map { TranscriptionRepository(dbQueue: $0.dbQueue) }
+        meetingRepository = database.map { MeetingRepository(dbQueue: $0.dbQueue) }
 
         // 既存の監視を停止
         vaultSyncService?.stopMonitoring()
@@ -145,17 +135,17 @@ final class SidebarViewModel {
         vaultObservation?.cancel()
         fileWatcher?.stopMonitoring()
 
-        // 全 transcription 監視を停止
-        for (_, cancellable) in transcriptionObservations {
+        // 全 meeting 監視を停止
+        for (_, cancellable) in meetingObservations {
             cancellable.cancel()
         }
-        transcriptionObservations.removeAll()
-        transcriptionsForProject.removeAll()
+        meetingObservations.removeAll()
+        meetingsForProject.removeAll()
 
         // 選択状態をリセット
         selectedProject = nil
-        selectedTranscriptionId = nil
-        selectedTranscriptionIds.removeAll()
+        selectedMeetingId = nil
+        selectedMeetingIds.removeAll()
 
         // vaults テーブルの ValueObservation で保管庫一覧を自動更新
         if let dbQueue = database?.dbQueue {
@@ -224,100 +214,79 @@ final class SidebarViewModel {
 
     func selectProject(id: UUID, name: String) {
         guard let vault = currentVault else { return }
-        // 折りたたまれていたら展開する
-        if collapsedProjectNames.contains(name) {
-            collapsedProjectNames.remove(name)
-            expandedProjectNames.insert(name)
-            saveExpandedNames()
-            startTranscriptionObservation(projectId: id)
-        }
         if selectedProject?.id == id {
-            selectedTranscriptionId = nil
-            selectedTranscriptionIds.removeAll()
+            selectedMeetingId = nil
+            selectedMeetingIds.removeAll()
             return
         }
-        // 旧選択プロジェクトが折りたたまれていれば監視を停止
-        if let oldProject = selectedProject,
-           collapsedProjectNames.contains(oldProject.name) {
-            stopTranscriptionObservation(projectId: oldProject.id)
+        // 旧プロジェクトの監視を停止
+        if let oldProject = selectedProject {
+            stopMeetingObservation(projectId: oldProject.id)
         }
         selectedProject = ProjectRecord(id: id, vaultId: vault.id, name: name, createdAt: .distantPast)
-        selectedTranscriptionId = nil
-        selectedTranscriptionIds.removeAll()
-        startTranscriptionObservation(projectId: id)
+        selectedMeetingId = nil
+        selectedMeetingIds.removeAll()
+        startMeetingObservation(projectId: id)
     }
 
-    /// transcript クリック時にプロジェクトを選択状態にする（selectedTranscriptionId を触らない）。
+    /// transcript クリック時にプロジェクトを選択状態にする（selectedMeetingId を触らない）。
     func ensureProjectSelected(id: UUID, name: String) {
         guard let vault = currentVault else { return }
-        if collapsedProjectNames.contains(name) {
-            collapsedProjectNames.remove(name)
-            expandedProjectNames.insert(name)
-            saveExpandedNames()
-            startTranscriptionObservation(projectId: id)
-        }
         guard selectedProject?.id != id else { return }
-        if let oldProject = selectedProject,
-           collapsedProjectNames.contains(oldProject.name) {
-            stopTranscriptionObservation(projectId: oldProject.id)
+        if let oldProject = selectedProject {
+            stopMeetingObservation(projectId: oldProject.id)
         }
         selectedProject = ProjectRecord(id: id, vaultId: vault.id, name: name, createdAt: .distantPast)
-        startTranscriptionObservation(projectId: id)
+        startMeetingObservation(projectId: id)
     }
 
-    func selectTranscription(_ id: UUID) {
-        selectedTranscriptionId = id
+    func selectMeeting(_ id: UUID) {
+        selectedMeetingId = id
     }
 
-    // MARK: - Transcription Observation
+    // MARK: - Meeting Observation
 
-    /// 指定プロジェクトの文字起こし監視を開始する。
-    func startTranscriptionObservation(projectId: UUID) {
-        guard let dbQueue, transcriptionObservations[projectId] == nil else { return }
+    /// 指定プロジェクトのミーティング監視を開始する。
+    func startMeetingObservation(projectId: UUID) {
+        guard let dbQueue, meetingObservations[projectId] == nil else { return }
 
         let observation = ValueObservation.tracking { db in
-            try TranscriptionRecord
+            try MeetingRecord
                 .filter(Column("projectId") == projectId)
                 .order(Column("startedAt").desc)
                 .fetchAll(db)
         }
 
-        transcriptionObservations[projectId] = observation.start(
+        meetingObservations[projectId] = observation.start(
             in: dbQueue,
             onError: { _ in },
-            onChange: { [weak self] transcriptions in
+            onChange: { [weak self] meetings in
                 Task { @MainActor in
                     guard let self else { return }
-                    self.transcriptionsForProject[projectId] = transcriptions
+                    self.meetingsForProject[projectId] = meetings
                 }
             }
         )
     }
 
-    /// 指定プロジェクトの文字起こし監視を停止する。
-    func stopTranscriptionObservation(projectId: UUID) {
-        transcriptionObservations[projectId]?.cancel()
-        transcriptionObservations.removeValue(forKey: projectId)
-        transcriptionsForProject.removeValue(forKey: projectId)
+    /// 指定プロジェクトのミーティング監視を停止する。
+    func stopMeetingObservation(projectId: UUID) {
+        meetingObservations[projectId]?.cancel()
+        meetingObservations.removeValue(forKey: projectId)
+        meetingsForProject.removeValue(forKey: projectId)
     }
 
-    /// 展開状態と選択状態に基づいて文字起こし監視を同期する。
-    private func refreshTranscriptionObservations() {
-        let expandedIds = Set(
-            flatProjects
-                .filter { !collapsedProjectNames.contains($0.name) }
-                .map(\.id)
-        )
-        let selectedId = selectedProject?.id
-        let requiredIds = expandedIds.union(selectedId.map { [$0] } ?? [])
+    /// 選択プロジェクトに基づいてミーティング監視を同期する。
+    private func refreshMeetingObservations() {
+        let requiredIds: Set<UUID> = selectedProject.map { [$0.id] } ?? []
 
         // 不要な監視を停止
-        for id in transcriptionObservations.keys where !requiredIds.contains(id) {
-            stopTranscriptionObservation(projectId: id)
+        for id in meetingObservations.keys where !requiredIds.contains(id) {
+            stopMeetingObservation(projectId: id)
         }
         // 必要な監視を開始
         for id in requiredIds {
-            startTranscriptionObservation(projectId: id)
+            startMeetingObservation(projectId: id)
         }
     }
 
@@ -332,7 +301,7 @@ final class SidebarViewModel {
             return
         }
 
-        guard let repo = transcriptionRepository else { return }
+        guard let repo = meetingRepository else { return }
         // 中間パスの親プロジェクトを先に作成し、対象プロジェクトを fetchOrCreate で取得
         let intermediates = ProjectRecord.allIntermediatePaths(for: name).dropLast()
         if !intermediates.isEmpty {
@@ -352,7 +321,7 @@ final class SidebarViewModel {
         if isActive {
             selectedProject = nil
         }
-        stopTranscriptionObservation(projectId: id)
+        stopMeetingObservation(projectId: id)
 
         do {
             try FileManager.default.createDirectory(
@@ -365,9 +334,9 @@ final class SidebarViewModel {
             return
         }
 
-        try? transcriptionRepository?.renameProjectsByPrefix(oldPrefix: name, newPrefix: newName, vaultId: vault.id)
+        try? meetingRepository?.renameProjectsByPrefix(oldPrefix: name, newPrefix: newName, vaultId: vault.id)
 
-        if isActive, let updated = try? transcriptionRepository?.fetchOrCreateProject(name: newName, vaultId: vault.id) {
+        if isActive, let updated = try? meetingRepository?.fetchOrCreateProject(name: newName, vaultId: vault.id) {
             selectProject(id: updated.id, name: updated.name)
         }
     }
@@ -386,10 +355,10 @@ final class SidebarViewModel {
         if let selected = selectedProject,
            selected.id == id || selected.name.hasPrefix(name + "/") {
             selectedProject = nil
-            selectedTranscriptionId = nil
+            selectedMeetingId = nil
         }
-        // 削除対象プロジェクトの transcription 監視を停止
-        stopTranscriptionObservation(projectId: id)
+        // 削除対象プロジェクトの meeting 監視を停止
+        stopMeetingObservation(projectId: id)
 
         // FS 削除を先に実行 — フォルダが既に存在しない場合はスキップ
         if FileManager.default.fileExists(atPath: projectURL.path) {
@@ -403,7 +372,7 @@ final class SidebarViewModel {
 
         // FS 成功後に DB 削除（サブツリー対応）
         do {
-            try transcriptionRepository?.deleteProjectsByPrefix(name: name, vaultId: vault.id)
+            try meetingRepository?.deleteProjectsByPrefix(name: name, vaultId: vault.id)
         } catch {
             lastError = "データベースの更新に失敗しました: \(error.localizedDescription)"
             ErrorReportingService.capture(error, context: ["source": "deleteProject"])
@@ -416,114 +385,114 @@ final class SidebarViewModel {
         let url = projectURL(for: name)
         do {
             try FileManager.default.createDirectory(at: url, withIntermediateDirectories: true)
-            try transcriptionRepository?.clearProjectsMissing(prefix: name, vaultId: vault.id)
+            try meetingRepository?.clearProjectsMissing(prefix: name, vaultId: vault.id)
         } catch {
             lastError = "フォルダの再作成に失敗しました: \(error.localizedDescription)"
         }
     }
 
-    // MARK: - Transcription Management
+    // MARK: - Meeting Management
 
-    func renameTranscription(id: UUID, newTitle: String) {
-        try? transcriptionRepository?.renameTranscription(id: id, newTitle: newTitle)
+    func renameMeeting(id: UUID, newName: String) {
+        try? meetingRepository?.renameMeeting(id: id, newName: newName)
     }
 
-    func deleteTranscription(id: UUID) {
-        try? transcriptionRepository?.deleteTranscription(id: id)
-        selectedTranscriptionIds.remove(id)
-        if selectedTranscriptionId == id {
-            selectedTranscriptionId = nil
+    func deleteMeeting(id: UUID) {
+        try? meetingRepository?.deleteMeeting(id: id)
+        selectedMeetingIds.remove(id)
+        if selectedMeetingId == id {
+            selectedMeetingId = nil
         }
     }
 
     /// 複数の文字起こしを一括削除する。
-    func deleteTranscriptions(ids: Set<UUID>) {
+    func deleteMeetings(ids: Set<UUID>) {
         guard !ids.isEmpty else { return }
         do {
-            try transcriptionRepository?.deleteTranscriptions(ids: ids)
+            try meetingRepository?.deleteMeetings(ids: ids)
         } catch {
             lastError = error.localizedDescription
             return
         }
-        if let selected = selectedTranscriptionId, ids.contains(selected) {
-            selectedTranscriptionId = nil
+        if let selected = selectedMeetingId, ids.contains(selected) {
+            selectedMeetingId = nil
         }
-        selectedTranscriptionIds.subtract(ids)
+        selectedMeetingIds.subtract(ids)
     }
 
-    func moveTranscription(id: UUID, toProjectId: UUID) {
-        guard let repo = transcriptionRepository else { return }
+    func moveMeeting(id: UUID, toProjectId: UUID) {
+        guard let repo = meetingRepository else { return }
         do {
-            try repo.moveTranscription(id: id, toProjectId: toProjectId)
+            try repo.moveMeeting(id: id, toProjectId: toProjectId)
         } catch {
             lastError = error.localizedDescription
         }
     }
 
     /// 複数の文字起こしを一括移動する。
-    func moveTranscriptions(ids: Set<UUID>, toProjectId: UUID) {
-        guard let repo = transcriptionRepository, !ids.isEmpty else { return }
+    func moveMeetings(ids: Set<UUID>, toProjectId: UUID) {
+        guard let repo = meetingRepository, !ids.isEmpty else { return }
         do {
-            try repo.moveTranscriptions(ids: ids, toProjectId: toProjectId)
+            try repo.moveMeetings(ids: ids, toProjectId: toProjectId)
         } catch {
             lastError = error.localizedDescription
             return
         }
-        selectedTranscriptionIds.removeAll()
+        selectedMeetingIds.removeAll()
     }
 
     // MARK: - Multi-Selection Helpers
 
     /// Cmd+Click: トグル選択。
-    func toggleTranscriptionSelection(_ id: UUID, projectId: UUID, projectName: String) {
+    func toggleMeetingSelection(_ id: UUID, projectId: UUID, projectName: String) {
         ensureProjectSelected(id: projectId, name: projectName)
-        if selectedTranscriptionIds.contains(id) {
-            selectedTranscriptionIds.remove(id)
-            // 最後の選択解除なら selectedTranscriptionId もクリア
-            if selectedTranscriptionIds.isEmpty {
-                selectedTranscriptionId = nil
+        if selectedMeetingIds.contains(id) {
+            selectedMeetingIds.remove(id)
+            // 最後の選択解除なら selectedMeetingId もクリア
+            if selectedMeetingIds.isEmpty {
+                selectedMeetingId = nil
             } else {
-                selectedTranscriptionId = selectedTranscriptionIds.first
+                selectedMeetingId = selectedMeetingIds.first
             }
         } else {
-            selectedTranscriptionIds.insert(id)
+            selectedMeetingIds.insert(id)
             // 最初の追加なら既存の単一選択も含める
-            if let existing = selectedTranscriptionId, existing != id {
-                selectedTranscriptionIds.insert(existing)
+            if let existing = selectedMeetingId, existing != id {
+                selectedMeetingIds.insert(existing)
             }
-            selectedTranscriptionId = id
+            selectedMeetingId = id
         }
     }
 
     /// Shift+Click: 範囲選択。
-    func rangeSelectTranscription(_ id: UUID, projectId: UUID, projectName: String) {
+    func rangeSelectMeeting(_ id: UUID, projectId: UUID, projectName: String) {
         ensureProjectSelected(id: projectId, name: projectName)
-        let transcriptions = transcriptionsForProject[projectId] ?? []
-        guard let anchor = selectedTranscriptionId,
-              let anchorIndex = transcriptions.firstIndex(where: { $0.id == anchor }),
-              let targetIndex = transcriptions.firstIndex(where: { $0.id == id }) else {
+        let meetings = meetingsForProject[projectId] ?? []
+        guard let anchor = selectedMeetingId,
+              let anchorIndex = meetings.firstIndex(where: { $0.id == anchor }),
+              let targetIndex = meetings.firstIndex(where: { $0.id == id }) else {
             // anchor がない場合は単一選択にフォールバック
-            selectedTranscriptionIds = [id]
-            selectedTranscriptionId = id
+            selectedMeetingIds = [id]
+            selectedMeetingId = id
             return
         }
         let range = min(anchorIndex, targetIndex) ... max(anchorIndex, targetIndex)
-        selectedTranscriptionIds = Set(transcriptions[range].map(\.id))
-        selectedTranscriptionId = id
+        selectedMeetingIds = Set(meetings[range].map(\.id))
+        selectedMeetingId = id
     }
 
     /// 通常クリック: 単一選択（複数選択をクリア）。
-    func singleSelectTranscription(_ id: UUID, projectId: UUID, projectName: String) {
+    func singleSelectMeeting(_ id: UUID, projectId: UUID, projectName: String) {
         ensureProjectSelected(id: projectId, name: projectName)
-        selectedTranscriptionIds = [id]
-        selectedTranscriptionId = id
+        selectedMeetingIds = [id]
+        selectedMeetingId = id
     }
 
     /// 選択中の文字起こし ID を返す（単一選択時も含む）。
     var effectiveSelectedIds: Set<UUID> {
-        if selectedTranscriptionIds.isEmpty, let single = selectedTranscriptionId {
+        if selectedMeetingIds.isEmpty, let single = selectedMeetingId {
             return [single]
         }
-        return selectedTranscriptionIds
+        return selectedMeetingIds
     }
 }

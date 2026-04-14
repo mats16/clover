@@ -12,12 +12,12 @@ enum TranscriptExportService {
         return f
     }()
 
-    /// 文字起こしを `<vault>/_transcripts/{transcriptionId}.md` に書き出す。
+    /// 文字起こしを `<vault>/_transcripts/{meetingId}.md` に書き出す。
     /// ファイルが既に存在する場合は上書きする。
     /// - Returns: vault 相対パス（例: `_transcripts/XXXXXXXX-....md`）
     static func exportTranscript(
         vaultURL: URL,
-        transcriptionId: UUID,
+        meetingId: UUID,
         projectName: String,
         startedAt: Date,
         segments: [TranscriptSegment]
@@ -41,7 +41,7 @@ enum TranscriptExportService {
 
         let markdown: String = frontmatter + "\n" + body + "\n"
 
-        let relativePath = "_transcripts/\(transcriptionId.uuidString).md"
+        let relativePath = "_transcripts/\(meetingId.uuidString).md"
         let fileURL = vaultURL.appendingPathComponent(relativePath)
         try Data(markdown.utf8).write(to: fileURL, options: .atomic)
 

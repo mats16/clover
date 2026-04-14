@@ -2,48 +2,46 @@ import Combine
 import Foundation
 import GRDB
 
-/// 文字起こし結果を GRDB/SQLite にリアルタイム保存するサービス。
+/// ミーティングの文字起こし結果を GRDB/SQLite にリアルタイム保存するサービス。
 /// 確定済みセグメントを差分で INSERT する。
 @MainActor
-final class TranscriptPersistenceService {
+final class MeetingPersistenceService {
     private let store: TranscriptStore
     private let dbQueue: DatabaseQueue
-    let transcriptionId: UUID
+    let meetingId: UUID
     private var cancellable: AnyCancellable?
     private var persistedSegmentIds: Set<UUID> = []
 
-    /// 新規文字起こしを作成して録音を開始する。
+    /// 新規ミーティングを作成して録音を開始する。
     init(store: TranscriptStore, dbQueue: DatabaseQueue, projectId: UUID) {
         self.store = store
         self.dbQueue = dbQueue
-        self.transcriptionId = .v7()
+        self.meetingId = .v7()
 
-        let transcription = TranscriptionRecord(
-            id: transcriptionId,
+        let meeting = MeetingRecord(
+            id: meetingId,
             projectId: projectId,
-            title: "",
+            name: "",
             startedAt: store.recordingStartTime ?? Date(),
-            endedAt: nil,
-            summaryCreated: false,
-            filePath: nil
+            endedAt: nil
         )
         try? dbQueue.write { db in
-            try transcription.insert(db)
+            try meeting.insert(db)
         }
 
         startObserving()
     }
 
-    /// 既存の文字起こしに追記する（追記モード）。
-    init(store: TranscriptStore, dbQueue: DatabaseQueue, projectId _: UUID, existingTranscriptionId: UUID, existingSegmentIds: Set<UUID>) {
+    /// 既存のミーティングに追記する（追記モード）。
+    init(store: TranscriptStore, dbQueue: DatabaseQueue, projectId _: UUID, existingMeetingId: UUID, existingSegmentIds: Set<UUID>) {
         self.store = store
         self.dbQueue = dbQueue
-        self.transcriptionId = existingTranscriptionId
+        self.meetingId = existingMeetingId
         self.persistedSegmentIds = existingSegmentIds
 
-        // 文字起こしを再開（endedAt をクリア）
+        // ミーティングを再開（endedAt をクリア）
         try? dbQueue.write { db in
-            if var record = try TranscriptionRecord.fetchOne(db, key: existingTranscriptionId) {
+            if var record = try MeetingRecord.fetchOne(db, key: existingMeetingId) {
                 record.endedAt = nil
                 try record.update(db)
             }
@@ -66,7 +64,7 @@ final class TranscriptPersistenceService {
         }
         guard !newConfirmed.isEmpty else { return }
 
-        let records = newConfirmed.map { SegmentRecord(from: $0, transcriptionId: transcriptionId) }
+        let records = newConfirmed.map { TranscriptSegmentRecord(from: $0, meetingId: meetingId) }
         let newIds = Set(newConfirmed.map(\.id))
         persistedSegmentIds.formUnion(newIds)
 
@@ -80,13 +78,13 @@ final class TranscriptPersistenceService {
         }
     }
 
-    /// 監視を停止し、最終保存と文字起こし終了時刻の記録を行う。
+    /// 監視を停止し、最終保存とミーティング終了時刻の記録を行う。
     func stop() {
         cancellable = nil
         persistNewConfirmedSegments(store.segments)
 
         try? dbQueue.write { db in
-            if var record = try TranscriptionRecord.fetchOne(db, key: transcriptionId) {
+            if var record = try MeetingRecord.fetchOne(db, key: meetingId) {
                 record.endedAt = Date()
                 try record.update(db)
             }

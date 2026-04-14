@@ -29,7 +29,7 @@ enum DetailTab: String, CaseIterable, Identifiable {
     }
 }
 
-/// Notion 風タブバー。選択中はピル型 Liquid Glass 背景がスライドする。
+/// Circleback 風タブバー。選択中はアンダーラインでアクティブを示す。
 private struct DetailTabBar: View {
     @Binding var selection: DetailTab
     @ObservedObject var viewModel: CaptionViewModel
@@ -39,28 +39,31 @@ private struct DetailTabBar: View {
     /// フォルダ選択時（transcription 未選択）は全タブを無効化する。
     /// 録音中は録音対象が存在するためタブを無効化しない。
     private var isFolderOnly: Bool {
-        viewModel.currentTranscriptionId == nil && !viewModel.isListening
+        viewModel.currentMeetingId == nil && !viewModel.isListening
     }
 
     var body: some View {
-        HStack(spacing: 2) {
-            ForEach(DetailTab.allCases) { tab in
-                DetailTabButton(
-                    tab: tab,
-                    isSelected: !isFolderOnly && selection == tab,
-                    namespace: tabNamespace,
-                    action: {
-                        withAnimation(.easeInOut(duration: 0.25)) {
-                            selection = tab
+        VStack(spacing: 0) {
+            HStack(spacing: 0) {
+                ForEach(DetailTab.allCases) { tab in
+                    DetailTabButton(
+                        tab: tab,
+                        isSelected: !isFolderOnly && selection == tab,
+                        namespace: tabNamespace,
+                        action: {
+                            withAnimation(.easeInOut(duration: 0.25)) {
+                                selection = tab
+                            }
                         }
-                    }
-                )
-                .disabled(isFolderOnly)
+                    )
+                    .disabled(isFolderOnly)
+                }
+                Spacer()
+                SessionSettingsMenu(viewModel: viewModel)
+                TranscribeButton(viewModel: viewModel, sidebarViewModel: sidebarViewModel)
+                ScreenshotButton(viewModel: viewModel)
             }
-            Spacer()
-            SessionSettingsMenu(viewModel: viewModel)
-            TranscribeButton(viewModel: viewModel, sidebarViewModel: sidebarViewModel)
-            ScreenshotButton(viewModel: viewModel)
+            Divider()
         }
     }
 }
@@ -235,17 +238,17 @@ private struct TranscribeButton: View {
 
     var body: some View {
         Button(action: toggle) {
-            HStack(spacing: 4) {
+            HStack(spacing: 5) {
                 Image(systemName: iconName)
-                    .font(.system(size: 10))
+                    .font(.system(size: 10, weight: .bold))
                 Text(label)
-                    .font(.system(size: 12, weight: .medium))
+                    .font(.system(size: 12, weight: .semibold))
             }
-            .padding(.horizontal, 10)
-            .padding(.vertical, 5)
+            .padding(.horizontal, 14)
+            .padding(.vertical, 6)
             .foregroundStyle(.white)
             .background(
-                RoundedRectangle(cornerRadius: 14)
+                Capsule()
                     .fill(viewModel.isListening ? Color.red : Color.accentColor)
             )
         }
@@ -261,7 +264,7 @@ private struct TranscribeButton: View {
                   let projectURL = sidebarViewModel.selectedProjectURL,
                   let project = sidebarViewModel.selectedProject,
                   let vaultURL = sidebarViewModel.currentVault?.url,
-                  let transcriptionId = viewModel.currentTranscriptionId else { return }
+                  let meetingId = viewModel.currentMeetingId else { return }
             Task {
                 await viewModel.startListening(
                     dbQueue: dbQueue,
@@ -269,7 +272,7 @@ private struct TranscribeButton: View {
                     projectId: project.id,
                     projectName: project.name,
                     vaultURL: vaultURL,
-                    appendingTo: transcriptionId
+                    appendingTo: meetingId
                 )
             }
         } else {
@@ -328,9 +331,9 @@ private struct ScreenshotOverlayView: View {
 
 /// スクリーンショットのサムネイル表示。
 private struct ScreenshotThumbnailView: View {
-    let screenshot: ScreenshotRecord
+    let screenshot: MeetingScreenshotRecord
     let viewModel: CaptionViewModel
-    @Binding var expandedScreenshot: ScreenshotRecord?
+    @Binding var expandedScreenshot: MeetingScreenshotRecord?
 
     private static let timeFormatter: DateFormatter = {
         let f = DateFormatter()
@@ -389,12 +392,12 @@ private struct ScreenshotButton: View {
         .foregroundStyle(.primary)
         .buttonStyle(.plain)
         .pointerStyle(.link)
-        .disabled(viewModel.currentTranscriptionId == nil)
+        .disabled(viewModel.currentMeetingId == nil)
         .help("スクリーンショットを撮影")
     }
 }
 
-/// Notion 風の個別タブボタン。選択中は Liquid Glass 背景がスライドする。
+/// Circleback 風の個別タブボタン。選択中はアンダーラインでアクティブを示す。
 private struct DetailTabButton: View {
     let tab: DetailTab
     let isSelected: Bool
@@ -404,27 +407,23 @@ private struct DetailTabButton: View {
 
     var body: some View {
         Button(action: action) {
-            HStack(spacing: 5) {
-                Image(systemName: tab.icon)
-                    .font(.system(size: 12))
-                Text(tab.label)
-                    .font(.system(size: 13, weight: isSelected ? .medium : .regular))
-            }
-            .padding(.horizontal, 10)
-            .padding(.vertical, 5)
-            .foregroundStyle(isSelected ? .primary : .secondary)
-            .background {
-                if !isSelected, isHovered {
-                    Capsule()
-                        .fill(Color.primary.opacity(0.04))
+            VStack(spacing: 4) {
+                HStack(spacing: 5) {
+                    Image(systemName: tab.icon)
+                        .font(.system(size: 12))
+                    Text(tab.label)
+                        .font(.system(size: 13, weight: isSelected ? .semibold : .regular))
                 }
-            }
-            .background {
-                if isSelected {
-                    Capsule()
-                        .fill(.quaternary)
-                        .matchedGeometryEffect(id: "activeTab", in: namespace)
-                }
+                .padding(.horizontal, 10)
+                .padding(.vertical, 5)
+                .foregroundStyle(isSelected ? .primary : .tertiary)
+
+                // アクティブインジケーター
+                RoundedRectangle(cornerRadius: 1)
+                    .fill(isSelected ? Color.primary : Color.clear)
+                    .frame(height: 2)
+                    .padding(.horizontal, 6)
+                    .matchedGeometryEffect(id: isSelected ? "activeTab" : "tab-\(tab.id)", in: namespace)
             }
         }
         .buttonStyle(.plain)
@@ -441,7 +440,7 @@ struct ControlPanelView: View {
     var sidebarViewModel: SidebarViewModel
     @Binding var isAgentSidebarPresented: Bool
     @State private var selectedTab: DetailTab = .transcript
-    @State private var expandedScreenshot: ScreenshotRecord?
+    @State private var expandedScreenshot: MeetingScreenshotRecord?
     @ObservedObject private var appSettings = AppSettings.shared
 
     var body: some View {
@@ -457,19 +456,15 @@ struct ControlPanelView: View {
 
             // タブコンテンツ
             Group {
-                if viewModel.currentTranscriptionId == nil {
-                    newTranscriptionPlaceholder
-                } else {
-                    switch selectedTab {
-                    case .summary:
-                        summaryTabContent
-                    case .notes:
-                        notesTabContent
-                    case .screenshots:
-                        screenshotsTabContent
-                    case .transcript:
-                        transcriptTabContent
-                    }
+                switch selectedTab {
+                case .summary:
+                    summaryTabContent
+                case .notes:
+                    notesTabContent
+                case .screenshots:
+                    screenshotsTabContent
+                case .transcript:
+                    transcriptTabContent
                 }
             }
             .frame(minHeight: 280)
@@ -514,7 +509,7 @@ struct ControlPanelView: View {
         .navigationTitle(headerTitle)
         .toolbar {
             ToolbarItemGroup(placement: .primaryAction) {
-                if viewModel.currentTranscriptionId != nil {
+                if viewModel.currentMeetingId != nil {
                     Button(L10n.export, systemImage: "square.and.arrow.up", action: exportTranscript)
                         .labelStyle(.iconOnly)
                         .disabled(viewModel.store.segments.isEmpty)
@@ -569,7 +564,7 @@ struct ControlPanelView: View {
             ContentUnavailableView {
                 Label(L10n.summary, systemImage: "list.bullet.clipboard")
             } description: {
-                if viewModel.summaryGeneratingTranscriptionId == viewModel.currentTranscriptionId {
+                if viewModel.summaryGeneratingMeetingId == viewModel.currentMeetingId {
                     ProgressView(L10n.generatingSummary)
                 } else {
                     Text("要約はまだ生成されていません")
@@ -661,44 +656,6 @@ struct ControlPanelView: View {
         }
     }
 
-    /// フォルダ選択時に表示する新規文字起こし作成プレースホルダー。
-    private var newTranscriptionPlaceholder: some View {
-        VStack(spacing: 12) {
-            Spacer()
-            Button(L10n.newTranscription, systemImage: "plus.circle", action: createNewTranscription)
-                .labelStyle(.iconOnly)
-                .font(.largeTitle)
-                .foregroundStyle(.secondary)
-                .buttonStyle(.plain)
-                .pointerStyle(.link)
-            Text(L10n.newTranscription)
-                .font(.subheadline)
-                .foregroundStyle(.secondary)
-            Spacer()
-        }
-        .frame(maxWidth: .infinity)
-    }
-
-    private func createNewTranscription() {
-        guard let project = sidebarViewModel.selectedProject,
-              let dbQueue = sidebarViewModel.dbQueue,
-              let projectURL = sidebarViewModel.selectedProjectURL,
-              let vault = sidebarViewModel.currentVault
-        else { return }
-
-        viewModel.createEmptyTranscription(
-            dbQueue: dbQueue,
-            projectURL: projectURL,
-            projectId: project.id,
-            projectName: project.name,
-            vaultURL: vault.url
-        )
-
-        if let newId = viewModel.currentTranscriptionId {
-            sidebarViewModel.selectTranscription(newId)
-        }
-    }
-
     // MARK: - Computed
 
     private var isAgentRunning: Bool {
@@ -708,15 +665,15 @@ struct ControlPanelView: View {
     /// ヘッダーに表示する「プロジェクト名 - トランスクリプション名」。
     private var headerTitle: String {
         guard let project = sidebarViewModel.selectedProject else { return "" }
-        let transcriptName: String = if let transcriptionId = viewModel.currentTranscriptionId,
-                                        let record = sidebarViewModel.transcriptionsForSelectedProject.first(where: { $0.id == transcriptionId }) {
-            record.title.isEmpty
+        let meetingName: String = if let meetingId = viewModel.currentMeetingId,
+                                      let record = sidebarViewModel.meetingsForSelectedProject.first(where: { $0.id == meetingId }) {
+            record.name.isEmpty
                 ? Self.headerDateFormatter.string(from: record.startedAt)
-                : record.title
+                : record.name
         } else {
             "new"
         }
-        return "\(project.name) - \(transcriptName)"
+        return "\(project.name) - \(meetingName)"
     }
 
     private static let headerDateFormatter: DateFormatter = {

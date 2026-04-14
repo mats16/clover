@@ -19,11 +19,11 @@ enum SummaryService {
     @MainActor
     static func generateSummary(
         projectURL: URL,
-        transcriptionId: UUID,
+        meetingId: UUID,
         startedAt: Date,
         transcriptText: String,
         noteText: String? = nil,
-        screenshots: [ScreenshotRecord] = []
+        screenshots: [MeetingScreenshotRecord] = []
     ) async throws -> URL {
         let settings = AppSettings.shared
         let endpoint = settings.llmEndpointURL
@@ -51,7 +51,7 @@ enum SummaryService {
             messages.append(.init(role: "user", content: contextContent))
         }
 
-        var transcriptContent = "<transcript_id>\(transcriptionId.uuidString)</transcript_id>\n<transcript>\n\(transcriptText)\n</transcript>"
+        var transcriptContent = "<meeting_id>\(meetingId.uuidString)</meeting_id>\n<transcript>\n\(transcriptText)\n</transcript>"
         if let noteText, !noteText.isEmpty {
             transcriptContent += "\n<note>\n\(noteText)\n</note>"
         }
@@ -108,7 +108,7 @@ enum SummaryService {
         let tagsYAML = tags.map { "  - \($0)" }.joined(separator: "\n")
 
         var frontmatterFields = """
-        transcript_id: "\(transcriptionId.uuidString)"
+        meeting_id: "\(meetingId.uuidString)"
         date: \(dateString)
         """
         if !result.title.isEmpty {
@@ -124,13 +124,13 @@ enum SummaryService {
 
         let markdown = frontmatter + "\n\n" + result.summary + "\n"
 
-        // 同じ transcript_id の要約ファイルが既に存在すればそのパスに上書きする
+        // 同じ meeting_id の要約ファイルが既に存在すればそのパスに上書きする
         let fileURL: URL
-        if let existing = findSummaryFile(in: projectURL, transcriptionId: transcriptionId) {
+        if let existing = findSummaryFile(in: projectURL, meetingId: meetingId) {
             fileURL = existing
         } else {
             let datePrefix = dateFormatter.string(from: startedAt)
-            let fileName = summaryFileName(datePrefix: datePrefix, title: result.title, transcriptionId: transcriptionId)
+            let fileName = summaryFileName(datePrefix: datePrefix, title: result.title, meetingId: meetingId)
             try FileManager.default.createDirectory(at: projectURL, withIntermediateDirectories: true)
             fileURL = projectURL.appendingPathComponent("\(fileName).md")
         }
@@ -140,9 +140,9 @@ enum SummaryService {
     }
 
     /// プロジェクトフォルダ内の `.md` ファイルを走査し、frontmatter の `transcription_id` が一致するファイルを返す。
-    static func findSummaryFile(in projectURL: URL, transcriptionId: UUID) -> URL? {
+    static func findSummaryFile(in projectURL: URL, meetingId: UUID) -> URL? {
         let fm = FileManager.default
-        let targetId = transcriptionId.uuidString.lowercased()
+        let targetId = meetingId.uuidString.lowercased()
 
         guard let enumerator = fm.enumerator(
             at: projectURL,
@@ -156,9 +156,9 @@ enum SummaryService {
             defer { try? handle.close() }
             guard let data = try? handle.read(upToCount: 512),
                   let head = String(data: data, encoding: .utf8) else { continue }
-            // frontmatter 内の transcript_id を case-insensitive で照合
+            // frontmatter 内の meeting_id を case-insensitive で照合
             let lowered = head.lowercased()
-            if lowered.contains("transcript_id:"),
+            if lowered.contains("meeting_id:"),
                lowered.contains(targetId) {
                 return fileURL
             }
@@ -168,15 +168,15 @@ enum SummaryService {
 
     // MARK: - Private Helpers
 
-    private static func summaryFileName(datePrefix: String, title: String, transcriptionId: UUID) -> String {
+    private static func summaryFileName(datePrefix: String, title: String, meetingId: UUID) -> String {
         guard !title.isEmpty else {
-            return "\(datePrefix)-summary_\(transcriptionId.uuidString)"
+            return "\(datePrefix)-summary_\(meetingId.uuidString)"
         }
         let sanitized = title
             .replacingOccurrences(of: " ", with: "-")
             .replacingOccurrences(of: "[/\\\\:*?\"<>|]", with: "", options: .regularExpression)
         return sanitized.isEmpty
-            ? "\(datePrefix)-summary_\(transcriptionId.uuidString)"
+            ? "\(datePrefix)-summary_\(meetingId.uuidString)"
             : "\(datePrefix)-\(sanitized)"
     }
 

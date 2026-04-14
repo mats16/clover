@@ -34,15 +34,15 @@ final class VaultSyncService: @unchecked Sendable {
     }
 
     /// DB 内のプロジェクトとディスク上のフォルダを突合し、不整合を解消する。
-    /// transcript を持たない孤立プロジェクトは削除、持つものは missingOnDisk フラグを設定する。
+    /// meeting を持たない孤立プロジェクトは削除、持つものは missingOnDisk フラグを設定する。
     private func reconcileMissingProjects(diskNames: Set<String>, in db: Database) throws {
         let allProjects = try ProjectRecord
             .filter(Column("vaultId") == self.vaultId)
             .fetchAll(db)
 
-        // transcript を持つプロジェクト ID を一括取得（N+1 回避）
-        let idsWithTranscripts = try UUID.fetchSet(db, sql: """
-        SELECT DISTINCT projectId FROM transcripts
+        // meeting を持つプロジェクト ID を一括取得（N+1 回避）
+        let idsWithMeetings = try UUID.fetchSet(db, sql: """
+        SELECT DISTINCT projectId FROM meetings
         WHERE projectId IN (SELECT id FROM projects WHERE vaultId = ?)
         """, arguments: [self.vaultId])
 
@@ -51,7 +51,7 @@ final class VaultSyncService: @unchecked Sendable {
             let shouldBeMissing = !onDisk
 
             if shouldBeMissing {
-                if idsWithTranscripts.contains(project.id) {
+                if idsWithMeetings.contains(project.id) {
                     if !project.missingOnDisk {
                         var updated = project
                         updated.missingOnDisk = true
@@ -162,13 +162,13 @@ final class VaultSyncService: @unchecked Sendable {
         }
     }
 
-    /// 削除されたフォルダ群を一括処理する。transcript ありなら missingOnDisk、なしなら DB 削除。
+    /// 削除されたフォルダ群を一括処理する。meeting ありなら missingOnDisk、なしなら DB 削除。
     private func handleDirectoryRemovals(_ relativePaths: [String], in db: Database) throws {
         guard !relativePaths.isEmpty else { return }
 
-        // transcript を持つプロジェクト ID を一括取得（N+1 回避）
-        let idsWithTranscripts = try UUID.fetchSet(db, sql: """
-        SELECT DISTINCT projectId FROM transcripts
+        // meeting を持つプロジェクト ID を一括取得（N+1 回避）
+        let idsWithMeetings = try UUID.fetchSet(db, sql: """
+        SELECT DISTINCT projectId FROM meetings
         WHERE projectId IN (SELECT id FROM projects WHERE vaultId = ?)
         """, arguments: [self.vaultId])
 
@@ -180,7 +180,7 @@ final class VaultSyncService: @unchecked Sendable {
             let matching = allProjects.filter {
                 $0.name == relativePath || $0.name.hasPrefix(relativePath + "/")
             }
-            let hasTranscripts = matching.contains { idsWithTranscripts.contains($0.id) }
+            let hasTranscripts = matching.contains { idsWithMeetings.contains($0.id) }
 
             if hasTranscripts {
                 try ProjectRecord.setMissingByPrefix(relativePath, missing: true, vaultId: self.vaultId, in: db)

@@ -5,23 +5,22 @@ struct TranscriptRowView: View {
     let segment: TranscriptSegment
 
     var body: some View {
-        HStack(alignment: .top, spacing: 8) {
+        HStack(alignment: .top, spacing: 10) {
             // タイムスタンプ
             Text(Formatters.timeHHmmss.string(from: segment.startTime))
                 .font(.system(.caption, design: .monospaced))
-                .foregroundStyle(.secondary)
-                .frame(width: 60, alignment: .leading)
+                .foregroundStyle(.tertiary)
+                .frame(width: 56, alignment: .leading)
 
             // 話者ラベル
             if let speaker = segment.speakerLabel {
                 Text(speakerDisplayName(for: speaker))
-                    .font(.caption)
+                    .font(.system(size: 11, weight: .semibold))
                     .foregroundStyle(.white)
-                    .padding(.horizontal, 6)
-                    .padding(.vertical, 1)
-                    .background(speakerColor(for: speaker))
-                    .clipShape(.rect(cornerRadius: 4))
-                    .frame(width: 56, alignment: .center)
+                    .padding(.horizontal, 8)
+                    .padding(.vertical, 2)
+                    .background(speakerColor(for: speaker), in: Capsule())
+                    .frame(width: 60, alignment: .center)
             }
 
             // テキスト
@@ -31,7 +30,7 @@ struct TranscriptRowView: View {
                 .textSelection(.enabled)
                 .frame(maxWidth: .infinity, alignment: .leading)
         }
-        .padding(.vertical, 2)
+        .padding(.vertical, 4)
     }
 
     private func speakerDisplayName(for label: String) -> String {

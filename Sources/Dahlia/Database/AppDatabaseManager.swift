@@ -51,26 +51,24 @@ final class AppDatabaseManager: Sendable {
                 columns: ["vaultId"]
             )
 
-            try db.create(table: "transcripts") { t in
+            try db.create(table: "meetings") { t in
                 t.primaryKey("id", .blob)
                 t.column("projectId", .blob).notNull()
                     .references("projects", onDelete: .cascade)
-                t.column("title", .text).notNull().defaults(to: "")
+                t.column("name", .text).notNull().defaults(to: "")
                 t.column("startedAt", .datetime).notNull()
                 t.column("endedAt", .datetime)
-                t.column("summaryCreated", .boolean).notNull().defaults(to: false)
-                t.column("filePath", .text)
             }
             try db.create(
-                index: "transcripts_on_projectId",
-                on: "transcripts",
+                index: "meetings_on_projectId",
+                on: "meetings",
                 columns: ["projectId"]
             )
 
-            try db.create(table: "segments") { t in
+            try db.create(table: "transcript_segments") { t in
                 t.primaryKey("id", .blob)
-                t.column("transcriptionId", .blob).notNull()
-                    .references("transcripts", onDelete: .cascade)
+                t.column("meetingId", .blob).notNull()
+                    .references("meetings", onDelete: .cascade)
                 t.column("startTime", .datetime).notNull()
                 t.column("endTime", .datetime)
                 t.column("text", .text).notNull()
@@ -78,50 +76,44 @@ final class AppDatabaseManager: Sendable {
                 t.column("speakerLabel", .text)
             }
             try db.create(
-                index: "segments_on_transcriptionId",
-                on: "segments",
-                columns: ["transcriptionId"]
+                index: "transcript_segments_on_meetingId",
+                on: "transcript_segments",
+                columns: ["meetingId"]
             )
             try db.create(
-                index: "segments_on_transcriptionId_startTime",
-                on: "segments",
-                columns: ["transcriptionId", "startTime"]
+                index: "transcript_segments_on_meetingId_startTime",
+                on: "transcript_segments",
+                columns: ["meetingId", "startTime"]
             )
         }
 
         migrator.registerMigration("v2_notesAndScreenshots") { db in
-            try db.create(table: "notes") { t in
-                t.primaryKey("id", .blob)
-                t.column("transcriptionId", .blob).notNull()
-                    .references("transcripts", onDelete: .cascade)
+            try db.create(table: "meeting_notes") { t in
+                t.primaryKey("meetingId", .blob)
+                    .references("meetings", onDelete: .cascade)
                 t.column("text", .text).notNull()
                 t.column("createdAt", .datetime).notNull()
                 t.column("updatedAt", .datetime).notNull()
             }
-            try db.create(
-                index: "notes_on_transcriptionId",
-                on: "notes",
-                columns: ["transcriptionId"]
-            )
 
-            try db.create(table: "screenshots") { t in
+            try db.create(table: "meeting_screenshots") { t in
                 t.primaryKey("id", .blob)
-                t.column("transcriptionId", .blob).notNull()
-                    .references("transcripts", onDelete: .cascade)
+                t.column("meetingId", .blob).notNull()
+                    .references("meetings", onDelete: .cascade)
                 t.column("capturedAt", .datetime).notNull()
                 t.column("imageData", .blob).notNull()
             }
             try db.create(
-                index: "screenshots_on_transcriptionId",
-                on: "screenshots",
-                columns: ["transcriptionId"]
+                index: "meeting_screenshots_on_meetingId",
+                on: "meeting_screenshots",
+                columns: ["meetingId"]
             )
         }
 
         migrator.registerMigration("v3_sidebarIndexes") { db in
             try db.create(
-                index: "transcripts_on_projectId_startedAt",
-                on: "transcripts",
+                index: "meetings_on_projectId_startedAt",
+                on: "meetings",
                 columns: ["projectId", "startedAt"]
             )
         }
@@ -130,6 +122,24 @@ final class AppDatabaseManager: Sendable {
             try db.alter(table: "projects") { t in
                 t.add(column: "missingOnDisk", .boolean).notNull().defaults(to: false)
             }
+        }
+
+        migrator.registerMigration("v5_meetingSummaries") { db in
+            try db.create(table: "meeting_summaries") { t in
+                t.primaryKey("id", .blob)
+                t.column("meetingId", .blob).notNull()
+                    .references("meetings", onDelete: .cascade)
+                t.column("title", .text).notNull().defaults(to: "")
+                t.column("summary", .text).notNull()
+                t.column("tags", .text).notNull().defaults(to: "[]")
+                t.column("createdAt", .datetime).notNull()
+            }
+            try db.create(
+                index: "meeting_summaries_on_meetingId",
+                on: "meeting_summaries",
+                columns: ["meetingId"],
+                unique: true
+            )
         }
 
         return migrator

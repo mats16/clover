@@ -8,8 +8,8 @@ struct VaultPickerView: View {
     @State private var vaults: [VaultRecord] = []
     @State private var showFolderPicker = false
 
-    private var repository: TranscriptionRepository? {
-        appDatabase.map { TranscriptionRepository(dbQueue: $0.dbQueue) }
+    private var repository: MeetingRepository? {
+        appDatabase.map { MeetingRepository(dbQueue: $0.dbQueue) }
     }
 
     var body: some View {

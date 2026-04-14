@@ -52,8 +52,8 @@ struct TranscriptSegment: Identifiable, Equatable {
         self.speakerLabel = speakerLabel
     }
 
-    /// SegmentRecord からの変換イニシャライザ。
-    init(from record: SegmentRecord) {
+    /// TranscriptSegmentRecord からの変換イニシャライザ。
+    init(from record: TranscriptSegmentRecord) {
         self.id = record.id
         self.startTime = record.startTime
         self.endTime = record.endTime

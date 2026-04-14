@@ -32,7 +32,7 @@ struct DahliaApp: App {
             .task { initializeAppIfNeeded() }
         }
         .windowResizability(.contentMinSize)
-        .windowStyle(.automatic)
+        .windowStyle(.hiddenTitleBar)
 
         Window(L10n.vault, id: WindowID.vaultManager) {
             VaultPickerView(appDatabase: appDatabase) { vault in
@@ -51,7 +51,7 @@ struct DahliaApp: App {
         guard let db = try? AppDatabaseManager() else { return }
         appDatabase = db
 
-        let repo = TranscriptionRepository(dbQueue: db.dbQueue)
+        let repo = MeetingRepository(dbQueue: db.dbQueue)
         if let lastVault = try? repo.fetchLastOpenedVault() {
             openVault(lastVault)
         }
@@ -80,7 +80,7 @@ struct DahliaApp: App {
             else { return }
 
             // "Meetings" プロジェクトを取得または自動作成
-            let repo = TranscriptionRepository(dbQueue: capturedDb.dbQueue)
+            let repo = MeetingRepository(dbQueue: capturedDb.dbQueue)
             let projectName = "Meetings"
             guard let project = try? repo.fetchOrCreateProject(name: projectName, vaultId: vault.id) else { return }
             let projectURL = vault.url.appendingPathComponent(projectName, isDirectory: true)
@@ -103,6 +103,16 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
     func applicationDidFinishLaunching(_: Notification) {
         ErrorReportingService.start()
         NSApplication.shared.setActivationPolicy(.regular)
+
+        // メインウィンドウのタイトルバーを透過し、コンテンツを上端まで拡張
+        DispatchQueue.main.async {
+            if let window = NSApplication.shared.windows.first {
+                window.titlebarAppearsTransparent = true
+                window.titleVisibility = .hidden
+                window.styleMask.insert(.fullSizeContentView)
+                window.isMovableByWindowBackground = true
+            }
+        }
     }
 
     func applicationShouldTerminateAfterLastWindowClosed(_: NSApplication) -> Bool {

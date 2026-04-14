@@ -12,7 +12,7 @@ private enum ScreenshotError: Error {
 
 /// 録音中のナビゲーション時に保持する録音コンテキスト。
 private struct RecordingContext {
-    let transcriptionId: UUID?
+    let meetingId: UUID?
     let store: TranscriptStore
     let projectURL: URL?
     let projectId: UUID?
@@ -37,9 +37,9 @@ final class CaptionViewModel: ObservableObject {
     @Published var supportedLocales: [Locale] = []
     @Published var filteredLocales: [Locale] = []
 
-    // MARK: - Transcription State
+    // MARK: - Meeting State
 
-    var currentTranscriptionId: UUID?
+    var currentMeetingId: UUID?
     var currentProjectURL: URL?
     var currentProjectId: UUID?
     var currentProjectName: String?
@@ -47,8 +47,8 @@ final class CaptionViewModel: ObservableObject {
 
     // MARK: - Summary State
 
-    @Published var summaryGeneratingTranscriptionId: UUID?
-    var isSummaryGenerating: Bool { summaryGeneratingTranscriptionId != nil }
+    @Published var summaryGeneratingMeetingId: UUID?
+    var isSummaryGenerating: Bool { summaryGeneratingMeetingId != nil }
     @Published var summaryError: String?
     @Published var lastSummaryURL: URL?
     /// Summary タブへの切り替えをリクエストするフラグ。
@@ -63,14 +63,14 @@ final class CaptionViewModel: ObservableObject {
     // MARK: - Note State
 
     @Published var noteText = ""
-    private var currentNoteId: UUID?
+    private var hasNote = false
     private var currentNoteCreatedAt: Date?
     private var noteAutoSaveCancellable: AnyCancellable?
     private var lastSavedNoteText: String?
 
     // MARK: - Screenshot State
 
-    @Published var screenshots: [ScreenshotRecord] = []
+    @Published var screenshots: [MeetingScreenshotRecord] = []
     /// キャプチャ対象として選択可能なウィンドウ一覧。
     @Published var availableWindows: [SCWindow] = []
     /// 選択中のウィンドウ ID。nil の場合はデスクトップ全体をキャプチャ。
@@ -78,7 +78,7 @@ final class CaptionViewModel: ObservableObject {
 
     /// 録音中でなく、文字起こしを表示中の場合 true。
     var isViewingHistory: Bool {
-        !isListening && currentTranscriptionId != nil
+        !isListening && currentMeetingId != nil
     }
 
     /// マイクが有効か（audioSourceMode から導出）。
@@ -93,7 +93,7 @@ final class CaptionViewModel: ObservableObject {
     private var recordingContext: RecordingContext?
 
     /// 録音対象の文字起こし ID。
-    var recordingTranscriptionId: UUID? { recordingContext?.transcriptionId }
+    var recordingMeetingId: UUID? { recordingContext?.meetingId }
 
     /// 録音中かつ録音対象とは別のトランスクリプトを閲覧中。
     var isViewingOtherWhileRecording: Bool {
@@ -106,10 +106,10 @@ final class CaptionViewModel: ObservableObject {
     private var audioManager: AudioCaptureManager?
     private var systemAudioManager: SystemAudioCaptureManager?
     private var pipelines: [(service: SpeechTranscriberService, bridge: AudioBufferBridge)] = []
-    private var persistenceService: TranscriptPersistenceService?
+    private var persistenceService: MeetingPersistenceService?
     private var storeCancellable: AnyCancellable?
     private var settingsCancellable: AnyCancellable?
-    private var transcriptionLoadTask: Task<Void, Never>?
+    private var meetingLoadTask: Task<Void, Never>?
 
     init() {
         resubscribeStoreCancellable()
@@ -144,31 +144,27 @@ final class CaptionViewModel: ObservableObject {
         return f
     }()
 
-    private struct LoadedTranscriptionData {
+    private struct LoadedMeetingData {
         let startedAt: Date?
         let segments: [TranscriptSegment]
-        let screenshots: [ScreenshotRecord]
+        let screenshots: [MeetingScreenshotRecord]
         let lastSummaryURL: URL?
-        let note: NoteRecord?
+        let note: MeetingNoteRecord?
     }
 
-    private nonisolated static func fetchLoadedTranscriptionData(
-        transcriptionId: UUID,
+    private nonisolated static func fetchLoadedMeetingData(
+        meetingId: UUID,
         dbQueue: DatabaseQueue,
         projectURL: URL
-    ) throws -> LoadedTranscriptionData {
-        let repo = TranscriptionRepository(dbQueue: dbQueue)
-        let detail = try repo.fetchTranscriptionDetail(id: transcriptionId)
+    ) throws -> LoadedMeetingData {
+        let repo = MeetingRepository(dbQueue: dbQueue)
+        let detail = try repo.fetchMeetingDetail(id: meetingId)
         let segments = detail.segments.map(TranscriptSegment.init(from:))
 
-        let lastSummaryURL: URL? = if detail.transcription?.summaryCreated == true {
-            SummaryService.findSummaryFile(in: projectURL, transcriptionId: transcriptionId)
-        } else {
-            nil
-        }
+        let lastSummaryURL: URL? = SummaryService.findSummaryFile(in: projectURL, meetingId: meetingId)
 
-        return LoadedTranscriptionData(
-            startedAt: detail.transcription?.startedAt,
+        return LoadedMeetingData(
+            startedAt: detail.meeting?.startedAt,
             segments: segments,
             screenshots: detail.screenshots,
             lastSummaryURL: lastSummaryURL,
@@ -176,12 +172,12 @@ final class CaptionViewModel: ObservableObject {
         )
     }
 
-    // MARK: - Transcription Loading
+    // MARK: - Meeting Loading
 
     /// DB から文字起こしのセグメントを読み込んで表示する。
     /// 録音中でも呼び出し可能。録音パイプラインはバックグラウンドで継続する。
-    func loadTranscription(
-        _ transcriptionId: UUID,
+    func loadMeeting(
+        _ meetingId: UUID,
         dbQueue: DatabaseQueue,
         projectURL: URL,
         projectId: UUID,
@@ -189,24 +185,24 @@ final class CaptionViewModel: ObservableObject {
         vaultURL: URL
     ) {
         // 録音中に録音対象のトランスクリプトを選択した場合はライブ表示に復帰
-        if isListening, transcriptionId == recordingTranscriptionId {
-            returnToRecordingTranscription()
+        if isListening, meetingId == recordingMeetingId {
+            returnToRecordingMeeting()
             return
         }
 
         // 録音中の場合、録音コンテキストをバックアップして表示用ストアを差し替え
         if isListening {
             saveRecordingContextIfNeeded()
-            transcriptionLoadTask?.cancel()
+            meetingLoadTask?.cancel()
             saveNoteImmediately()
             store = TranscriptStore()
             resubscribeStoreCancellable()
         } else {
-            resetTranscriptionState()
+            resetMeetingState()
         }
 
-        setTranscriptionContext(
-            id: transcriptionId,
+        setMeetingContext(
+            id: meetingId,
             dbQueue: dbQueue,
             projectURL: projectURL,
             projectId: projectId,
@@ -214,14 +210,14 @@ final class CaptionViewModel: ObservableObject {
             vaultURL: vaultURL
         )
 
-        transcriptionLoadTask = Task { [weak self, transcriptionId, dbQueue, projectURL] in
+        meetingLoadTask = Task { [weak self, meetingId, dbQueue, projectURL] in
             guard let self else { return }
 
-            let loaded: LoadedTranscriptionData
+            let loaded: LoadedMeetingData
             do {
                 loaded = try await Task.detached(priority: .userInitiated) {
-                    try Self.fetchLoadedTranscriptionData(
-                        transcriptionId: transcriptionId,
+                    try Self.fetchLoadedMeetingData(
+                        meetingId: meetingId,
                         dbQueue: dbQueue,
                         projectURL: projectURL
                     )
@@ -230,12 +226,12 @@ final class CaptionViewModel: ObservableObject {
                 return
             } catch {
                 Logger(subsystem: "com.dahlia", category: "CaptionViewModel")
-                    .error("Failed to load transcription \(transcriptionId): \(error)")
-                ErrorReportingService.capture(error, context: ["source": "loadTranscription"])
+                    .error("Failed to load meeting \(meetingId): \(error)")
+                ErrorReportingService.capture(error, context: ["source": "loadMeeting"])
                 return
             }
 
-            guard !Task.isCancelled, self.currentTranscriptionId == transcriptionId else { return }
+            guard !Task.isCancelled, self.currentMeetingId == meetingId else { return }
 
             self.store.recordingStartTime = loaded.startedAt
             self.store.loadSegments(loaded.segments)
@@ -243,33 +239,31 @@ final class CaptionViewModel: ObservableObject {
         }
     }
 
-    /// 文字起こしを開始せずに空の TranscriptionRecord を作成し、表示対象としてセットする。
-    func createEmptyTranscription(
+    /// 文字起こしを開始せずに空の MeetingRecord を作成し、表示対象としてセットする。
+    func createEmptyMeeting(
         dbQueue: DatabaseQueue,
         projectURL: URL,
         projectId: UUID,
         projectName: String? = nil,
         vaultURL: URL
     ) {
-        resetTranscriptionState()
+        resetMeetingState()
 
-        let transcriptionId = UUID.v7()
+        let meetingId = UUID.v7()
         let now = Date()
-        let record = TranscriptionRecord(
-            id: transcriptionId,
+        let record = MeetingRecord(
+            id: meetingId,
             projectId: projectId,
-            title: "",
+            name: "",
             startedAt: now,
-            endedAt: now,
-            summaryCreated: false,
-            filePath: nil
+            endedAt: now
         )
         try? dbQueue.write { db in
             try record.insert(db)
         }
 
-        setTranscriptionContext(
-            id: transcriptionId,
+        setMeetingContext(
+            id: meetingId,
             dbQueue: dbQueue,
             projectURL: projectURL,
             projectId: projectId,
@@ -280,7 +274,7 @@ final class CaptionViewModel: ObservableObject {
 
     /// 現在の文字起こし表示をクリアして初期状態に戻す。
     /// 録音中はバックグラウンド録音を維持したまま表示のみクリアする。
-    func clearCurrentTranscription() {
+    func clearCurrentMeeting() {
         if isListening {
             saveRecordingContextIfNeeded()
             store = TranscriptStore()
@@ -290,9 +284,9 @@ final class CaptionViewModel: ObservableObject {
             lastSummaryURL = nil
             summaryError = nil
         } else {
-            resetTranscriptionState()
+            resetMeetingState()
         }
-        currentTranscriptionId = nil
+        currentMeetingId = nil
         currentProjectURL = nil
         currentProjectId = nil
         currentProjectName = nil
@@ -300,14 +294,14 @@ final class CaptionViewModel: ObservableObject {
     }
 
     /// 録音対象のトランスクリプトに表示を復帰する。
-    func returnToRecordingTranscription() {
+    func returnToRecordingMeeting() {
         guard let ctx = recordingContext else { return }
-        transcriptionLoadTask?.cancel()
+        meetingLoadTask?.cancel()
         saveNoteImmediately()
 
         // コンテキストを先に復元（store 代入時の objectWillChange で SwiftUI が再評価する際に
-        // currentTranscriptionId 等が正しい値を返すようにする）
-        currentTranscriptionId = ctx.transcriptionId
+        // currentMeetingId 等が正しい値を返すようにする）
+        currentMeetingId = ctx.meetingId
         currentProjectURL = ctx.projectURL
         currentProjectId = ctx.projectId
         currentProjectName = ctx.projectName
@@ -318,21 +312,21 @@ final class CaptionViewModel: ObservableObject {
         resubscribeStoreCancellable()
         recordingContext = nil
 
-        reloadTranscriptionDetail()
+        reloadMeetingDetail()
     }
 
-    /// 現在の transcriptionId のノート・スクリーンショット・サマリーを DB から読み込み直す。
-    private func reloadTranscriptionDetail() {
-        guard let transcriptionId = currentTranscriptionId,
+    /// 現在の meetingId のノート・スクリーンショット・サマリーを DB から読み込み直す。
+    private func reloadMeetingDetail() {
+        guard let meetingId = currentMeetingId,
               let dbQueue = currentDbQueue,
               let projectURL = currentProjectURL else { return }
-        transcriptionLoadTask = Task { [weak self, transcriptionId, dbQueue, projectURL] in
+        meetingLoadTask = Task { [weak self, meetingId, dbQueue, projectURL] in
             guard let self else { return }
-            let loaded: LoadedTranscriptionData
+            let loaded: LoadedMeetingData
             do {
                 loaded = try await Task.detached(priority: .userInitiated) {
-                    try Self.fetchLoadedTranscriptionData(
-                        transcriptionId: transcriptionId,
+                    try Self.fetchLoadedMeetingData(
+                        meetingId: meetingId,
                         dbQueue: dbQueue,
                         projectURL: projectURL
                     )
@@ -340,17 +334,17 @@ final class CaptionViewModel: ObservableObject {
             } catch {
                 return
             }
-            guard !Task.isCancelled, self.currentTranscriptionId == transcriptionId else { return }
+            guard !Task.isCancelled, self.currentMeetingId == meetingId else { return }
             self.applyLoadedDetail(loaded)
         }
     }
 
     /// 読み込み済みデータのノート・スクリーンショット・サマリーを UI 状態に反映する。
-    private func applyLoadedDetail(_ loaded: LoadedTranscriptionData) {
+    private func applyLoadedDetail(_ loaded: LoadedMeetingData) {
         screenshots = loaded.screenshots
         lastSummaryURL = loaded.lastSummaryURL
         noteText = loaded.note?.text ?? ""
-        currentNoteId = loaded.note?.id
+        hasNote = loaded.note != nil
         currentNoteCreatedAt = loaded.note?.createdAt
         lastSavedNoteText = noteText
         setupNoteAutoSave()
@@ -362,7 +356,7 @@ final class CaptionViewModel: ObservableObject {
     private func saveRecordingContextIfNeeded() {
         guard recordingContext == nil else { return }
         recordingContext = RecordingContext(
-            transcriptionId: currentTranscriptionId,
+            meetingId: currentMeetingId,
             store: store,
             projectURL: currentProjectURL,
             projectId: currentProjectId,
@@ -382,9 +376,9 @@ final class CaptionViewModel: ObservableObject {
     }
 
     /// UI 状態をリセットし、次の文字起こし読み込みに備える。
-    private func resetTranscriptionState() {
+    private func resetMeetingState() {
         saveNoteImmediately()
-        transcriptionLoadTask?.cancel()
+        meetingLoadTask?.cancel()
         store.clear()
         screenshots = []
         resetNoteState()
@@ -393,7 +387,7 @@ final class CaptionViewModel: ObservableObject {
     }
 
     /// 現在の文字起こしコンテキスト（ID・プロジェクト情報）をセットする。
-    private func setTranscriptionContext(
+    private func setMeetingContext(
         id: UUID,
         dbQueue: DatabaseQueue,
         projectURL: URL,
@@ -401,7 +395,7 @@ final class CaptionViewModel: ObservableObject {
         projectName: String?,
         vaultURL: URL
     ) {
-        currentTranscriptionId = id
+        currentMeetingId = id
         currentProjectURL = projectURL
         currentProjectId = projectId
         currentProjectName = projectName
@@ -512,7 +506,7 @@ final class CaptionViewModel: ObservableObject {
         projectId: UUID,
         projectName: String? = nil,
         vaultURL: URL,
-        appendingTo existingTranscriptionId: UUID? = nil
+        appendingTo existingMeetingId: UUID? = nil
     ) async {
         self.currentProjectURL = projectURL
         self.currentProjectId = projectId
@@ -527,25 +521,25 @@ final class CaptionViewModel: ObservableObject {
         pipelines.removeAll()
         store.recordingStartTime = Date()
 
-        if let existingTranscriptionId {
+        if let existingMeetingId {
             // 追記モード: 既存セグメント ID を取得して PersistenceService に渡す
-            let repo = TranscriptionRepository(dbQueue: dbQueue)
-            let existingIds = (try? repo.fetchSegmentIds(forTranscriptionId: existingTranscriptionId)) ?? []
-            persistenceService = TranscriptPersistenceService(
+            let repo = MeetingRepository(dbQueue: dbQueue)
+            let existingIds = (try? repo.fetchSegmentIds(forMeetingId: existingMeetingId)) ?? []
+            persistenceService = MeetingPersistenceService(
                 store: store,
                 dbQueue: dbQueue,
                 projectId: projectId,
-                existingTranscriptionId: existingTranscriptionId,
+                existingMeetingId: existingMeetingId,
                 existingSegmentIds: existingIds
             )
-            currentTranscriptionId = existingTranscriptionId
+            currentMeetingId = existingMeetingId
         } else {
-            persistenceService = TranscriptPersistenceService(
+            persistenceService = MeetingPersistenceService(
                 store: store,
                 dbQueue: dbQueue,
                 projectId: projectId
             )
-            currentTranscriptionId = persistenceService?.transcriptionId
+            currentMeetingId = persistenceService?.meetingId
         }
 
         do {
@@ -594,7 +588,7 @@ final class CaptionViewModel: ObservableObject {
         // ナビゲーション済みの場合、録音コンテキストからデータを取得
         let ctx = recordingContext
         let activeStore = ctx?.store ?? store
-        let transcriptionId = ctx?.transcriptionId ?? currentTranscriptionId
+        let meetingId = ctx?.meetingId ?? currentMeetingId
         let projectName = ctx?.projectName ?? selectedProjectName
         let projectURL = ctx?.projectURL ?? currentProjectURL
         let vaultURL = ctx?.vaultURL ?? currentVaultURL
@@ -614,11 +608,11 @@ final class CaptionViewModel: ObservableObject {
             persistenceService?.stop()
             persistenceService = nil
 
-            if let transcriptionId, !segments.isEmpty {
+            if let meetingId, !segments.isEmpty {
                 if AppSettings.shared.llmAutoSummaryEnabled, let projectURL {
                     // 要約 + ファイル書き出しを並行実行
                     await generateSummary(
-                        transcriptionId: transcriptionId,
+                        meetingId: meetingId,
                         transcriptText: transcriptText,
                         projectURL: projectURL,
                         startedAt: recordingStart,
@@ -630,7 +624,7 @@ final class CaptionViewModel: ObservableObject {
                     // 要約なし: ファイル書き出しのみ
                     await exportFiles(
                         vaultURL: vaultURL,
-                        transcriptionId: transcriptionId,
+                        meetingId: meetingId,
                         projectName: projectName ?? "",
                         startedAt: recordingStart,
                         segments: segments
@@ -673,14 +667,14 @@ final class CaptionViewModel: ObservableObject {
 
     /// 手動で要約を実行できるかどうか。
     var canGenerateSummary: Bool {
-        guard currentTranscriptionId != nil,
+        guard currentMeetingId != nil,
               currentProjectURL != nil else { return false }
         return !store.segments.isEmpty
     }
 
     /// プルダウンメニューから手動で要約を実行する。
     func triggerManualSummary() {
-        guard let transcriptionId = currentTranscriptionId,
+        guard let meetingId = currentMeetingId,
               let projectURL = currentProjectURL,
               let vaultURL = currentVaultURL else { return }
         let transcriptText = store.exportForSummary()
@@ -690,7 +684,7 @@ final class CaptionViewModel: ObservableObject {
         requestShowSummaryTab = true
         Task {
             await generateSummary(
-                transcriptionId: transcriptionId,
+                meetingId: meetingId,
                 transcriptText: transcriptText,
                 projectURL: projectURL,
                 startedAt: startedAt,
@@ -702,7 +696,7 @@ final class CaptionViewModel: ObservableObject {
     }
 
     func generateSummary(
-        transcriptionId: UUID,
+        meetingId: UUID,
         transcriptText: String,
         projectURL: URL,
         startedAt: Date,
@@ -721,16 +715,16 @@ final class CaptionViewModel: ObservableObject {
         saveNoteImmediately()
         let currentNoteText = noteText
 
-        summaryGeneratingTranscriptionId = transcriptionId
+        summaryGeneratingMeetingId = meetingId
         summaryError = nil
         lastSummaryURL = nil
         summaryProgress.show()
 
         do {
-            var screenshots: [ScreenshotRecord] = []
+            var screenshots: [MeetingScreenshotRecord] = []
             if let queue = currentDbQueue {
-                let repo = TranscriptionRepository(dbQueue: queue)
-                screenshots = (try? repo.fetchScreenshots(forTranscriptionId: transcriptionId)) ?? []
+                let repo = MeetingRepository(dbQueue: queue)
+                screenshots = (try? repo.fetchScreenshots(forMeetingId: meetingId)) ?? []
             }
 
             let screenshotsForExport = screenshots
@@ -747,7 +741,7 @@ final class CaptionViewModel: ObservableObject {
             // LLM 要約とファイル書き出しを並行実行
             async let summaryResult = SummaryService.generateSummary(
                 projectURL: projectURL,
-                transcriptionId: transcriptionId,
+                meetingId: meetingId,
                 startedAt: startedAt,
                 transcriptText: transcriptText,
                 noteText: currentNoteText.isEmpty ? nil : currentNoteText,
@@ -756,7 +750,7 @@ final class CaptionViewModel: ObservableObject {
 
             async let fileExport: Void = exportTranscriptAndScreenshotsWithProgress(
                 vaultURL: vaultURL,
-                transcriptionId: transcriptionId,
+                meetingId: meetingId,
                 projectName: projectName,
                 startedAt: startedAt,
                 segments: segments,
@@ -767,25 +761,22 @@ final class CaptionViewModel: ObservableObject {
             summaryProgress.summaryGeneration = .completed
 
             _ = await fileExport
-            if currentTranscriptionId == transcriptionId {
+            if currentMeetingId == meetingId {
                 lastSummaryURL = fileURL
             }
 
-            // summaryCreated フラグを立てる
-            if let dbQueue = currentDbQueue {
-                let repo = TranscriptionRepository(dbQueue: dbQueue)
-                try? repo.markSummaryCreated(id: transcriptionId)
-            }
+            // サマリーを DB に保存
+            // TODO: SummaryService から SummaryResult を受け取り MeetingSummaryRecord として保存
         } catch {
-            if currentTranscriptionId == transcriptionId {
+            if currentMeetingId == meetingId {
                 summaryError = error.localizedDescription
             }
             summaryProgress.summaryGeneration = .failed(error.localizedDescription)
             ErrorReportingService.capture(error, context: ["source": "summaryGeneration"])
         }
 
-        if summaryGeneratingTranscriptionId == transcriptionId {
-            summaryGeneratingTranscriptionId = nil
+        if summaryGeneratingMeetingId == meetingId {
+            summaryGeneratingMeetingId = nil
         }
 
         // 全完了後に自動で非表示
@@ -800,19 +791,19 @@ final class CaptionViewModel: ObservableObject {
     /// 要約なしでファイル書き出しのみ実行する。
     private func exportFiles(
         vaultURL: URL,
-        transcriptionId: UUID,
+        meetingId: UUID,
         projectName: String,
         startedAt: Date,
         segments: [TranscriptSegment]
     ) async {
-        var screenshots: [ScreenshotRecord] = []
+        var screenshots: [MeetingScreenshotRecord] = []
         if let dbQueue = currentDbQueue {
-            let repo = TranscriptionRepository(dbQueue: dbQueue)
-            screenshots = (try? repo.fetchScreenshots(forTranscriptionId: transcriptionId)) ?? []
+            let repo = MeetingRepository(dbQueue: dbQueue)
+            screenshots = (try? repo.fetchScreenshots(forMeetingId: meetingId)) ?? []
         }
         await exportTranscriptAndScreenshots(
             vaultURL: vaultURL,
-            transcriptionId: transcriptionId,
+            meetingId: meetingId,
             projectName: projectName,
             startedAt: startedAt,
             segments: segments,
@@ -823,18 +814,16 @@ final class CaptionViewModel: ObservableObject {
     /// transcript と screenshot をファイルに書き出す共通処理。メインアクター外で実行。
     private func exportTranscriptAndScreenshots(
         vaultURL: URL,
-        transcriptionId: UUID,
+        meetingId: UUID,
         projectName: String,
         startedAt: Date,
         segments: [TranscriptSegment],
-        screenshots: [ScreenshotRecord]
+        screenshots: [MeetingScreenshotRecord]
     ) async {
-        let dbQueue = currentDbQueue
-
         async let transcriptPath = Task.detached {
             try? TranscriptExportService.exportTranscript(
                 vaultURL: vaultURL,
-                transcriptionId: transcriptionId,
+                meetingId: meetingId,
                 projectName: projectName,
                 startedAt: startedAt,
                 segments: segments
@@ -849,28 +838,23 @@ final class CaptionViewModel: ObservableObject {
             )
         }.value
 
-        if let path = await transcriptPath, let dbQueue {
-            let repo = TranscriptionRepository(dbQueue: dbQueue)
-            try? repo.updateTranscriptFilePath(id: transcriptionId, path: path)
-        }
+        _ = await transcriptPath
         _ = await screenshotExport
     }
 
     /// transcript と screenshot をファイルに書き出し、進捗トーストを更新する。
     private func exportTranscriptAndScreenshotsWithProgress(
         vaultURL: URL,
-        transcriptionId: UUID,
+        meetingId: UUID,
         projectName: String,
         startedAt: Date,
         segments: [TranscriptSegment],
-        screenshots: [ScreenshotRecord]
+        screenshots: [MeetingScreenshotRecord]
     ) async {
-        let dbQueue = currentDbQueue
-
         async let transcriptPath = Task.detached {
             try? TranscriptExportService.exportTranscript(
                 vaultURL: vaultURL,
-                transcriptionId: transcriptionId,
+                meetingId: meetingId,
                 projectName: projectName,
                 startedAt: startedAt,
                 segments: segments
@@ -885,10 +869,7 @@ final class CaptionViewModel: ObservableObject {
             )
         }.value
 
-        if let path = await transcriptPath, let dbQueue {
-            let repo = TranscriptionRepository(dbQueue: dbQueue)
-            try? repo.updateTranscriptFilePath(id: transcriptionId, path: path)
-        }
+        _ = await transcriptPath
         summaryProgress.transcriptExport = .completed
 
         _ = await screenshotExport
@@ -937,7 +918,7 @@ final class CaptionViewModel: ObservableObject {
     }
 
     func takeScreenshot() {
-        guard let transcriptionId = currentTranscriptionId,
+        guard let meetingId = currentMeetingId,
               let dbQueue = currentDbQueue else { return }
 
         Task {
@@ -977,9 +958,9 @@ final class CaptionViewModel: ObservableObject {
                     return encoded
                 }.value
 
-                let record = ScreenshotRecord(
+                let record = MeetingScreenshotRecord(
                     id: UUID.v7(),
-                    transcriptionId: transcriptionId,
+                    meetingId: meetingId,
                     capturedAt: Date(),
                     imageData: imageData
                 )
@@ -1009,30 +990,28 @@ final class CaptionViewModel: ObservableObject {
 
     private func resetNoteState() {
         noteText = ""
-        currentNoteId = nil
+        hasNote = false
         currentNoteCreatedAt = nil
         lastSavedNoteText = nil
         noteAutoSaveCancellable?.cancel()
     }
 
     private func saveNote(text: String) {
-        guard let transcriptionId = currentTranscriptionId,
+        guard let meetingId = currentMeetingId,
               let dbQueue = currentDbQueue else { return }
         let now = Date()
-        let isNew = currentNoteId == nil
-        let noteId = currentNoteId ?? UUID.v7()
-        let note = NoteRecord(
-            id: noteId,
-            transcriptionId: transcriptionId,
+        let isNew = !hasNote
+        let note = MeetingNoteRecord(
+            meetingId: meetingId,
             text: text,
             createdAt: isNew ? now : (currentNoteCreatedAt ?? now),
             updatedAt: now
         )
-        let repo = TranscriptionRepository(dbQueue: dbQueue)
+        let repo = MeetingRepository(dbQueue: dbQueue)
         do {
             try repo.upsertNote(note)
             if isNew {
-                currentNoteId = noteId
+                hasNote = true
                 currentNoteCreatedAt = now
             }
             lastSavedNoteText = text
@@ -1043,25 +1022,25 @@ final class CaptionViewModel: ObservableObject {
     }
 
     private func saveNoteImmediately() {
-        guard currentNoteId != nil || !noteText.isEmpty,
+        guard hasNote || !noteText.isEmpty,
               noteText != lastSavedNoteText else { return }
         saveNote(text: noteText)
     }
 
     /// DB からスクリーンショット一覧を再読み込みする。
     func reloadScreenshots() {
-        guard let transcriptionId = currentTranscriptionId,
+        guard let meetingId = currentMeetingId,
               let dbQueue = currentDbQueue else {
             screenshots = []
             return
         }
-        let repo = TranscriptionRepository(dbQueue: dbQueue)
-        screenshots = (try? repo.fetchScreenshots(forTranscriptionId: transcriptionId)) ?? []
+        let repo = MeetingRepository(dbQueue: dbQueue)
+        screenshots = (try? repo.fetchScreenshots(forMeetingId: meetingId)) ?? []
     }
 
-    func deleteScreenshot(_ screenshot: ScreenshotRecord) {
+    func deleteScreenshot(_ screenshot: MeetingScreenshotRecord) {
         guard let dbQueue = currentDbQueue else { return }
-        let repo = TranscriptionRepository(dbQueue: dbQueue)
+        let repo = MeetingRepository(dbQueue: dbQueue)
         try? repo.deleteScreenshot(id: screenshot.id)
         reloadScreenshots()
     }
