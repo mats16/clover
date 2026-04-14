@@ -7,6 +7,13 @@ PROJECT_DIR="$(dirname "$SCRIPT_DIR")"
 
 cd "$PROJECT_DIR"
 
+# .env.local から環境変数を読み込む（SENTRY_DSN など）
+if [ -f .env.local ]; then
+    set -a
+    source .env.local
+    set +a
+fi
+
 echo "=== Building ${APP_NAME} (debug) ==="
 swift build
 

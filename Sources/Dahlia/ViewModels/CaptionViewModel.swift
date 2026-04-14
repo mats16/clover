@@ -231,6 +231,7 @@ final class CaptionViewModel: ObservableObject {
             } catch {
                 Logger(subsystem: "com.dahlia", category: "CaptionViewModel")
                     .error("Failed to load transcription \(transcriptionId): \(error)")
+                ErrorReportingService.capture(error, context: ["source": "loadTranscription"])
                 return
             }
 
@@ -437,6 +438,7 @@ final class CaptionViewModel: ObservableObject {
             } catch {
                 self.isPreparingAnalyzer = false
                 self.errorMessage = L10n.speechPreparationFailed(error.localizedDescription)
+                ErrorReportingService.capture(error, context: ["source": "prepareAnalyzer"])
             }
         }
     }
@@ -573,6 +575,7 @@ final class CaptionViewModel: ObservableObject {
             self.errorMessage = nil
         } catch {
             self.errorMessage = error.localizedDescription
+            ErrorReportingService.capture(error, context: ["source": "startListening"])
             audioManager?.stopCapture()
             audioManager = nil
             systemAudioManager?.stopCapture()
@@ -778,6 +781,7 @@ final class CaptionViewModel: ObservableObject {
                 summaryError = error.localizedDescription
             }
             summaryProgress.summaryGeneration = .failed(error.localizedDescription)
+            ErrorReportingService.capture(error, context: ["source": "summaryGeneration"])
         }
 
         if summaryGeneratingTranscriptionId == transcriptionId {

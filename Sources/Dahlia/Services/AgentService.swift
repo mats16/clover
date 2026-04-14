@@ -71,9 +71,9 @@ final class AgentService: ObservableObject {
     private let logger = Logger(subsystem: "com.dahlia", category: "AgentService")
 
     /// 結果を UI に表示しないツール。
-    static let toolsOmitResult: Set<String> = ["Glob", "Grep", "Read", "Write", "Edit", "TodoWrite"]
+    static let toolsOmitResult: Set = ["Glob", "Grep", "Read", "Write", "Edit", "TodoWrite"]
     /// 入力サマリーを省略するツール。
-    static let toolsOmitInputSummary: Set<String> = ["TodoWrite"]
+    static let toolsOmitInputSummary: Set = ["TodoWrite"]
 
     // MARK: - Lifecycle
 
@@ -130,6 +130,7 @@ final class AgentService: ObservableObject {
             try proc.run()
         } catch {
             logger.error("Failed to launch claude process: \(error.localizedDescription)")
+            ErrorReportingService.capture(error, context: ["source": "agentProcessLaunch"])
             messages.append(AgentMessage(role: .error, content: "Claude Code の起動に失敗しました: \(error.localizedDescription)"))
             return
         }
@@ -370,7 +371,7 @@ final class AgentService: ObservableObject {
         case "Skill":
             return (input["skill"] as? String) ?? toolName
         default:
-            if Self.toolsOmitInputSummary.contains(toolName) { return toolName }
+            if toolsOmitInputSummary.contains(toolName) { return toolName }
             if let data = try? JSONSerialization.data(withJSONObject: input, options: [.sortedKeys]),
                let str = String(data: data, encoding: .utf8) {
                 return String(str.prefix(120))

@@ -140,14 +140,14 @@ private struct AgentLauncherView: View {
                     projectURL: projectURL,
                     projectId: project.id,
                     projectName: project.name,
-                    vaultURL: vaultURL,
+                    vaultURL: vaultURL
                 )
             }
 
             viewModel.startAgent(
                 mode: .transcript(store: viewModel.store),
                 initialMessage: "文字起こしモードを開始します。リアルタイムの文字起こしが随時送信されます。準備ができたら教えてください。",
-                workingDirectory: sidebarViewModel.selectedProjectURL,
+                workingDirectory: sidebarViewModel.selectedProjectURL
             )
         }
     }
