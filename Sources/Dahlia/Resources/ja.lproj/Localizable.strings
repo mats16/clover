@@ -48,6 +48,8 @@
 "Export" = "書き出し";
 "Clear transcription" = "文字起こしをクリア";
 "New Transcription" = "新規文字起こし";
+"Screen" = "画面";
+"Source" = "ソース";
 
 /* Detail Tabs */
 "Summary" = "要約";
@@ -72,9 +74,15 @@
 "Enable the Agent sidebar to interact with Claude. This is a beta feature." = "Claude と対話できるエージェントサイドバーを有効にします。これはベータ機能です。";
 
 /* Audio Source Mode */
+"Audio source" = "音声ソース";
+"Microphone" = "マイク";
 "Mic" = "マイク";
 "System" = "システム";
+"System Audio" = "システムオーディオ";
 "Both" = "両方";
+"None" = "なし";
+"No computer audio" = "コンピュータ音声なし";
+"Record computer audio" = "コンピュータ音声を録音";
 
 /* Settings */
 "General" = "一般";
@@ -142,6 +150,8 @@
 "Invalid audio hardware format" = "無効なオーディオハードウェアフォーマットです";
 "Failed to create audio format converter" = "オーディオフォーマットコンバーターの作成に失敗しました";
 "Microphone access denied. Please allow it in System Settings > Privacy & Security > Microphone." = "マイクのアクセスが拒否されました。システム設定 > プライバシーとセキュリティ > マイク で許可してください";
+"The selected microphone is unavailable" = "選択したマイクは利用できません";
+"Select at least one audio source" = "少なくとも 1 つの音声ソースを選択してください";
 
 /* Error Messages - ViewModel */
 "Speech recognition is not available on this Mac" = "この Mac では音声認識を利用できません";

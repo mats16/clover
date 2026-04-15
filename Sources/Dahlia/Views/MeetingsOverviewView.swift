@@ -138,22 +138,6 @@ struct MeetingsOverviewView: View {
             .frame(maxWidth: .infinity, alignment: .leading)
         }
         .background(.background)
-        .overlay(alignment: .bottom) {
-            if !sidebarViewModel.selectedMeetingIds.isEmpty {
-                BatchSelectionBar(
-                    selectedCount: sidebarViewModel.selectedMeetingIds.count,
-                    onClearSelection: {
-                        sidebarViewModel.clearMeetingSelection()
-                    },
-                    onDelete: {
-                        sidebarViewModel.deleteMeetings(ids: sidebarViewModel.selectedMeetingIds)
-                    }
-                )
-                .padding(.bottom, 20)
-                .transition(.move(edge: .bottom).combined(with: .opacity))
-            }
-        }
-        .animation(.spring(duration: 0.3), value: isMultiSelectMode)
         .onDeleteCommand(perform: deleteSelection)
     }
 
@@ -434,46 +418,80 @@ private struct MeetingsOverviewRow: View {
 
 // MARK: - Batch Selection Bar
 
-private struct BatchSelectionBar: View {
+struct BatchSelectionBar: View {
     let selectedCount: Int
     let onClearSelection: () -> Void
     let onDelete: () -> Void
 
+    @State private var isClearHovered = false
+    @State private var isDeleteHovered = false
+
     var body: some View {
-        HStack(spacing: 0) {
+        HStack(spacing: 6) {
             HStack(spacing: 6) {
                 Text(L10n.selectedCount(selectedCount))
-                    .font(.subheadline.weight(.medium))
+                    .font(.system(size: 14, weight: .semibold))
+                    .foregroundStyle(.primary)
 
                 Button(action: onClearSelection) {
                     Image(systemName: "xmark")
-                        .font(.caption.weight(.semibold))
+                        .font(.system(size: 12, weight: .semibold))
                         .foregroundStyle(.secondary)
+                        .padding(.horizontal, 12)
+                        .padding(.vertical, 8)
+                        .background(
+                            RoundedRectangle(cornerRadius: 14)
+                                .fill(.quaternary)
+                                .opacity(isClearHovered ? 1 : 0)
+                        )
+                        .overlay(
+                            RoundedRectangle(cornerRadius: 14)
+                                .stroke(.quaternary, lineWidth: 1)
+                                .allowsHitTesting(false)
+                                .opacity(isClearHovered ? 1 : 0)
+                        )
                 }
                 .buttonStyle(.plain)
+                .onHover { hovering in
+                    isClearHovered = hovering
+                }
             }
             .padding(.horizontal, 16)
-
-            Divider()
-                .frame(height: 20)
 
             Button(action: onDelete) {
                 Label(L10n.delete, systemImage: "trash")
-                    .font(.subheadline.weight(.medium))
-                    .foregroundStyle(.red)
+                    .font(.system(size: 14, weight: .semibold))
+                    .foregroundStyle(isDeleteHovered ? .white : .red)
+                    .padding(.horizontal, 18)
+                    .padding(.vertical, 9)
+                    .background(
+                        Capsule()
+                            .fill(isDeleteHovered ? Color.red : Color.clear)
+                    )
+                    .overlay {
+                        Capsule()
+                            .stroke(isDeleteHovered ? Color.red : Color.primary.opacity(0.12), lineWidth: 1)
+                            .allowsHitTesting(false)
+                    }
+                    .shadow(color: .black.opacity(isDeleteHovered ? 0.18 : 0), radius: isDeleteHovered ? 10 : 0, y: isDeleteHovered ? 3 : 0)
             }
             .buttonStyle(.plain)
-            .padding(.horizontal, 16)
+            .onHover { hovering in
+                isDeleteHovered = hovering
+            }
         }
-        .padding(.vertical, 10)
+        .padding(.horizontal, 12)
+        .padding(.vertical, 8)
         .background(
             Capsule()
-                .fill(.regularMaterial)
-                .shadow(color: .black.opacity(0.10), radius: 12, y: 4)
+                .fill(.background)
+                .shadow(color: .black.opacity(0.12), radius: 10, y: 4)
+                .allowsHitTesting(false)
         )
         .overlay(
             Capsule()
-                .stroke(.quaternary, lineWidth: 0.5)
+                .stroke(.quaternary, lineWidth: 1)
+                .allowsHitTesting(false)
         )
     }
 }

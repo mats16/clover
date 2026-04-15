@@ -1,29 +1,6 @@
 @preconcurrency import AVFoundation
 import ScreenCaptureKit
 
-/// 音声入力ソースの選択モード
-enum AudioSourceMode: String, CaseIterable {
-    case microphone
-    case systemAudio
-    case both
-
-    var label: String {
-        switch self {
-        case .microphone: L10n.mic
-        case .systemAudio: L10n.system
-        case .both: L10n.both
-        }
-    }
-
-    var iconName: String {
-        switch self {
-        case .microphone: "mic.fill"
-        case .systemAudio: "speaker.wave.2.fill"
-        case .both: "person.wave.2.fill"
-        }
-    }
-}
-
 enum SystemAudioCaptureError: Error, LocalizedError {
     case screenRecordingPermissionDenied
     case noDisplayFound

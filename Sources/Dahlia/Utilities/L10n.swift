@@ -68,6 +68,7 @@ enum L10n {
 
     // MARK: - Control Panel
 
+    static var audioSource: String { String(localized: "Audio source", bundle: bundle) }
     static var preparingSpeechRecognition: String { String(localized: "Preparing speech recognition...", bundle: bundle) }
     static var recognizing: String { String(localized: "Recognizing...", bundle: bundle) }
     static var transcription: String { String(localized: "Transcription", bundle: bundle) }
@@ -78,6 +79,8 @@ enum L10n {
     static var export: String { String(localized: "Export", bundle: bundle) }
     static var clearTranscription: String { String(localized: "Clear transcription", bundle: bundle) }
     static var newTranscription: String { String(localized: "New Transcription", bundle: bundle) }
+    static var screen: String { String(localized: "Screen", bundle: bundle) }
+    static var source: String { String(localized: "Source", bundle: bundle) }
 
     // MARK: - Detail Tabs
 
@@ -118,9 +121,14 @@ enum L10n {
 
     // MARK: - Audio Source Mode
 
+    static var microphone: String { String(localized: "Microphone", bundle: bundle) }
     static var mic: String { String(localized: "Mic", bundle: bundle) }
     static var system: String { String(localized: "System", bundle: bundle) }
+    static var systemAudio: String { String(localized: "System Audio", bundle: bundle) }
     static var both: String { String(localized: "Both", bundle: bundle) }
+    static var none: String { String(localized: "None", bundle: bundle) }
+    static var noComputerAudio: String { String(localized: "No computer audio", bundle: bundle) }
+    static var recordComputerAudio: String { String(localized: "Record computer audio", bundle: bundle) }
 
     // MARK: - Settings
 
@@ -210,6 +218,8 @@ enum L10n {
         localized: "Microphone access denied. Please allow it in System Settings > Privacy & Security > Microphone.",
         bundle: bundle
     ) }
+    static var microphoneUnavailable: String { String(localized: "The selected microphone is unavailable", bundle: bundle) }
+    static var noAudioSourceSelected: String { String(localized: "Select at least one audio source", bundle: bundle) }
 
     // MARK: - Error Messages (ViewModel)
 

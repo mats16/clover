@@ -48,6 +48,8 @@
 "Export" = "Export";
 "Clear transcription" = "Clear transcription";
 "New Transcription" = "New Transcription";
+"Screen" = "Screen";
+"Source" = "Source";
 
 /* Detail Tabs */
 "Summary" = "Summary";
@@ -72,9 +74,15 @@
 "Enable the Agent sidebar to interact with Claude. This is a beta feature." = "Enable the Agent sidebar to interact with Claude. This is a beta feature.";
 
 /* Audio Source Mode */
+"Audio source" = "Audio source";
+"Microphone" = "Microphone";
 "Mic" = "Mic";
 "System" = "System";
+"System Audio" = "System Audio";
 "Both" = "Both";
+"None" = "None";
+"No computer audio" = "No computer audio";
+"Record computer audio" = "Record computer audio";
 
 /* Settings */
 "General" = "General";
@@ -142,6 +150,8 @@
 "Invalid audio hardware format" = "Invalid audio hardware format";
 "Failed to create audio format converter" = "Failed to create audio format converter";
 "Microphone access denied. Please allow it in System Settings > Privacy & Security > Microphone." = "Microphone access denied. Please allow it in System Settings > Privacy & Security > Microphone.";
+"The selected microphone is unavailable" = "The selected microphone is unavailable";
+"Select at least one audio source" = "Select at least one audio source";
 
 /* Error Messages - ViewModel */
 "Speech recognition is not available on this Mac" = "Speech recognition is not available on this Mac";

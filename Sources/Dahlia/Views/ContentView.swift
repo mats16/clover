@@ -34,9 +34,25 @@ struct ContentView: View {
                     }
                 }
                 .overlay(alignment: .bottom) {
-                    if shouldShowFloatingActionBar {
-                        FloatingActionBar(viewModel: viewModel, sidebarViewModel: sidebarViewModel)
-                            .padding(.bottom, 20)
+                    if shouldShowBottomOverlayBar {
+                        HStack(spacing: 12) {
+                            if shouldShowFloatingActionBar {
+                                FloatingActionBar(viewModel: viewModel, sidebarViewModel: sidebarViewModel)
+                            }
+
+                            if shouldShowBatchSelectionBar {
+                                BatchSelectionBar(
+                                    selectedCount: sidebarViewModel.selectedMeetingIds.count,
+                                    onClearSelection: {
+                                        sidebarViewModel.clearMeetingSelection()
+                                    },
+                                    onDelete: {
+                                        sidebarViewModel.deleteMeetings(ids: sidebarViewModel.selectedMeetingIds)
+                                    }
+                                )
+                            }
+                        }
+                        .padding(.bottom, 20)
                     }
                 }
         }
@@ -107,6 +123,16 @@ struct ContentView: View {
 
     private var shouldShowFloatingActionBar: Bool {
         viewModel.isListening || isShowingMeetingDetail
+    }
+
+    private var shouldShowBatchSelectionBar: Bool {
+        sidebarViewModel.selectedDestination == .meetings
+            && sidebarViewModel.selectedMeetingId == nil
+            && !sidebarViewModel.selectedMeetingIds.isEmpty
+    }
+
+    private var shouldShowBottomOverlayBar: Bool {
+        shouldShowFloatingActionBar || shouldShowBatchSelectionBar
     }
 
     private var isShowingMeetingDetail: Bool {

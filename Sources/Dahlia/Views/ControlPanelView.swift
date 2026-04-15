@@ -1,4 +1,5 @@
 import AppKit
+import CoreAudio
 import SwiftUI
 import UniformTypeIdentifiers
 
@@ -154,19 +155,42 @@ private struct SessionSettingsMenu: View {
             // ── Transcribe ──
             Section("Transcribe") {
                 Menu {
-                    Picker(selection: $viewModel.audioSourceMode) {
-                        ForEach(AudioSourceMode.allCases, id: \.self) { mode in
-                            Text(mode.label).tag(mode)
+                    Picker(selection: $viewModel.selectedMicrophoneID) {
+                        Text(L10n.none).tag(AudioDeviceID?.none)
+
+                        if !viewModel.availableMicrophones.isEmpty {
+                            Divider()
+                        }
+
+                        ForEach(viewModel.availableMicrophones) { microphone in
+                            Text(microphone.name).tag(AudioDeviceID?.some(microphone.id))
                         }
                     } label: {
                         EmptyView()
                     }
                     .pickerStyle(.inline)
                     .labelsHidden()
-                    .disabled(viewModel.isListening)
                 } label: {
-                    Label("Audio source", systemImage: "waveform.badge.microphone")
+                    Label(L10n.microphone, systemImage: "mic.fill")
                 }
+                .disabled(viewModel.isListening)
+                .onAppear {
+                    viewModel.refreshAvailableMicrophones()
+                }
+
+                Menu {
+                    Picker(selection: $viewModel.isSystemAudioEnabled) {
+                        Text(L10n.noComputerAudio).tag(false)
+                        Text(L10n.recordComputerAudio).tag(true)
+                    } label: {
+                        EmptyView()
+                    }
+                    .pickerStyle(.inline)
+                    .labelsHidden()
+                } label: {
+                    Label(L10n.systemAudio, systemImage: "speaker.wave.2.fill")
+                }
+                .disabled(viewModel.isListening)
 
                 Menu {
                     Picker(selection: $viewModel.selectedLocale) {
@@ -195,7 +219,7 @@ private struct SessionSettingsMenu: View {
             }
 
             // ── Screenshots ──
-            Section("Screenshots") {
+            Section(L10n.screen) {
                 Menu {
                     Picker(selection: $viewModel.selectedWindowID) {
                         Text("デスクトップ全体").tag(CGWindowID?.none)
@@ -214,7 +238,7 @@ private struct SessionSettingsMenu: View {
                     .pickerStyle(.inline)
                     .labelsHidden()
                 } label: {
-                    Label("Capture source", systemImage: "photo.badge.plus")
+                    Label(L10n.source, systemImage: "photo.badge.plus")
                 }
             }
         } label: {
@@ -295,7 +319,7 @@ private struct TranscribeButton: View {
     }
 
     private var isEnabled: Bool {
-        viewModel.isListening || (viewModel.analyzerReady && sidebarViewModel.selectedProjectURL != nil)
+        viewModel.isListening || (viewModel.hasEnabledAudioSource && viewModel.analyzerReady && sidebarViewModel.selectedProjectURL != nil)
     }
 
     var body: some View {

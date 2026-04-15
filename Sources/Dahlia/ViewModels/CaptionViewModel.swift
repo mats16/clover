@@ -1,4 +1,5 @@
 import Combine
+import CoreAudio
 import GRDB
 import os
 @preconcurrency import ScreenCaptureKit
@@ -32,7 +33,9 @@ final class CaptionViewModel: ObservableObject {
     @Published var analyzerReady = false
     @Published var isPreparingAnalyzer = false
     @Published var errorMessage: String?
-    @Published var audioSourceMode: AudioSourceMode = .both
+    @Published var availableMicrophones: [MicrophoneDevice] = []
+    @Published var selectedMicrophoneID: AudioDeviceID? = AudioCaptureManager.defaultInputDeviceID()
+    @Published var isSystemAudioEnabled = true
     @Published var selectedLocale: String = AppSettings.shared.transcriptionLocale
     @Published var supportedLocales: [Locale] = []
     @Published var filteredLocales: [Locale] = []
@@ -81,11 +84,11 @@ final class CaptionViewModel: ObservableObject {
         !isListening && currentMeetingId != nil
     }
 
-    /// マイクが有効か（audioSourceMode から導出）。
-    var isMicEnabled: Bool { audioSourceMode == .microphone || audioSourceMode == .both }
+    /// マイクが有効か。
+    var isMicEnabled: Bool { selectedMicrophoneID != nil }
 
-    /// システム音声が有効か（audioSourceMode から導出）。
-    var isSystemAudioEnabled: Bool { audioSourceMode == .systemAudio || audioSourceMode == .both }
+    /// 少なくとも 1 つの音声ソースが有効か。
+    var hasEnabledAudioSource: Bool { isMicEnabled || isSystemAudioEnabled }
 
     // MARK: - Recording Context (録音中のナビゲーション時に保持)
 
@@ -125,6 +128,7 @@ final class CaptionViewModel: ObservableObject {
 
     init() {
         resubscribeStoreCancellable()
+        refreshAvailableMicrophones()
 
         // AppSettings の表示言語設定変更を監視
         settingsCancellable = UserDefaults.standard
@@ -147,6 +151,19 @@ final class CaptionViewModel: ObservableObject {
                 enabled.contains(locale.identifier)
                     || locale.identifier == selectedLocale
             }
+        }
+    }
+
+    func refreshAvailableMicrophones() {
+        let devices = AudioCaptureManager.availableInputDevices()
+
+        if devices != availableMicrophones {
+            availableMicrophones = devices
+        }
+
+        if let currentMicrophoneID = selectedMicrophoneID,
+           !devices.contains(where: { $0.id == currentMicrophoneID }) {
+            self.selectedMicrophoneID = AudioCaptureManager.defaultInputDeviceID()
         }
     }
 
@@ -531,6 +548,11 @@ final class CaptionViewModel: ObservableObject {
             return
         }
 
+        guard hasEnabledAudioSource else {
+            errorMessage = L10n.noAudioSourceSelected
+            return
+        }
+
         pipelines.removeAll()
         store.recordingStartTime = Date()
 
@@ -569,7 +591,11 @@ final class CaptionViewModel: ObservableObject {
 
             if isMicEnabled {
                 let (service, bridge, format) = try await buildPipeline(locale: primaryLocale, speakerLabel: "mic")
-                try startMicrophoneCapture(bridge: bridge, targetFormat: format)
+                try startMicrophoneCapture(
+                    bridge: bridge,
+                    targetFormat: format,
+                    selectedDeviceID: selectedMicrophoneID
+                )
                 pipelines.append((service: service, bridge: bridge))
             }
             if isSystemAudioEnabled {
@@ -1096,12 +1122,16 @@ final class CaptionViewModel: ObservableObject {
 
     // MARK: - Private Helpers
 
-    private func startMicrophoneCapture(bridge: AudioBufferBridge, targetFormat: AVAudioFormat) throws {
+    private func startMicrophoneCapture(
+        bridge: AudioBufferBridge,
+        targetFormat: AVAudioFormat,
+        selectedDeviceID: AudioDeviceID?
+    ) throws {
         let manager = AudioCaptureManager()
         manager.onAudioBuffer = { [bridge] buffer in
             bridge.appendBuffer(buffer)
         }
-        try manager.startCapture(targetFormat: targetFormat)
+        try manager.startCapture(targetFormat: targetFormat, selectedDeviceID: selectedDeviceID)
         self.audioManager = manager
     }
 
