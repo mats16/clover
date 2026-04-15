@@ -59,7 +59,7 @@ private struct DetailTabBar: View {
 
 /// 画面下部にフローティング表示するアクションバー。
 /// 設定メニュー・文字起こし開始/停止・スクリーンショット取得をまとめて配置する。
-private struct FloatingActionBar: View {
+struct FloatingActionBar: View {
     @ObservedObject var viewModel: CaptionViewModel
     var sidebarViewModel: SidebarViewModel
 
@@ -281,11 +281,16 @@ private struct TranscribeButton: View {
         }
         .buttonStyle(.plain)
         .pointerStyle(.link)
-        .disabled(!viewModel.analyzerReady || sidebarViewModel.selectedProjectURL == nil)
+        .disabled(!viewModel.isListening && (!viewModel.analyzerReady || sidebarViewModel.selectedProjectURL == nil))
         .keyboardShortcut(.space, modifiers: [])
     }
 
     private func toggle() {
+        if viewModel.isListening {
+            viewModel.stopListening()
+            return
+        }
+
         if viewModel.isViewingHistory {
             guard let dbQueue = sidebarViewModel.dbQueue,
                   let projectURL = sidebarViewModel.selectedProjectURL,
@@ -438,7 +443,7 @@ private struct ScreenshotButton: View {
         .foregroundStyle(.primary)
         .buttonStyle(.plain)
         .pointerStyle(.link)
-        .disabled(viewModel.currentMeetingId == nil)
+        .disabled(!viewModel.canTakeScreenshot)
         .help("スクリーンショットを撮影")
     }
 }
@@ -682,10 +687,6 @@ struct ControlPanelView: View {
             cancelMeetingRename()
         }
         .navigationTitle(headerTitle)
-        .overlay(alignment: .bottom) {
-            FloatingActionBar(viewModel: viewModel, sidebarViewModel: sidebarViewModel)
-                .padding(.bottom, 20)
-        }
         .overlay(alignment: .bottomTrailing) {
             if viewModel.summaryProgress.isVisible {
                 SummaryProgressToastView(state: viewModel.summaryProgress)

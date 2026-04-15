@@ -100,6 +100,14 @@ final class CaptionViewModel: ObservableObject {
         isListening && recordingContext != nil
     }
 
+    var activeMeetingIdForSessionControls: UUID? {
+        recordingContext?.meetingId ?? currentMeetingId
+    }
+
+    var canTakeScreenshot: Bool {
+        activeMeetingIdForSessionControls != nil && activeDbQueueForSessionControls != nil
+    }
+
     // MARK: - Private
 
     private var currentDbQueue: DatabaseQueue?
@@ -110,6 +118,10 @@ final class CaptionViewModel: ObservableObject {
     private var storeCancellable: AnyCancellable?
     private var settingsCancellable: AnyCancellable?
     private var meetingLoadTask: Task<Void, Never>?
+
+    private var activeDbQueueForSessionControls: DatabaseQueue? {
+        recordingContext?.dbQueue ?? currentDbQueue
+    }
 
     init() {
         resubscribeStoreCancellable()
@@ -919,8 +931,10 @@ final class CaptionViewModel: ObservableObject {
     }
 
     func takeScreenshot() {
-        guard let meetingId = currentMeetingId,
-              let dbQueue = currentDbQueue else { return }
+        guard let meetingId = activeMeetingIdForSessionControls,
+              let dbQueue = activeDbQueueForSessionControls else { return }
+
+        let shouldRefreshVisibleScreenshots = currentMeetingId == meetingId
 
         Task {
             do {
@@ -969,7 +983,9 @@ final class CaptionViewModel: ObservableObject {
                 try await dbQueue.write { db in
                     try record.insert(db)
                 }
-                reloadScreenshots()
+                if shouldRefreshVisibleScreenshots {
+                    reloadScreenshots()
+                }
             } catch {
                 errorMessage = "スクリーンショットの取得に失敗しました: \(error.localizedDescription)"
             }
@@ -1040,10 +1056,12 @@ final class CaptionViewModel: ObservableObject {
     }
 
     func deleteScreenshot(_ screenshot: MeetingScreenshotRecord) {
-        guard let dbQueue = currentDbQueue else { return }
+        guard let dbQueue = activeDbQueueForSessionControls else { return }
         let repo = MeetingRepository(dbQueue: dbQueue)
         try? repo.deleteScreenshot(id: screenshot.id)
-        reloadScreenshots()
+        if currentMeetingId == screenshot.meetingId {
+            reloadScreenshots()
+        }
     }
 
     func exportTranscript() {

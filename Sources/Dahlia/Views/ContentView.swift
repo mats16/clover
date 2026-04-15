@@ -33,6 +33,12 @@ struct ContentView: View {
                         }
                     }
                 }
+                .overlay(alignment: .bottom) {
+                    if shouldShowFloatingActionBar {
+                        FloatingActionBar(viewModel: viewModel, sidebarViewModel: sidebarViewModel)
+                            .padding(.bottom, 20)
+                    }
+                }
         }
         .onChange(of: sidebarViewModel.selectedMeetingId) { oldId, newId in
             guard oldId != newId else { return }
@@ -97,6 +103,19 @@ struct ContentView: View {
         .accessibilityLabel(L10n.agent)
         .padding(.top, 14)
         .padding(.trailing, 14)
+    }
+
+    private var shouldShowFloatingActionBar: Bool {
+        viewModel.isListening || isShowingMeetingDetail
+    }
+
+    private var isShowingMeetingDetail: Bool {
+        switch sidebarViewModel.selectedDestination {
+        case .meetings, .projects:
+            sidebarViewModel.selectedMeetingId != nil
+        case .home, .actionItems, .ask:
+            false
+        }
     }
 
     @ViewBuilder
