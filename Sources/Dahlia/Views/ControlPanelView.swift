@@ -30,10 +30,10 @@ enum DetailTab: String, CaseIterable, Identifiable {
 }
 
 /// Circleback 風タブバー。選択中はアンダーラインでアクティブを示す。
+/// タブは左寄せで表示し、アクションボタンは画面下部のフローティングバーに配置する。
 private struct DetailTabBar: View {
     @Binding var selection: DetailTab
     @ObservedObject var viewModel: CaptionViewModel
-    var sidebarViewModel: SidebarViewModel
     @Namespace private var tabNamespace
 
     /// フォルダ選択時（transcription 未選択）は全タブを無効化する。
@@ -58,13 +58,36 @@ private struct DetailTabBar: View {
                     )
                     .disabled(isFolderOnly)
                 }
-                Spacer()
-                SessionSettingsMenu(viewModel: viewModel)
-                TranscribeButton(viewModel: viewModel, sidebarViewModel: sidebarViewModel)
-                ScreenshotButton(viewModel: viewModel)
+                Spacer(minLength: 0)
             }
             Divider()
         }
+    }
+}
+
+/// 画面下部にフローティング表示するアクションバー。
+/// 設定メニュー・文字起こし開始/停止・スクリーンショット取得をまとめて配置する。
+private struct FloatingActionBar: View {
+    @ObservedObject var viewModel: CaptionViewModel
+    var sidebarViewModel: SidebarViewModel
+
+    var body: some View {
+        HStack(spacing: 6) {
+            SessionSettingsMenu(viewModel: viewModel)
+            TranscribeButton(viewModel: viewModel, sidebarViewModel: sidebarViewModel)
+            ScreenshotButton(viewModel: viewModel)
+        }
+        .padding(.horizontal, 10)
+        .padding(.vertical, 6)
+        .background(
+            Capsule()
+                .fill(.background)
+                .shadow(color: .black.opacity(0.12), radius: 10, y: 4)
+        )
+        .overlay(
+            Capsule()
+                .stroke(.quaternary, lineWidth: 1)
+        )
     }
 }
 
@@ -451,8 +474,8 @@ struct ControlPanelView: View {
                     .progressViewStyle(.linear)
             }
 
-            // タブ切り替え
-            DetailTabBar(selection: $selectedTab, viewModel: viewModel, sidebarViewModel: sidebarViewModel)
+            // タブ切り替え（左寄せ）
+            DetailTabBar(selection: $selectedTab, viewModel: viewModel)
 
             // タブコンテンツ
             Group {
@@ -524,6 +547,10 @@ struct ControlPanelView: View {
                     .help(L10n.agent)
                 }
             }
+        }
+        .overlay(alignment: .bottom) {
+            FloatingActionBar(viewModel: viewModel, sidebarViewModel: sidebarViewModel)
+                .padding(.bottom, 20)
         }
         .overlay(alignment: .bottomTrailing) {
             if viewModel.summaryProgress.isVisible {
