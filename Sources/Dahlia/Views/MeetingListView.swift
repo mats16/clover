@@ -24,7 +24,27 @@ struct MeetingListView: View {
     var body: some View {
         VStack(spacing: 0) {
             HStack {
+                Button(action: { sidebarViewModel.deselectProject() }) {
+                    HStack(spacing: 4) {
+                        Image(systemName: "chevron.left")
+                            .font(.system(size: 12, weight: .semibold))
+                        Text(L10n.projects)
+                            .font(.subheadline.weight(.medium))
+                    }
+                    .foregroundStyle(.secondary)
+                }
+                .buttonStyle(.plain)
+
                 Spacer()
+
+                if let project = sidebarViewModel.selectedProject {
+                    Text(project.name)
+                        .font(.headline)
+                        .lineLimit(1)
+                }
+
+                Spacer()
+
                 Button(action: createNewMeeting) {
                     Image(systemName: "plus")
                         .font(.system(size: 13))

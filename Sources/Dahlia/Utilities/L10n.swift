@@ -59,6 +59,11 @@ enum L10n {
     static var inProgress: String { String(localized: "In Progress", bundle: bundle) }
     static var noMeetingsYet: String { String(localized: "No meetings yet", bundle: bundle) }
     static var noMeetingsMatchFilter: String { String(localized: "No meetings match the current filter.", bundle: bundle) }
+    static var noProjectsYet: String { String(localized: "No projects yet", bundle: bundle) }
+    static var noProjectsMatchFilter: String { String(localized: "No projects match the current filter.", bundle: bundle) }
+    static var missingOnDisk: String { String(localized: "Missing on Disk", bundle: bundle) }
+    static func meetingCount(_ count: Int) -> String { String(localized: "\(count) meetings", bundle: bundle) }
+    static var noMeetings: String { String(localized: "No meetings", bundle: bundle) }
     static var noConversationDetected: String { String(localized: "We couldn't detect any conversation in this meeting.", bundle: bundle) }
     static var recordingNow: String { String(localized: "Recording now", bundle: bundle) }
     static var yesterday: String { String(localized: "Yesterday", bundle: bundle) }

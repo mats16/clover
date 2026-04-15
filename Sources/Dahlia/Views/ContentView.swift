@@ -40,7 +40,17 @@ struct ContentView: View {
                                 FloatingActionBar(viewModel: viewModel, sidebarViewModel: sidebarViewModel)
                             }
 
-                            if shouldShowBatchSelectionBar {
+                            if shouldShowBatchProjectSelectionBar {
+                                BatchSelectionBar(
+                                    selectedCount: sidebarViewModel.selectedProjectIds.count,
+                                    onClearSelection: {
+                                        sidebarViewModel.clearProjectSelection()
+                                    },
+                                    onDelete: {
+                                        sidebarViewModel.deleteProjects(ids: sidebarViewModel.selectedProjectIds)
+                                    }
+                                )
+                            } else if shouldShowBatchMeetingSelectionBar {
                                 BatchSelectionBar(
                                     selectedCount: sidebarViewModel.selectedMeetingIds.count,
                                     onClearSelection: {
@@ -67,6 +77,10 @@ struct ContentView: View {
         .onChange(of: sidebarViewModel.selectedDestination) { oldValue, newValue in
             if oldValue != .meetings, newValue == .meetings {
                 sidebarViewModel.clearMeetingSelection()
+            }
+            if oldValue != .projects, newValue == .projects {
+                sidebarViewModel.clearProjectSelection()
+                sidebarViewModel.deselectProject()
             }
         }
         .onChange(of: viewModel.currentMeetingId) { oldId, newId in
@@ -125,10 +139,20 @@ struct ContentView: View {
         viewModel.isListening || isShowingMeetingDetail
     }
 
-    private var shouldShowBatchSelectionBar: Bool {
+    private var shouldShowBatchMeetingSelectionBar: Bool {
         sidebarViewModel.selectedDestination == .meetings
             && sidebarViewModel.selectedMeetingId == nil
             && !sidebarViewModel.selectedMeetingIds.isEmpty
+    }
+
+    private var shouldShowBatchProjectSelectionBar: Bool {
+        sidebarViewModel.selectedDestination == .projects
+            && sidebarViewModel.selectedProject == nil
+            && !sidebarViewModel.selectedProjectIds.isEmpty
+    }
+
+    private var shouldShowBatchSelectionBar: Bool {
+        shouldShowBatchMeetingSelectionBar || shouldShowBatchProjectSelectionBar
     }
 
     private var shouldShowBottomOverlayBar: Bool {
@@ -165,12 +189,18 @@ struct ContentView: View {
         }
     }
 
+    @ViewBuilder
     private var projectsWorkspaceContent: some View {
-        HSplitView {
-            ProjectBrowserView(sidebarViewModel: sidebarViewModel)
-                .frame(minWidth: 240, idealWidth: 280, maxWidth: 360, maxHeight: .infinity)
-
-            meetingsWorkspaceContent
+        if sidebarViewModel.selectedProject != nil {
+            meetingDetailOrList {
+                MeetingListView(
+                    viewModel: viewModel,
+                    sidebarViewModel: sidebarViewModel,
+                    onSelectMeeting: { _ in }
+                )
+            }
+        } else {
+            ProjectsOverviewView(sidebarViewModel: sidebarViewModel)
         }
     }
 
@@ -181,28 +211,6 @@ struct ContentView: View {
                 sidebarViewModel: sidebarViewModel,
                 onSelectMeeting: { _ in }
             )
-        }
-    }
-
-    @ViewBuilder
-    private var meetingsWorkspaceContent: some View {
-        if sidebarViewModel.selectedProject == nil {
-            placeholderView(
-                title: L10n.meetings,
-                systemImage: SidebarDestination.meetings.systemImage,
-                message: L10n.selectProjectFromProjects,
-                actionTitle: L10n.openProjects
-            ) {
-                sidebarViewModel.selectedDestination = .projects
-            }
-        } else {
-            meetingDetailOrList {
-                MeetingListView(
-                    viewModel: viewModel,
-                    sidebarViewModel: sidebarViewModel,
-                    onSelectMeeting: { _ in }
-                )
-            }
         }
     }
 
