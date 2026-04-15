@@ -86,10 +86,7 @@ private struct NewMeetingButton: View {
                     .font(.system(size: 12, weight: .medium))
                 Text(L10n.newMeeting)
                     .font(.system(size: 13, weight: .medium))
-                Spacer(minLength: 4)
-                Image(systemName: "chevron.down")
-                    .font(.system(size: 9, weight: .semibold))
-                    .foregroundStyle(.tertiary)
+                Spacer(minLength: 0)
             }
             .foregroundStyle(isDisabled ? Color.secondary : Color.primary)
             .padding(.horizontal, 10)
