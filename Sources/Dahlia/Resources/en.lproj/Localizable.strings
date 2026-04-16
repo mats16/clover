@@ -18,6 +18,7 @@
 "Projects" = "Projects";
 "Context" = "Context";
 "Action Items" = "Action Items";
+"Me" = "Me";
 "Ask" = "Ask";
 "New Project" = "New Project";
 "New meeting" = "New meeting";
@@ -38,6 +39,8 @@
 "Filter" = "Filter";
 "Search filters..." = "Search filters...";
 "Tags" = "Tags";
+"Assigned to me" = "Assigned to me";
+"Completed" = "Completed";
 "Project is" = "Project is";
 "Tag is" = "Tag is";
 "Add tag" = "Add tag";
@@ -49,6 +52,9 @@
 "In Progress" = "In Progress";
 "No meetings yet" = "No meetings yet";
 "No meetings match the current filter." = "No meetings match the current filter.";
+"No action items yet" = "No action items yet";
+"No action items match the current filter." = "No action items match the current filter.";
+"Action items extracted from summaries will appear here." = "Action items extracted from summaries will appear here.";
 "We couldn't detect any conversation in this meeting." = "We couldn't detect any conversation in this meeting.";
 "Recording now" = "Recording now";
 "Yesterday" = "Yesterday";
@@ -77,6 +83,10 @@
 "Screenshots" = "Screenshots";
 "Transcript" = "Transcript";
 "Agent" = "Agent";
+"Assign to me" = "Assign to me";
+"Remove assignee" = "Remove assignee";
+"Mark action item complete" = "Mark action item complete";
+"Mark action item incomplete" = "Mark action item incomplete";
 
 /* Agent */
 "Project Mode" = "Project Mode";
@@ -183,6 +193,9 @@
 "Speech recognition is not available on this Mac" = "Speech recognition is not available on this Mac";
 "Failed to prepare speech recognition: %@" = "Failed to prepare speech recognition: %@";
 "Failed to change language: %@" = "Failed to change language: %@";
+"Could not update action item assignee: %@" = "Could not update action item assignee: %@";
+"Could not delete action item: %@" = "Could not delete action item: %@";
+"Could not update action item: %@" = "Could not update action item: %@";
 "Speech recognition is not ready" = "Speech recognition is not ready";
 "System audio capture stopped" = "System audio capture stopped";
 

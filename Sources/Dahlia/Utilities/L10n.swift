@@ -47,6 +47,7 @@ enum L10n {
     static var projects: String { String(localized: "Projects", bundle: bundle) }
     static var context: String { String(localized: "Context", bundle: bundle) }
     static var actionItems: String { String(localized: "Action Items", bundle: bundle) }
+    static var me: String { String(localized: "Me", bundle: bundle) }
     static var ask: String { String(localized: "Ask", bundle: bundle) }
     static var newProject: String { String(localized: "New Project", bundle: bundle) }
     static var newMeeting: String { String(localized: "New meeting", bundle: bundle) }
@@ -67,6 +68,8 @@ enum L10n {
     static var filter: String { String(localized: "Filter", bundle: bundle) }
     static var searchFilters: String { String(localized: "Search filters...", bundle: bundle) }
     static var tags: String { String(localized: "Tags", bundle: bundle) }
+    static var assignedToMe: String { String(localized: "Assigned to me", bundle: bundle) }
+    static var completed: String { String(localized: "Completed", bundle: bundle) }
     static var projectIs: String { String(localized: "Project is", bundle: bundle) }
     static var tagIs: String { String(localized: "Tag is", bundle: bundle) }
     static var today: String { String(localized: "Today", bundle: bundle) }
@@ -75,6 +78,9 @@ enum L10n {
     static var noMeetingsMatchFilter: String { String(localized: "No meetings match the current filter.", bundle: bundle) }
     static var noProjectsYet: String { String(localized: "No projects yet", bundle: bundle) }
     static var noProjectsMatchFilter: String { String(localized: "No projects match the current filter.", bundle: bundle) }
+    static var noActionItemsYet: String { String(localized: "No action items yet", bundle: bundle) }
+    static var noActionItemsMatchFilter: String { String(localized: "No action items match the current filter.", bundle: bundle) }
+    static var actionItemsDescription: String { String(localized: "Action items extracted from summaries will appear here.", bundle: bundle) }
     static var missingOnDisk: String { String(localized: "Missing on Disk", bundle: bundle) }
     static func meetingCount(_ count: Int) -> String { String(localized: "\(count) meetings", bundle: bundle) }
     static var noMeetings: String { String(localized: "No meetings", bundle: bundle) }
@@ -117,6 +123,10 @@ enum L10n {
     static var screenshots: String { String(localized: "Screenshots", bundle: bundle) }
     static var transcript: String { String(localized: "Transcript", bundle: bundle) }
     static var agent: String { String(localized: "Agent", bundle: bundle) }
+    static var assignToMe: String { String(localized: "Assign to me", bundle: bundle) }
+    static var removeAssignee: String { String(localized: "Remove assignee", bundle: bundle) }
+    static var markActionItemComplete: String { String(localized: "Mark action item complete", bundle: bundle) }
+    static var markActionItemIncomplete: String { String(localized: "Mark action item incomplete", bundle: bundle) }
 
     // MARK: - Agent
 
@@ -278,6 +288,12 @@ enum L10n {
         bundle: bundle
     ) }
     static func languageChangeFailed(_ error: String) -> String { String(localized: "Failed to change language: \(error)", bundle: bundle) }
+    static func actionItemAssigneeUpdateFailed(_ error: String) -> String { String(
+        localized: "Could not update action item assignee: \(error)",
+        bundle: bundle
+    ) }
+    static func actionItemDeleteFailed(_ error: String) -> String { String(localized: "Could not delete action item: \(error)", bundle: bundle) }
+    static func actionItemUpdateFailed(_ error: String) -> String { String(localized: "Could not update action item: \(error)", bundle: bundle) }
     static var speechRecognitionNotReady: String { String(localized: "Speech recognition is not ready", bundle: bundle) }
     static var systemAudioCaptureStopped: String { String(localized: "System audio capture stopped", bundle: bundle) }
 

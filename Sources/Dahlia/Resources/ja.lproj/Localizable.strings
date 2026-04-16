@@ -18,6 +18,7 @@
 "Projects" = "Projects";
 "Context" = "Context";
 "Action Items" = "Action Items";
+"Me" = "自分";
 "Ask" = "Ask";
 "New Project" = "新規プロジェクト";
 "New meeting" = "New meeting";
@@ -38,6 +39,8 @@
 "Filter" = "フィルター";
 "Search filters..." = "フィルターを検索...";
 "Tags" = "タグ";
+"Assigned to me" = "自分担当";
+"Completed" = "完了";
 "Project is" = "プロジェクト";
 "Tag is" = "タグ";
 "Add tag" = "タグを追加";
@@ -49,6 +52,9 @@
 "In Progress" = "進行中";
 "No meetings yet" = "まだ meeting がありません";
 "No meetings match the current filter." = "現在のフィルターに一致する meeting はありません。";
+"No action items yet" = "まだ Action Items はありません";
+"No action items match the current filter." = "現在のフィルターに一致する Action Items はありません。";
+"Action items extracted from summaries will appear here." = "要約から抽出された Action Items がここに表示されます。";
 "We couldn't detect any conversation in this meeting." = "この meeting では会話を検出できませんでした。";
 "Recording now" = "録音中";
 "Yesterday" = "昨日";
@@ -77,6 +83,10 @@
 "Screenshots" = "スクリーンショット";
 "Transcript" = "文字起こし";
 "Agent" = "エージェント";
+"Assign to me" = "自分に割り当てる";
+"Remove assignee" = "担当を外す";
+"Mark action item complete" = "アクションアイテムを完了にする";
+"Mark action item incomplete" = "アクションアイテムを未完了に戻す";
 
 /* Agent */
 "Project Mode" = "プロジェクトモード";
@@ -183,6 +193,9 @@
 "Speech recognition is not available on this Mac" = "この Mac では音声認識を利用できません";
 "Failed to prepare speech recognition: %@" = "音声認識の準備に失敗: %@";
 "Failed to change language: %@" = "言語切替に失敗: %@";
+"Could not update action item assignee: %@" = "アクションアイテムの担当を更新できませんでした: %@";
+"Could not delete action item: %@" = "アクションアイテムを削除できませんでした: %@";
+"Could not update action item: %@" = "アクションアイテムを更新できませんでした: %@";
 "Speech recognition is not ready" = "音声認識が準備されていません";
 "System audio capture stopped" = "システム音声キャプチャが停止しました";
 

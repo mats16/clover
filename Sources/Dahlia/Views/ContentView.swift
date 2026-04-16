@@ -64,6 +64,11 @@ struct ContentView: View {
                 sidebarViewModel.clearProjectSelection()
                 sidebarViewModel.deselectProject()
             }
+            if oldValue != .actionItems, newValue == .actionItems {
+                sidebarViewModel.clearProjectSelection()
+                sidebarViewModel.deselectProject()
+                sidebarViewModel.clearMeetingSelection()
+            }
         }
         .onChange(of: viewModel.currentMeetingId) { oldId, newId in
             guard oldId != newId else { return }
@@ -108,11 +113,7 @@ struct ContentView: View {
         case .projects:
             projectsWorkspaceContent
         case .actionItems:
-            placeholderView(
-                title: L10n.actionItems,
-                systemImage: SidebarDestination.actionItems.systemImage,
-                message: L10n.actionItemsComingSoon
-            )
+            actionItemsOverviewContent
         case .ask:
             askWorkspaceContent
         }
@@ -346,6 +347,10 @@ struct ContentView: View {
                 onSelectMeeting: { _ in }
             )
         }
+    }
+
+    private var actionItemsOverviewContent: some View {
+        ActionItemsOverviewView(sidebarViewModel: sidebarViewModel)
     }
 
     @ViewBuilder

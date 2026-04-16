@@ -22,6 +22,8 @@ final class SidebarViewModel {
     var allMeetings: [MeetingOverviewItem] = []
     /// 現在の vault に属する全 project の集約一覧。
     var allProjectItems: [ProjectOverviewItem] = []
+    /// 現在の vault に属する全 action item の集約一覧。
+    var allActionItems: [ActionItemOverviewItem] = []
     /// 複数選択中のプロジェクト ID。
     var selectedProjectIds: Set<UUID> = []
     /// プロジェクト複数選択の範囲指定に使うアンカー。
@@ -139,6 +141,7 @@ final class SidebarViewModel {
     @ObservationIgnored private var allMeetingsObservation: AnyDatabaseCancellable?
     @ObservationIgnored private var allTagsObservation: AnyDatabaseCancellable?
     @ObservationIgnored private var allProjectsObservation: AnyDatabaseCancellable?
+    @ObservationIgnored private var allActionItemsObservation: AnyDatabaseCancellable?
     @ObservationIgnored private var projectObservation: AnyDatabaseCancellable?
     @ObservationIgnored private var vaultObservation: AnyDatabaseCancellable?
     @ObservationIgnored private var vaultSyncService: VaultSyncService?
@@ -161,6 +164,7 @@ final class SidebarViewModel {
         allMeetingsObservation?.cancel()
         allTagsObservation?.cancel()
         allProjectsObservation?.cancel()
+        allActionItemsObservation?.cancel()
         fileWatcher?.stopMonitoring()
 
         // 全 meeting 監視を停止
@@ -172,6 +176,7 @@ final class SidebarViewModel {
         allMeetings.removeAll()
         allTags.removeAll()
         allProjectItems.removeAll()
+        allActionItems.removeAll()
 
         // 選択状態をリセット
         selectedProject = nil
@@ -339,6 +344,63 @@ final class SidebarViewModel {
                 }
             }
         )
+
+        let actionItemsObservation = ValueObservation.tracking { db in
+            let actionItems = try ActionItemOverviewItem.fetchAll(
+                db,
+                sql: """
+                SELECT
+                    action_items.id AS actionItemId,
+                    action_items.meetingId AS meetingId,
+                    meetings.projectId AS projectId,
+                    projects.name AS projectName,
+                    meetings.name AS meetingName,
+                    meetings.createdAt AS meetingCreatedAt,
+                    action_items.title AS title,
+                    action_items.assignee AS assignee,
+                    action_items.isCompleted AS isCompleted
+                FROM action_items
+                INNER JOIN meetings ON meetings.id = action_items.meetingId
+                LEFT JOIN projects ON projects.id = meetings.projectId
+                WHERE meetings.vaultId = ?
+                """,
+                arguments: [vaultId]
+            )
+
+            return actionItems.sorted { lhs, rhs in
+                if lhs.isCompleted != rhs.isCompleted {
+                    return !lhs.isCompleted && rhs.isCompleted
+                }
+                if lhs.sortsAsMine != rhs.sortsAsMine {
+                    return lhs.sortsAsMine && !rhs.sortsAsMine
+                }
+                if lhs.meetingCreatedAt != rhs.meetingCreatedAt {
+                    return lhs.meetingCreatedAt > rhs.meetingCreatedAt
+                }
+
+                let titleComparison = lhs.title.localizedCaseInsensitiveCompare(rhs.title)
+                if titleComparison != .orderedSame {
+                    return titleComparison == .orderedAscending
+                }
+
+                let assigneeComparison = lhs.assignee.localizedCaseInsensitiveCompare(rhs.assignee)
+                if assigneeComparison != .orderedSame {
+                    return assigneeComparison == .orderedAscending
+                }
+
+                return lhs.actionItemId.uuidString < rhs.actionItemId.uuidString
+            }
+        }
+        allActionItemsObservation = actionItemsObservation.start(
+            in: dbQueue,
+            onError: { _ in },
+            onChange: { [weak self] actionItems in
+                Task { @MainActor in
+                    guard let self else { return }
+                    self.allActionItems = actionItems
+                }
+            }
+        )
     }
 
     // MARK: - Selection
@@ -398,6 +460,10 @@ final class SidebarViewModel {
             } else if destination == .projects {
                 clearProjectSelection()
                 deselectProject()
+            } else if destination == .actionItems {
+                clearProjectSelection()
+                deselectProject()
+                clearMeetingSelection()
             }
             return
         }
@@ -603,6 +669,30 @@ final class SidebarViewModel {
 
     func removeTagFromMeeting(id: UUID, tag: String) {
         try? meetingRepository?.removeTag(name: tag, fromMeetingId: id)
+    }
+
+    func setActionItemCompleted(id: UUID, isCompleted: Bool) {
+        do {
+            try meetingRepository?.setActionItemCompleted(id: id, isCompleted: isCompleted)
+        } catch {
+            lastError = error.localizedDescription
+        }
+    }
+
+    func setActionItemAssignee(id: UUID, assignee: String) {
+        do {
+            try meetingRepository?.setActionItemAssignee(id: id, assignee: assignee)
+        } catch {
+            lastError = error.localizedDescription
+        }
+    }
+
+    func deleteActionItem(id: UUID) {
+        do {
+            try meetingRepository?.deleteActionItem(id: id)
+        } catch {
+            lastError = error.localizedDescription
+        }
     }
 
     private(set) var allAvailableTags: [TagInfo] = []

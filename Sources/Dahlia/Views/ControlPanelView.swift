@@ -908,9 +908,16 @@ struct ControlPanelView: View {
     private var summaryTabContent: some View {
         if let summary = viewModel.sanitizedMeetingSummary {
             ScrollView {
-                MarkdownContentView(markdown: summary)
-                    .frame(maxWidth: .infinity, alignment: .leading)
-                    .padding(16)
+                VStack(alignment: .leading, spacing: 20) {
+                    if !viewModel.currentMeetingActionItems.isEmpty {
+                        MeetingActionItemsSection(viewModel: viewModel)
+                    }
+
+                    MarkdownContentView(markdown: summary)
+                        .frame(maxWidth: .infinity, alignment: .leading)
+                }
+                .padding(16)
+                .frame(maxWidth: .infinity, alignment: .leading)
             }
         } else {
             ContentUnavailableView {

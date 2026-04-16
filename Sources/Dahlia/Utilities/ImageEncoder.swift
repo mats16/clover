@@ -43,17 +43,17 @@ enum ImageEncoder {
     static func fileExtension(for mimeType: String) -> String? {
         switch mimeType.lowercased() {
         case "image/webp":
-            return "webp"
+            "webp"
         case "image/jpeg":
-            return "jpeg"
+            "jpeg"
         case "image/png":
-            return "png"
+            "png"
         case "image/gif":
-            return "gif"
+            "gif"
         case "image/tiff":
-            return "tiff"
+            "tiff"
         default:
-            return nil
+            nil
         }
     }
 

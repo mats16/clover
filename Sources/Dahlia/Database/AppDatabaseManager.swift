@@ -7,13 +7,19 @@ final class AppDatabaseManager: Sendable {
     let dbQueue: DatabaseQueue
 
     /// アプリケーションサポートディレクトリに DB を作成・オープンする。
-    init() throws {
-        let dbURL = Self.databaseURL
-        try FileManager.default.createDirectory(
-            at: dbURL.deletingLastPathComponent(),
-            withIntermediateDirectories: true
-        )
-        dbQueue = try DatabaseQueue(path: dbURL.path)
+    convenience init() throws {
+        try self.init(path: Self.databaseURL.path)
+    }
+
+    init(path: String) throws {
+        if path != ":memory:" {
+            let dbURL = URL(fileURLWithPath: path)
+            try FileManager.default.createDirectory(
+                at: dbURL.deletingLastPathComponent(),
+                withIntermediateDirectories: true
+            )
+        }
+        dbQueue = try DatabaseQueue(path: path)
         try Self.migrator.migrate(dbQueue)
     }
 
@@ -31,7 +37,7 @@ final class AppDatabaseManager: Sendable {
         // リリース前のため、旧スキーマとの互換性は持たず現行スキーマへ作り直す。
         migrator.eraseDatabaseOnSchemaChange = true
 
-        migrator.registerMigration("v1_currentSchema") { db in
+        migrator.registerMigration("v2_actionItemsSchema") { db in
             try createSchema(in: db)
         }
 
@@ -48,6 +54,7 @@ final class AppDatabaseManager: Sendable {
         try createNotesTable(in: db)
         try createScreenshotsTable(in: db)
         try createSummariesTable(in: db)
+        try createActionItemsTable(in: db)
     }
 
     private static func createVaultsTable(in db: Database) throws {
@@ -188,5 +195,21 @@ final class AppDatabaseManager: Sendable {
             t.column("summary", .text).notNull()
             t.column("createdAt", .datetime).notNull()
         }
+    }
+
+    private static func createActionItemsTable(in db: Database) throws {
+        try db.create(table: "action_items") { t in
+            t.primaryKey("id", .blob)
+            t.column("meetingId", .blob).notNull()
+                .references("meetings", onDelete: .cascade)
+            t.column("title", .text).notNull()
+            t.column("assignee", .text).notNull().defaults(to: "")
+            t.column("isCompleted", .boolean).notNull().defaults(to: false)
+        }
+        try db.create(
+            index: "action_items_on_meetingId",
+            on: "action_items",
+            columns: ["meetingId"]
+        )
     }
 }

@@ -7,6 +7,7 @@ enum SummaryService {
         let title: String
         let summary: String
         let tags: [String]
+        let actionItems: [SummaryActionItem]
     }
 
     private static let dateFormatter: DateFormatter = {
@@ -47,10 +48,13 @@ enum SummaryService {
         let structuredInstruction = """
 
         # Response Format
-        Your response MUST be a JSON object with exactly three keys:
+        Your response MUST be a JSON object with exactly four keys:
         - "title": a concise title for this meeting/transcript (one line, no quotes)
         - "summary": the full summary in Markdown format
         - "tags": an array of relevant short tags for categorization (empty array if none)
+        - "action_items": an array of objects with exactly two keys:
+          - "title": the concrete action item
+          - "assignee": who owns it, or an empty string if unclear
         """
         let systemPrompt = prompt + "\n\n# Language\nWrite the summary in \(languageName)." + structuredInstruction
         var messages: [LLMService.ChatMessage] = [
@@ -70,7 +74,7 @@ enum SummaryService {
         } else {
             // マルチモーダル: テキスト + スクリーンショット画像（MainActor 外でリサイズ・エンコード）
             let preparedImages = await Task.detached(priority: .userInitiated) {
-                return screenshots.map { screenshot in
+                screenshots.map { screenshot in
                     let imageData = ImageEncoder.resized(screenshot.imageData, maxLongEdge: 1024)
                     let mimeType = ImageEncoder.mimeType(for: imageData) ?? screenshot.mimeType
                     let ext = ImageEncoder.fileExtension(for: mimeType) ?? ImageEncoder.preferredFileExtension
@@ -143,7 +147,8 @@ enum SummaryService {
             fileURL: fileURL,
             title: result.title,
             summary: result.summary,
-            tags: tags
+            tags: tags,
+            actionItems: result.actionItems
         )
     }
 
@@ -199,11 +204,10 @@ enum SummaryService {
         let matches = linkRegex.matches(in: sanitized, range: NSRange(sanitized.startIndex..., in: sanitized))
         for match in matches.reversed() {
             guard let fullRange = Range(match.range(at: 0), in: sanitized) else { continue }
-            let replacement: String
-            if let aliasRange = Range(match.range(at: 2), in: sanitized) {
-                replacement = String(sanitized[aliasRange])
+            let replacement = if let aliasRange = Range(match.range(at: 2), in: sanitized) {
+                String(sanitized[aliasRange])
             } else {
-                replacement = ""
+                ""
             }
             sanitized.replaceSubrange(fullRange, with: replacement)
         }

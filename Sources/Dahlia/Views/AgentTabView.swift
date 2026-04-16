@@ -90,6 +90,7 @@ private struct AgentLauncherView: View {
             TextField("メッセージを入力...", text: $inputText)
                 .textFieldStyle(.plain)
                 .font(.body)
+                .padding(.leading, 4)
                 .focused($isTextFieldFocused)
                 .onSubmit {
                     guard hasContent else { return }
@@ -110,8 +111,9 @@ private struct AgentLauncherView: View {
             .buttonStyle(.plain)
             .help(hasContent ? L10n.agentProjectMode : L10n.agentTranscriptMode)
         }
-        .padding(.horizontal, 12)
-        .padding(.vertical, 8)
+        .padding(.horizontal, 14)
+        .padding(.vertical, 10)
+        .background(capsuleInputBarBackground)
         .disabled(isDisabled)
         .onAppear {
             DispatchQueue.main.async {
@@ -248,6 +250,7 @@ private struct ChatInputBar: View {
             TextField("メッセージを入力...", text: $text)
                 .textFieldStyle(.plain)
                 .font(.body)
+                .padding(.leading, 4)
                 .focused($isTextFieldFocused)
                 .onSubmit(onSend)
 
@@ -259,8 +262,9 @@ private struct ChatInputBar: View {
             .buttonStyle(.plain)
             .disabled(!hasContent)
         }
-        .padding(.horizontal, 12)
-        .padding(.vertical, 8)
+        .padding(.horizontal, 14)
+        .padding(.vertical, 10)
+        .background(capsuleInputBarBackground)
         .disabled(!isEnabled)
         .onAppear {
             guard isEnabled else { return }
@@ -275,6 +279,7 @@ private struct ChatInputBar: View {
             }
         }
     }
+
 }
 
 /// チャット風の吹き出しビュー。
@@ -567,4 +572,17 @@ private struct ToolUseCardView: View {
                 .textSelection(.enabled)
         }
     }
+}
+
+// MARK: - Shared Input Bar Background
+
+private var capsuleInputBarBackground: some View {
+    Capsule()
+        .fill(.quaternary.opacity(0.8))
+        .overlay {
+            Capsule()
+                .strokeBorder(.separator.opacity(0.35), lineWidth: 1)
+        }
+        .padding(.horizontal, 12)
+        .padding(.vertical, 8)
 }

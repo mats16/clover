@@ -55,6 +55,7 @@ final class CaptionViewModel: ObservableObject {
     @Published var summaryError: String?
     @Published var lastSummaryURL: URL?
     @Published var currentMeetingSummary: String?
+    @Published var currentMeetingActionItems: [ActionItemRecord] = []
     /// Summary タブへの切り替えをリクエストするフラグ。
     @Published var requestShowSummaryTab = false
     /// 要約生成の進捗トースト状態。
@@ -89,6 +90,29 @@ final class CaptionViewModel: ObservableObject {
         guard let currentMeetingSummary else { return nil }
         let sanitized = SummaryService.sanitizeDisplaySummary(currentMeetingSummary)
         return sanitized.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty ? nil : sanitized
+    }
+
+    var orderedCurrentMeetingActionItems: [ActionItemRecord] {
+        currentMeetingActionItems.sorted { lhs, rhs in
+            if lhs.isCompleted != rhs.isCompleted {
+                return !lhs.isCompleted && rhs.isCompleted
+            }
+            if lhs.sortsAsMine != rhs.sortsAsMine {
+                return lhs.sortsAsMine && !rhs.sortsAsMine
+            }
+
+            let titleOrder = lhs.title.localizedCaseInsensitiveCompare(rhs.title)
+            if titleOrder != .orderedSame {
+                return titleOrder == .orderedAscending
+            }
+
+            let assigneeOrder = lhs.assignee.localizedCaseInsensitiveCompare(rhs.assignee)
+            if assigneeOrder != .orderedSame {
+                return assigneeOrder == .orderedAscending
+            }
+
+            return lhs.id.uuidString < rhs.id.uuidString
+        }
     }
 
     /// 録音中でなく、文字起こしを表示中の場合 true。
@@ -193,6 +217,7 @@ final class CaptionViewModel: ObservableObject {
         let segments: [TranscriptSegment]
         let screenshots: [MeetingScreenshotRecord]
         let summary: String?
+        let actionItems: [ActionItemRecord]
         let lastSummaryURL: URL?
         let note: MeetingNoteRecord?
     }
@@ -218,6 +243,7 @@ final class CaptionViewModel: ObservableObject {
             segments: segments,
             screenshots: detail.screenshots,
             summary: detail.summary?.summary,
+            actionItems: detail.actionItems,
             lastSummaryURL: lastSummaryURL,
             note: detail.note
         )
@@ -399,6 +425,7 @@ final class CaptionViewModel: ObservableObject {
     private func applyLoadedDetail(_ loaded: LoadedMeetingData) {
         screenshots = loaded.screenshots
         currentMeetingSummary = loaded.summary
+        currentMeetingActionItems = loaded.actionItems
         lastSummaryURL = loaded.lastSummaryURL
         noteText = loaded.note?.text ?? ""
         hasNote = loaded.note != nil
@@ -444,6 +471,7 @@ final class CaptionViewModel: ObservableObject {
 
     private func resetSummaryState() {
         currentMeetingSummary = nil
+        currentMeetingActionItems = []
         lastSummaryURL = nil
         requestShowSummaryTab = false
         summaryError = nil
@@ -922,12 +950,19 @@ final class CaptionViewModel: ObservableObject {
                     toMeetingId: meetingId,
                     title: generatedSummary.title,
                     summary: generatedSummary.summary,
-                    tags: generatedSummary.tags
+                    tags: generatedSummary.tags,
+                    actionItems: generatedSummary.actionItems
                 )
             }
             if currentMeetingId == meetingId {
                 currentMeetingSummary = generatedSummary.summary
                 lastSummaryURL = generatedSummary.fileURL
+                if let dbQueue {
+                    let repo = MeetingRepository(dbQueue: dbQueue)
+                    currentMeetingActionItems = (try? repo.fetchActionItems(forMeetingId: meetingId)) ?? []
+                } else {
+                    currentMeetingActionItems = []
+                }
             }
         } catch {
             if currentMeetingId == meetingId {
@@ -1212,6 +1247,68 @@ final class CaptionViewModel: ObservableObject {
         try? repo.deleteScreenshot(id: screenshot.id)
         if currentMeetingId == screenshot.meetingId {
             reloadScreenshots()
+        }
+    }
+
+    func toggleActionItemCompletion(_ actionItem: ActionItemRecord) {
+        setActionItemCompleted(actionItem, isCompleted: !actionItem.isCompleted)
+    }
+
+    func setActionItemCompleted(_ actionItem: ActionItemRecord, isCompleted: Bool) {
+        guard let dbQueue = currentDbQueue,
+              let index = currentMeetingActionItems.firstIndex(where: { $0.id == actionItem.id }) else { return }
+
+        let previousValue = currentMeetingActionItems[index].isCompleted
+        currentMeetingActionItems[index].isCompleted = isCompleted
+
+        let repo = MeetingRepository(dbQueue: dbQueue)
+        do {
+            try repo.setActionItemCompleted(id: actionItem.id, isCompleted: isCompleted)
+        } catch {
+            currentMeetingActionItems[index].isCompleted = previousValue
+            summaryError = L10n.actionItemUpdateFailed(error.localizedDescription)
+            Logger(subsystem: "com.dahlia", category: "CaptionViewModel")
+                .error("Failed to update action item completion: \(error)")
+        }
+    }
+
+    func deleteActionItem(_ actionItem: ActionItemRecord) {
+        guard let dbQueue = currentDbQueue,
+              let index = currentMeetingActionItems.firstIndex(where: { $0.id == actionItem.id }) else { return }
+
+        let removedActionItem = currentMeetingActionItems.remove(at: index)
+        let repo = MeetingRepository(dbQueue: dbQueue)
+
+        do {
+            try repo.deleteActionItem(id: actionItem.id)
+        } catch {
+            currentMeetingActionItems.insert(removedActionItem, at: index)
+            summaryError = L10n.actionItemDeleteFailed(error.localizedDescription)
+            Logger(subsystem: "com.dahlia", category: "CaptionViewModel")
+                .error("Failed to delete action item: \(error)")
+        }
+    }
+
+    func toggleActionItemAssignedToMe(_ actionItem: ActionItemRecord) {
+        setActionItemAssignee(actionItem, assignee: actionItem.isExplicitlyAssignedToMe ? "" : SummaryActionItem.selfAssigneeKey)
+    }
+
+    func setActionItemAssignee(_ actionItem: ActionItemRecord, assignee: String) {
+        guard let dbQueue = currentDbQueue,
+              let index = currentMeetingActionItems.firstIndex(where: { $0.id == actionItem.id }) else { return }
+
+        let normalizedAssignee = SummaryActionItem.normalize(assignee)
+        let previousAssignee = currentMeetingActionItems[index].assignee
+        currentMeetingActionItems[index].assignee = normalizedAssignee
+
+        let repo = MeetingRepository(dbQueue: dbQueue)
+        do {
+            try repo.setActionItemAssignee(id: actionItem.id, assignee: normalizedAssignee)
+        } catch {
+            currentMeetingActionItems[index].assignee = previousAssignee
+            summaryError = L10n.actionItemAssigneeUpdateFailed(error.localizedDescription)
+            Logger(subsystem: "com.dahlia", category: "CaptionViewModel")
+                .error("Failed to update action item assignee: \(error)")
         }
     }
 
