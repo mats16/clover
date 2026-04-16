@@ -55,6 +55,8 @@ enum L10n {
     static var title: String { String(localized: "Title", bundle: bundle) }
     static var all: String { String(localized: "All", bundle: bundle) }
     static var filter: String { String(localized: "Filter", bundle: bundle) }
+    static var searchFilters: String { String(localized: "Search filters...", bundle: bundle) }
+    static var tags: String { String(localized: "Tags", bundle: bundle) }
     static var today: String { String(localized: "Today", bundle: bundle) }
     static var inProgress: String { String(localized: "In Progress", bundle: bundle) }
     static var noMeetingsYet: String { String(localized: "No meetings yet", bundle: bundle) }
@@ -70,6 +72,12 @@ enum L10n {
     static func deleteCount(_ count: Int) -> String { String(localized: "Delete \(count) items", bundle: bundle) }
     static func moveCount(_ count: Int) -> String { String(localized: "Move \(count) items", bundle: bundle) }
     static func selectedCount(_ count: Int) -> String { String(localized: "\(count) selected", bundle: bundle) }
+
+    // MARK: - Meeting Metadata
+
+    static var addTag: String { String(localized: "Add tag", bundle: bundle) }
+    static var searchOrCreateTag: String { String(localized: "Search or create tag...", bundle: bundle) }
+    static var noResultsFound: String { String(localized: "No results found", bundle: bundle) }
 
     // MARK: - Control Panel
 

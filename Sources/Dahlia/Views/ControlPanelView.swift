@@ -717,6 +717,12 @@ struct ControlPanelView: View {
                     onEditorTap: markMeetingNameEditorTap
                 )
                 .padding(.top, -12)
+
+                MeetingMetadataBar(
+                    meeting: meeting,
+                    tags: sidebarViewModel.allMeetings.first(where: { $0.meetingId == meeting.id })?.tags ?? [],
+                    sidebarViewModel: sidebarViewModel
+                )
             }
 
             // タブ切り替え（左寄せ）

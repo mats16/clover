@@ -171,6 +171,72 @@ final class MeetingRepository {
         }
     }
 
+    // MARK: - Tags
+
+    func addTag(name: String, toMeetingId meetingId: UUID, colorHex: String) throws {
+        try dbQueue.write { db in
+            let tagId: Int64
+            if let existing = try TagRecord.filter(Column("name") == name).fetchOne(db) {
+                guard let existingId = existing.id else { return }
+                tagId = existingId
+            } else {
+                let newTag = TagRecord(name: name, colorHex: colorHex, createdAt: Date())
+                try newTag.insert(db)
+                tagId = db.lastInsertedRowID
+            }
+            try db.execute(
+                sql: "INSERT OR IGNORE INTO meeting_tags (meetingId, tagId) VALUES (?, ?)",
+                arguments: [meetingId, tagId]
+            )
+        }
+    }
+
+    /// 孤立したタグマスタも自動削除する。
+    func removeTag(name: String, fromMeetingId meetingId: UUID) throws {
+        try dbQueue.write { db in
+            guard let tag = try TagRecord.filter(Column("name") == name).fetchOne(db),
+                  let tagId = tag.id else { return }
+            _ = try MeetingTagRecord
+                .filter(Column("meetingId") == meetingId && Column("tagId") == tagId)
+                .deleteAll(db)
+            let count = try MeetingTagRecord.filter(Column("tagId") == tagId).fetchCount(db)
+            if count == 0 {
+                _ = try TagRecord.deleteOne(db, key: tagId)
+            }
+        }
+    }
+
+    func fetchAllTags() throws -> [TagRecord] {
+        try dbQueue.read { db in
+            try TagRecord.order(Column("name").asc).fetchAll(db)
+        }
+    }
+
+    func fetchTagsForMeeting(id meetingId: UUID) throws -> [TagRecord] {
+        try dbQueue.read { db in
+            try TagRecord.fetchAll(
+                db,
+                sql: """
+                    SELECT t.*
+                    FROM tags t
+                    INNER JOIN meeting_tags mt ON mt.tagId = t.id
+                    WHERE mt.meetingId = ?
+                    ORDER BY t.name ASC
+                    """,
+                arguments: [meetingId]
+            )
+        }
+    }
+
+    func updateTagColor(id: Int64, colorHex: String) throws {
+        try dbQueue.write { db in
+            if var tag = try TagRecord.fetchOne(db, key: id) {
+                tag.colorHex = colorHex
+                try tag.update(db)
+            }
+        }
+    }
+
     // MARK: - Segments
 
     func fetchSegments(forMeetingId meetingId: UUID) throws -> [TranscriptSegmentRecord] {

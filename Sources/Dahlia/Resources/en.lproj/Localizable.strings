@@ -26,6 +26,11 @@
 "Title" = "Title";
 "All" = "All";
 "Filter" = "Filter";
+"Search filters..." = "Search filters...";
+"Tags" = "Tags";
+"Add tag" = "Add tag";
+"Search or create tag..." = "Search or create tag...";
+"No results found" = "No results found";
 "Today" = "Today";
 "In Progress" = "In Progress";
 "No meetings yet" = "No meetings yet";

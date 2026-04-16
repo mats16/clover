@@ -17,7 +17,6 @@ struct MeetingRecord: Codable, FetchableRecord, PersistableRecord, Equatable {
     var projectId: UUID
     var name: String
     var status: MeetingStatus = .transcriptNotFound
-    var tags: [String] = []
     var duration: TimeInterval?
     var bulletPointSummary: String?
     var createdAt: Date

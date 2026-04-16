@@ -57,7 +57,6 @@ final class AppDatabaseManager: Sendable {
                     .references("projects", onDelete: .cascade)
                 t.column("name", .text).notNull().defaults(to: "")
                 t.column("status", .text).notNull().defaults(to: MeetingStatus.transcriptNotFound.rawValue)
-                t.column("tags", .text).notNull().defaults(to: "[]")
                 t.column("duration", .double)
                 t.column("bulletPointSummary", .text)
                 t.column("createdAt", .datetime).notNull()
@@ -88,6 +87,28 @@ final class AppDatabaseManager: Sendable {
                 index: "transcript_segments_on_meetingId_startTime",
                 on: "transcript_segments",
                 columns: ["meetingId", "startTime"]
+            )
+
+            // tags マスタテーブル
+            try db.create(table: "tags") { t in
+                t.autoIncrementedPrimaryKey("id")
+                t.column("name", .text).notNull().unique()
+                t.column("colorHex", .text).notNull().defaults(to: "#808080")
+                t.column("createdAt", .datetime).notNull()
+            }
+
+            // meeting_tags 中間テーブル
+            try db.create(table: "meeting_tags") { t in
+                t.column("meetingId", .blob).notNull()
+                    .references("meetings", onDelete: .cascade)
+                t.column("tagId", .integer).notNull()
+                    .references("tags", onDelete: .cascade)
+                t.primaryKey(["meetingId", "tagId"])
+            }
+            try db.create(
+                index: "meeting_tags_on_tagId",
+                on: "meeting_tags",
+                columns: ["tagId"]
             )
         }
 

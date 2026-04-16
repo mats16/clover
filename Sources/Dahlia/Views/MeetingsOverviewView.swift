@@ -27,19 +27,76 @@ struct MeetingsOverviewView: View {
     var onSelectMeeting: (UUID) -> Void
 
     @State private var filter: Filter = .all
+    @State private var selectedProjectIds: Set<UUID> = []
+    @State private var selectedTagNames: Set<String> = []
+    @State private var showFilterPopover = false
+
+    private var hasActiveFilters: Bool {
+        !selectedProjectIds.isEmpty || !selectedTagNames.isEmpty
+    }
+
+    private var activeFilterChips: [FilterChipData] {
+        var chips: [FilterChipData] = []
+        for projectId in selectedProjectIds {
+            if let project = availableProjects.first(where: { $0.id == projectId }) {
+                chips.append(FilterChipData(kind: .project(projectId), label: project.name))
+            }
+        }
+        for tag in availableTags.filter({ selectedTagNames.contains($0.name) }) {
+            chips.append(FilterChipData(kind: .tag(tag.name), label: tag.name, tagColorHex: tag.colorHex))
+        }
+        return chips
+    }
+
+    private func removeFilterChip(_ chip: FilterChipData) {
+        switch chip.kind {
+        case .project(let id):
+            selectedProjectIds.remove(id)
+        case .tag(let name):
+            selectedTagNames.remove(name)
+        }
+    }
+
+    private var availableProjects: [(id: UUID, name: String)] {
+        let all = sidebarViewModel.allMeetings
+        var seen = Set<UUID>()
+        var result: [(id: UUID, name: String)] = []
+        for m in all {
+            if seen.insert(m.projectId).inserted {
+                let display = m.projectName.split(separator: "/").last.map(String.init) ?? m.projectName
+                result.append((id: m.projectId, name: display))
+            }
+        }
+        return result.sorted { $0.name.localizedCaseInsensitiveCompare($1.name) == .orderedAscending }
+    }
+
+    private var availableTags: [TagInfo] {
+        sidebarViewModel.allAvailableTags
+    }
 
     private var meetings: [MeetingOverviewItem] {
-        let allMeetings = sidebarViewModel.allMeetings
+        var result = sidebarViewModel.allMeetings
         let calendar = Calendar.current
 
         switch filter {
         case .all:
-            return allMeetings
+            break
         case .today:
-            return allMeetings.filter { calendar.isDateInToday($0.createdAt) }
+            result = result.filter { calendar.isDateInToday($0.createdAt) }
         case .inProgress:
-            return allMeetings.filter { $0.status == .recording }
+            result = result.filter { $0.status == .recording }
         }
+
+        if !selectedProjectIds.isEmpty {
+            result = result.filter { selectedProjectIds.contains($0.projectId) }
+        }
+        if !selectedTagNames.isEmpty {
+            result = result.filter { meeting in
+                meeting.tags.contains(where: { selectedTagNames.contains($0.name) })
+            }
+        }
+
+        return result
     }
 
     private var isMultiSelectMode: Bool {
@@ -82,25 +139,30 @@ struct MeetingsOverviewView: View {
                             .accessibilityLabel(L10n.newTranscription)
                     }
 
-                    Menu {
-                        ForEach(Filter.allCases) { option in
-                            Button {
-                                filter = option
-                            } label: {
-                                if option == filter {
-                                    Label(option.title, systemImage: "checkmark")
-                                } else {
-                                    Text(option.title)
-                                }
+                    HStack(spacing: 8) {
+                        Button {
+                            showFilterPopover.toggle()
+                        } label: {
+                            Label(L10n.filter, systemImage: "line.3.horizontal.decrease")
+                                .font(.body)
+                                .foregroundStyle(.secondary)
+                        }
+                        .buttonStyle(.plain)
+                        .popover(isPresented: $showFilterPopover, arrowEdge: .bottom) {
+                            FilterDropdown(
+                                selectedProjectIds: $selectedProjectIds,
+                                selectedTagNames: $selectedTagNames,
+                                availableProjects: availableProjects,
+                                availableTags: availableTags
+                            )
+                        }
+
+                        ForEach(activeFilterChips, id: \.id) { chip in
+                            FilterChip(chip: chip) {
+                                removeFilterChip(chip)
                             }
                         }
-                    } label: {
-                        Label(L10n.filter, systemImage: "line.3.horizontal.decrease")
-                            .font(.body)
-                            .foregroundStyle(.secondary)
                     }
-                    .menuStyle(.borderlessButton)
-                    .menuIndicator(.hidden)
                 }
 
                 if meetings.isEmpty {
@@ -143,7 +205,10 @@ struct MeetingsOverviewView: View {
 
     private func resetFilter() {
         filter = .all
+        selectedProjectIds.removeAll()
+        selectedTagNames.removeAll()
     }
+
 
     private func handleRowActivation(_ item: MeetingOverviewItem) {
         let flags = NSEvent.modifierFlags
@@ -493,5 +558,274 @@ struct BatchSelectionBar: View {
                 .stroke(.quaternary, lineWidth: 1)
                 .allowsHitTesting(false)
         )
+    }
+}
+
+// MARK: - Filter Chip
+
+private struct FilterChipData: Identifiable {
+    enum Kind: Hashable {
+        case project(UUID)
+        case tag(String)
+    }
+
+    let kind: Kind
+    let label: String
+    var tagColorHex: String?
+
+    var id: String {
+        switch kind {
+        case .project(let id): "project-\(id)"
+        case .tag(let tag): "tag-\(tag)"
+        }
+    }
+
+    var prefix: String {
+        switch kind {
+        case .project: "\(L10n.projects) is"
+        case .tag: "\(L10n.tags) is"
+        }
+    }
+
+    var dotColor: Color {
+        switch kind {
+        case .project: .orange
+        case .tag: Color(hex: tagColorHex ?? "#808080")
+        }
+    }
+}
+
+private struct FilterChip: View {
+    let chip: FilterChipData
+    let onRemove: () -> Void
+
+    var body: some View {
+        HStack(spacing: 6) {
+            Text(chip.prefix)
+                .foregroundStyle(.secondary)
+
+            Circle()
+                .fill(chip.dotColor)
+                .frame(width: 8, height: 8)
+
+            Text(chip.label)
+                .foregroundStyle(.primary)
+
+            Button(action: onRemove) {
+                Image(systemName: "xmark")
+                    .font(.system(size: 10, weight: .semibold))
+                    .foregroundStyle(.secondary)
+            }
+            .buttonStyle(.plain)
+        }
+        .font(.subheadline.weight(.medium))
+        .padding(.horizontal, 12)
+        .padding(.vertical, 7)
+        .background(
+            Capsule()
+                .fill(Color.primary.opacity(0.05))
+        )
+    }
+}
+
+// MARK: - Filter Dropdown
+
+private struct FilterDropdown: View {
+    @Binding var selectedProjectIds: Set<UUID>
+    @Binding var selectedTagNames: Set<String>
+    let availableProjects: [(id: UUID, name: String)]
+    let availableTags: [TagInfo]
+
+    @State private var expandedSection: Section?
+    @State private var searchText = ""
+
+    private enum Section: Hashable {
+        case projects
+        case tags
+    }
+
+    var body: some View {
+        VStack(alignment: .leading, spacing: 0) {
+            if expandedSection == nil {
+                // Category list
+                FilterDropdownRow(
+                    title: L10n.projects,
+                    systemImage: "folder",
+                    badgeCount: selectedProjectIds.count,
+                    showChevron: true
+                ) {
+                    expandedSection = .projects
+                    searchText = ""
+                }
+
+                Divider().padding(.horizontal, 8)
+
+                FilterDropdownRow(
+                    title: L10n.tags,
+                    systemImage: "tag",
+                    badgeCount: selectedTagNames.count,
+                    showChevron: true
+                ) {
+                    expandedSection = .tags
+                    searchText = ""
+                }
+            } else {
+                // Back + search + items
+                FilterDropdownRow(
+                    title: expandedSection == .projects ? L10n.projects : L10n.tags,
+                    systemImage: "chevron.left",
+                    badgeCount: 0,
+                    showChevron: false
+                ) {
+                    expandedSection = nil
+                    searchText = ""
+                }
+
+                Divider().padding(.horizontal, 8)
+
+                TextField(L10n.searchFilters, text: $searchText)
+                    .textFieldStyle(.plain)
+                    .font(.body)
+                    .padding(.horizontal, 12)
+                    .padding(.vertical, 8)
+
+                Divider().padding(.horizontal, 8)
+
+                ScrollView {
+                    VStack(alignment: .leading, spacing: 0) {
+                        switch expandedSection {
+                        case .projects:
+                            ForEach(filteredProjects, id: \.id) { project in
+                                FilterDropdownItem(
+                                    title: project.name,
+                                    isSelected: selectedProjectIds.contains(project.id)
+                                ) {
+                                    selectedProjectIds.toggle(project.id)
+                                }
+                            }
+                        case .tags:
+                            ForEach(filteredTags, id: \.name) { tag in
+                                FilterDropdownItem(
+                                    title: tag.name,
+                                    isSelected: selectedTagNames.contains(tag.name),
+                                    dotColor: Color(hex: tag.colorHex)
+                                ) {
+                                    selectedTagNames.toggle(tag.name)
+                                }
+                            }
+                        case nil:
+                            EmptyView()
+                        }
+                    }
+                }
+            }
+        }
+        .padding(.vertical, 6)
+        .frame(width: 220)
+        .frame(maxHeight: 300)
+    }
+
+    private var filteredProjects: [(id: UUID, name: String)] {
+        guard !searchText.isEmpty else { return availableProjects }
+        return availableProjects.filter { $0.name.localizedCaseInsensitiveContains(searchText) }
+    }
+
+    private var filteredTags: [TagInfo] {
+        guard !searchText.isEmpty else { return availableTags }
+        return availableTags.filter { $0.name.localizedCaseInsensitiveContains(searchText) }
+    }
+}
+
+private struct FilterDropdownRow: View {
+    let title: String
+    let systemImage: String
+    let badgeCount: Int
+    let showChevron: Bool
+    let action: () -> Void
+
+    @State private var isHovered = false
+
+    var body: some View {
+        Button(action: action) {
+            HStack(spacing: 8) {
+                Image(systemName: systemImage)
+                    .font(.body)
+                    .foregroundStyle(.secondary)
+                    .frame(width: 18)
+
+                Text(title)
+                    .font(.body.weight(.medium))
+                    .foregroundStyle(.primary)
+
+                if badgeCount > 0 {
+                    Text("\(badgeCount)")
+                        .font(.caption2.weight(.semibold))
+                        .foregroundStyle(.white)
+                        .padding(.horizontal, 5)
+                        .padding(.vertical, 1)
+                        .background(Capsule().fill(Color.accentColor))
+                }
+
+                Spacer()
+
+                if showChevron {
+                    Image(systemName: "chevron.right")
+                        .font(.caption.weight(.semibold))
+                        .foregroundStyle(.tertiary)
+                }
+            }
+            .padding(.horizontal, 12)
+            .padding(.vertical, 8)
+            .background(
+                RoundedRectangle(cornerRadius: 6)
+                    .fill(Color.primary.opacity(isHovered ? 0.05 : 0))
+            )
+            .contentShape(Rectangle())
+        }
+        .buttonStyle(.plain)
+        .onHover { isHovered = $0 }
+        .padding(.horizontal, 4)
+    }
+}
+
+private struct FilterDropdownItem: View {
+    let title: String
+    let isSelected: Bool
+    var dotColor: Color?
+    let action: () -> Void
+
+    @State private var isHovered = false
+
+    var body: some View {
+        Button(action: action) {
+            HStack(spacing: 8) {
+                Circle()
+                    .fill(isSelected ? (dotColor ?? Color.accentColor) : (dotColor ?? Color.secondary).opacity(0.3))
+                    .frame(width: 8, height: 8)
+
+                Text(title)
+                    .font(.body)
+                    .foregroundStyle(.primary)
+                    .lineLimit(1)
+
+                Spacer()
+
+                if isSelected {
+                    Image(systemName: "checkmark")
+                        .font(.caption.weight(.semibold))
+                        .foregroundStyle(Color.accentColor)
+                }
+            }
+            .padding(.horizontal, 12)
+            .padding(.vertical, 6)
+            .background(
+                RoundedRectangle(cornerRadius: 6)
+                    .fill(Color.primary.opacity(isHovered ? 0.05 : 0))
+            )
+            .contentShape(Rectangle())
+        }
+        .buttonStyle(.plain)
+        .onHover { isHovered = $0 }
+        .padding(.horizontal, 4)
     }
 }

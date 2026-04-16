@@ -30,6 +30,7 @@ final class SidebarViewModel {
     var meetingsForProject: [UUID: [MeetingRecord]] = [:]
     var lastError: String?
     var allVaults: [VaultRecord] = []
+    var allTags: [TagRecord] = []
 
     /// 後方互換: 選択中プロジェクトの文字起こし一覧。
     var meetingsForSelectedProject: [MeetingRecord] {
@@ -126,6 +127,7 @@ final class SidebarViewModel {
     @ObservationIgnored private var fileWatcher: TranscriptFileWatcher?
     @ObservationIgnored private var meetingObservations: [UUID: AnyDatabaseCancellable] = [:]
     @ObservationIgnored private var allMeetingsObservation: AnyDatabaseCancellable?
+    @ObservationIgnored private var allTagsObservation: AnyDatabaseCancellable?
     @ObservationIgnored private var allProjectsObservation: AnyDatabaseCancellable?
     @ObservationIgnored private var projectObservation: AnyDatabaseCancellable?
     @ObservationIgnored private var vaultObservation: AnyDatabaseCancellable?
@@ -147,6 +149,7 @@ final class SidebarViewModel {
         projectObservation?.cancel()
         vaultObservation?.cancel()
         allMeetingsObservation?.cancel()
+        allTagsObservation?.cancel()
         allProjectsObservation?.cancel()
         fileWatcher?.stopMonitoring()
 
@@ -157,6 +160,7 @@ final class SidebarViewModel {
         meetingObservations.removeAll()
         meetingsForProject.removeAll()
         allMeetings.removeAll()
+        allTags.removeAll()
         allProjectItems.removeAll()
 
         // 選択状態をリセット
@@ -245,7 +249,11 @@ final class SidebarViewModel {
                         WHERE preview.meetingId = meetings.id
                         ORDER BY preview.startTime DESC
                         LIMIT 1
-                    ) AS latestSegmentText
+                    ) AS latestSegmentText,
+                    (SELECT GROUP_CONCAT(t.name || char(30) || t.colorHex, char(31))
+                     FROM meeting_tags mt
+                     INNER JOIN tags t ON t.id = mt.tagId
+                     WHERE mt.meetingId = meetings.id) AS tags
                 FROM meetings
                 INNER JOIN projects ON projects.id = meetings.projectId
                 LEFT JOIN transcript_segments AS segments ON segments.meetingId = meetings.id
@@ -263,6 +271,22 @@ final class SidebarViewModel {
                 Task { @MainActor in
                     guard let self else { return }
                     self.allMeetings = meetings
+                }
+            }
+        )
+
+        // tags テーブルの ValueObservation でタグマスタを自動更新
+        let tagsObservation = ValueObservation.tracking { db in
+            try TagRecord.order(Column("name").asc).fetchAll(db)
+        }
+        allTagsObservation = tagsObservation.start(
+            in: dbQueue,
+            onError: { _ in },
+            onChange: { [weak self] tags in
+                Task { @MainActor in
+                    guard let self else { return }
+                    self.allTags = tags
+                    self.allAvailableTags = tags.map { TagInfo(name: $0.name, colorHex: $0.colorHex) }
                 }
             }
         )
@@ -534,6 +558,25 @@ final class SidebarViewModel {
     func renameMeeting(id: UUID, newName: String) {
         try? meetingRepository?.renameMeeting(id: id, newName: newName)
     }
+
+    private static let tagColorPalette = [
+        "#FF6B6B", "#4ECDC4", "#45B7D1", "#96CEB4",
+        "#FFEAA7", "#DDA0DD", "#98D8C8", "#F7DC6F",
+        "#BB8FCE", "#85C1E9",
+    ]
+
+    func addTagToMeeting(id: UUID, tag: String) {
+        let trimmed = tag.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard !trimmed.isEmpty else { return }
+        let colorHex = Self.tagColorPalette.randomElement() ?? "#808080"
+        try? meetingRepository?.addTag(name: trimmed, toMeetingId: id, colorHex: colorHex)
+    }
+
+    func removeTagFromMeeting(id: UUID, tag: String) {
+        try? meetingRepository?.removeTag(name: tag, fromMeetingId: id)
+    }
+
+    private(set) var allAvailableTags: [TagInfo] = []
 
     func deleteMeeting(id: UUID) {
         try? meetingRepository?.deleteMeeting(id: id)
