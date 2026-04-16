@@ -292,7 +292,7 @@ final class SidebarViewModel {
         )
 
         let projectsOverviewObservation = ValueObservation.tracking { db in
-            try ProjectOverviewItem.fetchAll(
+            let projects = try ProjectOverviewItem.fetchAll(
                 db,
                 sql: """
                 SELECT
@@ -306,10 +306,16 @@ final class SidebarViewModel {
                 LEFT JOIN meetings ON meetings.projectId = projects.id
                 WHERE projects.vaultId = ?
                 GROUP BY projects.id
-                ORDER BY COALESCE(MAX(meetings.createdAt), projects.createdAt) DESC
                 """,
                 arguments: [vaultId]
             )
+            return projects.sorted { lhs, rhs in
+                let comparison = lhs.projectName.localizedStandardCompare(rhs.projectName)
+                if comparison == .orderedSame {
+                    return lhs.projectId.uuidString < rhs.projectId.uuidString
+                }
+                return comparison == .orderedAscending
+            }
         }
         allProjectsObservation = projectsOverviewObservation.start(
             in: dbQueue,

@@ -77,6 +77,7 @@ enum L10n {
 
     static var addTag: String { String(localized: "Add tag", bundle: bundle) }
     static var searchOrCreateTag: String { String(localized: "Search or create tag...", bundle: bundle) }
+    static var searchOrCreateProject: String { String(localized: "Search or create project...", bundle: bundle) }
     static var noResultsFound: String { String(localized: "No results found", bundle: bundle) }
 
     // MARK: - Control Panel

@@ -63,8 +63,7 @@ struct MeetingsOverviewView: View {
         var result: [(id: UUID, name: String)] = []
         for m in all {
             if seen.insert(m.projectId).inserted {
-                let display = m.projectName.split(separator: "/").last.map(String.init) ?? m.projectName
-                result.append((id: m.projectId, name: display))
+                result.append((id: m.projectId, name: m.projectName))
             }
         }
         return result.sorted { $0.name.localizedCaseInsensitiveCompare($1.name) == .orderedAscending }
@@ -287,6 +286,7 @@ struct MeetingsOverviewView: View {
 
 private struct MeetingsOverviewRow: View {
     private static let defaultProjectName = "Meetings"
+    private static let maxVisibleTags = 2
 
     let item: MeetingOverviewItem
     let isSelected: Bool
@@ -320,29 +320,28 @@ private struct MeetingsOverviewRow: View {
             }
 
             VStack(alignment: .leading, spacing: 4) {
-                HStack(spacing: 8) {
+                HStack(alignment: .center, spacing: 8) {
                     Text(displayTitle)
                         .font(.title3.weight(.medium))
                         .foregroundStyle(.primary)
                         .lineLimit(1)
 
-                    if let badgeTitle {
-                        Text(badgeTitle)
-                            .font(.caption.weight(.medium))
-                            .foregroundStyle(.secondary)
-                            .padding(.horizontal, 8)
-                            .padding(.vertical, 3)
-                            .background(
-                                Capsule()
-                                    .fill(Color.primary.opacity(0.05))
-                            )
+                    if !metadataChips.isEmpty {
+                        HStack(spacing: 6) {
+                            ForEach(metadataChips) { chip in
+                                MeetingOverviewMetadataChip(chip: chip)
+                            }
+                        }
+                        .lineLimit(1)
                     }
                 }
 
-                Text(displaySubtitle)
-                    .font(.body)
-                    .foregroundStyle(.secondary)
-                    .lineLimit(1)
+                if let subtitleText {
+                    Text(subtitleText)
+                        .font(.body)
+                        .foregroundStyle(.secondary)
+                        .lineLimit(1)
+                }
             }
 
             Spacer(minLength: 8)
@@ -437,9 +436,29 @@ private struct MeetingsOverviewRow: View {
         return item.projectName
     }
 
-    private var badgeTitle: String? {
-        guard item.projectName != Self.defaultProjectName else { return nil }
-        return item.projectName.split(separator: "/").last.map(String.init) ?? item.projectName
+    private var subtitleText: String? {
+        let subtitle = displaySubtitle.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard !subtitle.isEmpty else { return nil }
+        guard subtitle != item.projectName || metadataChips.isEmpty else { return nil }
+        return subtitle
+    }
+
+    private var metadataChips: [MeetingOverviewMetadataChipData] {
+        var chips: [MeetingOverviewMetadataChipData] = []
+
+        if item.projectName != Self.defaultProjectName {
+            chips.append(.project(item.projectName))
+        }
+
+        let visibleTags = item.tags.prefix(Self.maxVisibleTags)
+        chips.append(contentsOf: visibleTags.map(MeetingOverviewMetadataChipData.tag))
+
+        let overflowCount = item.tags.count - visibleTags.count
+        if overflowCount > 0 {
+            chips.append(.overflow(overflowCount))
+        }
+
+        return chips
     }
 
     private var relativeDate: String {
@@ -477,7 +496,112 @@ private struct MeetingsOverviewRow: View {
     }
 
     private var accessibilityLabel: String {
-        "\(displayTitle), \(displaySubtitle), \(relativeDate)"
+        [
+            displayTitle,
+            metadataAccessibilityLabel,
+            subtitleText,
+            relativeDate,
+        ]
+        .compactMap { $0 }
+        .joined(separator: ", ")
+    }
+
+    private var metadataAccessibilityLabel: String? {
+        let labels = metadataChips.map(\.accessibilityLabel)
+        guard !labels.isEmpty else { return nil }
+        return labels.joined(separator: ", ")
+    }
+}
+
+private struct MeetingOverviewMetadataChipData: Identifiable {
+    enum Kind {
+        case project
+        case tag
+        case overflow
+    }
+
+    let kind: Kind
+    let label: String
+    let dotColor: Color?
+    let accessibilityLabel: String
+
+    var id: String {
+        switch kind {
+        case .project:
+            "project-\(label)"
+        case .tag:
+            "tag-\(label)"
+        case .overflow:
+            "overflow-\(label)"
+        }
+    }
+
+    static func project(_ name: String) -> Self {
+        .init(
+            kind: .project,
+            label: name,
+            dotColor: nil,
+            accessibilityLabel: "\(L10n.projects): \(name)"
+        )
+    }
+
+    static func tag(_ tag: TagInfo) -> Self {
+        .init(
+            kind: .tag,
+            label: tag.name,
+            dotColor: Color(hex: tag.colorHex),
+            accessibilityLabel: "\(L10n.tags): \(tag.name)"
+        )
+    }
+
+    static func overflow(_ count: Int) -> Self {
+        .init(
+            kind: .overflow,
+            label: "+\(count)",
+            dotColor: nil,
+            accessibilityLabel: "\(L10n.tags): +\(count)"
+        )
+    }
+}
+
+private struct MeetingOverviewMetadataChip: View {
+    let chip: MeetingOverviewMetadataChipData
+
+    var body: some View {
+        HStack(spacing: 5) {
+            switch chip.kind {
+            case .project:
+                Image(systemName: "folder")
+                    .font(.caption2.weight(.medium))
+                    .foregroundStyle(.secondary)
+            case .tag:
+                Circle()
+                    .fill(chip.dotColor ?? .secondary)
+                    .frame(width: 7, height: 7)
+            case .overflow:
+                EmptyView()
+            }
+
+            Text(chip.label)
+                .font(.caption.weight(.medium))
+                .foregroundStyle(.secondary)
+                .lineLimit(1)
+        }
+        .padding(.horizontal, 8)
+        .padding(.vertical, 3)
+        .background(
+            Capsule()
+                .fill(chipBackgroundColor)
+        )
+        .accessibilityElement(children: .ignore)
+        .accessibilityLabel(chip.accessibilityLabel)
+    }
+
+    private var chipBackgroundColor: Color {
+        if case .tag = chip.kind {
+            return (chip.dotColor ?? .secondary).opacity(0.12)
+        }
+        return Color.primary.opacity(0.05)
     }
 }
 

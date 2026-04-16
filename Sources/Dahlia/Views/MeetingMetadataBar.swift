@@ -205,27 +205,41 @@ private struct MeetingProjectPicker: View {
     let meeting: MeetingRecord
     var sidebarViewModel: SidebarViewModel
 
+    @State private var showProjectPopover = false
+    @State private var projectInput = ""
+    @FocusState private var isProjectFieldFocused: Bool
+
+    private var trimmedProjectInput: String {
+        projectInput.trimmingCharacters(in: .whitespacesAndNewlines)
+    }
+
     private var currentProjectName: String {
-        sidebarViewModel.flatProjects.first(where: { $0.id == meeting.projectId })?.displayName ?? ""
+        sidebarViewModel.flatProjects.first(where: { $0.id == meeting.projectId })?.name ?? ""
+    }
+
+    private var filteredProjects: [FlatProjectRow] {
+        guard !trimmedProjectInput.isEmpty else { return sidebarViewModel.flatProjects }
+        let query = trimmedProjectInput.localizedLowercase
+        return sidebarViewModel.flatProjects.filter { project in
+            project.name.localizedLowercase.contains(query) || project.displayName.localizedLowercase.contains(query)
+        }
+    }
+
+    private var shouldShowCreateSuggestion: Bool {
+        !trimmedProjectInput.isEmpty
+            && !filteredProjects.contains(where: {
+                $0.name.caseInsensitiveCompare(trimmedProjectInput) == .orderedSame
+            })
+    }
+
+    private var emptyProjectMessage: String {
+        sidebarViewModel.flatProjects.isEmpty && trimmedProjectInput.isEmpty ? L10n.noProjectsYet : L10n.noResultsFound
     }
 
     var body: some View {
-        Menu {
-            ForEach(sidebarViewModel.flatProjects, id: \.id) { project in
-                Button {
-                    guard project.id != meeting.projectId else { return }
-                    sidebarViewModel.moveMeeting(id: meeting.id, toProjectId: project.id)
-                    sidebarViewModel.selectProject(id: project.id, name: project.name)
-                    sidebarViewModel.selectedMeetingId = meeting.id
-                } label: {
-                    HStack {
-                        Text(String(repeating: "  ", count: project.depth) + project.displayName)
-                        if project.id == meeting.projectId {
-                            Image(systemName: "checkmark")
-                        }
-                    }
-                }
-            }
+        Button {
+            projectInput = ""
+            showProjectPopover.toggle()
         } label: {
             HStack(spacing: 4) {
                 Image(systemName: "folder")
@@ -244,6 +258,121 @@ private struct MeetingProjectPicker: View {
             )
         }
         .buttonStyle(.plain)
+        .popover(isPresented: $showProjectPopover, arrowEdge: .bottom) {
+            projectPopoverContent
+        }
+    }
+
+    private var projectPopoverContent: some View {
+        VStack(alignment: .leading, spacing: 0) {
+            TextField(L10n.searchOrCreateProject, text: $projectInput)
+                .textFieldStyle(.plain)
+                .padding(10)
+                .focused($isProjectFieldFocused)
+                .onSubmit {
+                    submitProjectInput()
+                }
+
+            Divider()
+
+            if !filteredProjects.isEmpty || shouldShowCreateSuggestion {
+                ScrollView {
+                    LazyVStack(alignment: .leading, spacing: 0) {
+                        ForEach(filteredProjects, id: \.id) { project in
+                            popoverRow(
+                                icon: "folder",
+                                name: project.name,
+                                isSelected: project.id == meeting.projectId,
+                            ) {
+                                assignMeeting(to: project.id, projectName: project.name)
+                            }
+                        }
+
+                        if shouldShowCreateSuggestion {
+                            popoverRow(icon: "plus", name: trimmedProjectInput) {
+                                createAndAssignProject(named: trimmedProjectInput)
+                            }
+                        }
+                    }
+                }
+                .frame(maxHeight: 260)
+            } else {
+                VStack {
+                    Spacer()
+                    Text(emptyProjectMessage)
+                        .font(.callout)
+                        .foregroundStyle(.tertiary)
+                    Spacer()
+                }
+                .frame(maxWidth: .infinity)
+                .frame(height: 180)
+            }
+        }
+        .frame(width: 280)
+        .onAppear {
+            isProjectFieldFocused = true
+        }
+    }
+
+    private func popoverRow(
+        icon: String,
+        name: String,
+        isSelected: Bool = false,
+        action: @escaping () -> Void,
+    ) -> some View {
+        Button(action: action) {
+            HStack(spacing: 8) {
+                Image(systemName: icon)
+                    .font(.callout)
+                    .foregroundStyle(.secondary)
+
+                Text(name)
+                    .font(.callout)
+                    .foregroundStyle(.primary)
+                    .lineLimit(1)
+
+                Spacer(minLength: 8)
+
+                if isSelected {
+                    Image(systemName: "checkmark")
+                        .font(.caption.weight(.medium))
+                        .foregroundStyle(.secondary)
+                }
+            }
+            .frame(maxWidth: .infinity, alignment: .leading)
+            .contentShape(Rectangle())
+            .padding(.vertical, 8)
+            .padding(.horizontal, 10)
+        }
+        .buttonStyle(.plain)
+    }
+
+    private func submitProjectInput() {
+        guard !trimmedProjectInput.isEmpty else { return }
+
+        if let matchingProject = sidebarViewModel.flatProjects.first(where: {
+            $0.name.caseInsensitiveCompare(trimmedProjectInput) == .orderedSame
+        }) {
+            assignMeeting(to: matchingProject.id, projectName: matchingProject.name)
+            return
+        }
+
+        createAndAssignProject(named: trimmedProjectInput)
+    }
+
+    private func createAndAssignProject(named name: String) {
+        guard let project = sidebarViewModel.fetchOrCreateProject(name: name) else { return }
+        assignMeeting(to: project.record.id, projectName: project.record.name)
+    }
+
+    private func assignMeeting(to projectId: UUID, projectName: String) {
+        if projectId != meeting.projectId {
+            sidebarViewModel.moveMeeting(id: meeting.id, toProjectId: projectId)
+        }
+        sidebarViewModel.selectProject(id: projectId, name: projectName)
+        sidebarViewModel.selectedMeetingId = meeting.id
+        projectInput = ""
+        showProjectPopover = false
     }
 }
 

@@ -289,36 +289,33 @@ private struct ProjectsOverviewRow: View {
 
                 Button(action: onToggleCheck) {
                     Image(systemName: isChecked ? "checkmark.circle.fill" : "circle")
-                        .font(.system(size: 18))
+                        .font(.system(size: 16))
                         .foregroundStyle(isChecked ? Color.accentColor : Color.secondary.opacity(0.5))
-                        .frame(width: 38, height: 38)
+                        .frame(width: 32, height: 32)
                         .contentShape(Rectangle())
                 }
                 .buttonStyle(.plain)
                 .opacity(showControls ? 1 : 0)
             }
 
-            VStack(alignment: .leading, spacing: 4) {
+            HStack(alignment: .firstTextBaseline, spacing: 8) {
                 Text(item.projectName)
-                    .font(.title3.weight(.medium))
+                    .font(.body.weight(.medium))
                     .foregroundStyle(.primary)
                     .lineLimit(1)
 
                 Text(displaySubtitle)
-                    .font(.body)
+                    .font(.subheadline)
                     .foregroundStyle(.secondary)
                     .lineLimit(1)
+                    .fixedSize(horizontal: true, vertical: false)
             }
+            .padding(.trailing, 36)
 
-            Spacer(minLength: 8)
-
-            Text(relativeDate)
-                .font(.subheadline)
-                .foregroundStyle(.secondary)
-                .padding(.trailing, 36)
+            Spacer(minLength: 0)
         }
         .padding(.horizontal, 12)
-        .padding(.vertical, 12)
+        .padding(.vertical, 8)
         .frame(maxWidth: .infinity, alignment: .leading)
         .contentShape(Rectangle())
         .onTapGesture(perform: onSelect)
@@ -371,10 +368,10 @@ private struct ProjectsOverviewRow: View {
         ZStack {
             Circle()
                 .fill(avatarGradient)
-                .frame(width: 38, height: 38)
+                .frame(width: 32, height: 32)
 
             Image(systemName: "folder.fill")
-                .font(.system(size: 15, weight: .semibold))
+                .font(.system(size: 13, weight: .semibold))
                 .foregroundStyle(.white)
         }
         .overlay(alignment: .bottomTrailing) {
@@ -404,18 +401,6 @@ private struct ProjectsOverviewRow: View {
         return L10n.meetingCount(item.meetingCount)
     }
 
-    private var relativeDate: String {
-        let date = item.latestMeetingDate ?? item.createdAt
-        let calendar = Calendar.current
-        if calendar.isDateInToday(date) {
-            return date.formatted(date: .omitted, time: .shortened)
-        }
-        if calendar.isDateInYesterday(date) {
-            return L10n.yesterday
-        }
-        return date.formatted(date: .abbreviated, time: .omitted)
-    }
-
     private var avatarGradient: LinearGradient {
         let colors: [(Color, Color)] = [
             (.blue, .cyan),
@@ -434,6 +419,6 @@ private struct ProjectsOverviewRow: View {
     }
 
     private var accessibilityLabel: String {
-        "\(item.projectName), \(displaySubtitle), \(relativeDate)"
+        "\(item.projectName), \(displaySubtitle)"
     }
 }
