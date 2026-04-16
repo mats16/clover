@@ -2,6 +2,14 @@ import Foundation
 
 /// 文字起こしテキストを LLM で要約し、Obsidian 互換の Markdown ファイルとして保存するサービス。
 enum SummaryService {
+    struct GeneratedSummary {
+        let fileURL: URL
+        let title: String
+        let summary: String
+        let bulletPointSummary: String
+        let tags: [String]
+    }
+
     private static let dateFormatter: DateFormatter = {
         let f = DateFormatter()
         f.dateFormat = "yyyy-MM-dd"
@@ -14,17 +22,19 @@ enum SummaryService {
         return f
     }()
 
-    /// 要約を生成してプロジェクトフォルダに Markdown ファイルとして書き出す。
+    /// 要約を生成して Markdown ファイルとして書き出す。
+    /// プロジェクトがある場合はそのフォルダ直下、ない場合は vault 直下へ保存する。
     /// - Returns: 生成された `.md` ファイルの URL。
     @MainActor
     static func generateSummary(
-        projectURL: URL,
+        projectURL: URL?,
+        vaultURL: URL,
         meetingId: UUID,
         createdAt: Date,
         transcriptText: String,
         noteText: String? = nil,
         screenshots: [MeetingScreenshotRecord] = []
-    ) async throws -> URL {
+    ) async throws -> GeneratedSummary {
         let settings = AppSettings.shared
         let endpoint = settings.llmEndpointURL
         let model = settings.llmModelName
@@ -33,7 +43,7 @@ enum SummaryService {
         let languageName = settings.llmSummaryLanguage.displayName
 
         // メッセージ組み立て: テンプレート(system) → CONTEXT.md(user) → 文字起こし(user) + スクリーンショット
-        let contextContent = readContext(in: projectURL)
+        let contextContent = projectURL.flatMap(readContext(in:))
 
         let structuredInstruction = """
 
@@ -95,16 +105,7 @@ enum SummaryService {
         }
 
         let dateString = dateFormatter.string(from: createdAt)
-        // タグ: 常に ai_summary を含め、LLM 生成タグと CONTEXT.md の tags をマージ
-        var tags = ["ai_summary"]
-        for tag in result.tags where !tags.contains(tag) {
-            tags.append(tag)
-        }
-        if let contextContent {
-            for tag in parseFrontmatterTags(from: contextContent) where !tags.contains(tag) {
-                tags.append(tag)
-            }
-        }
+        let tags = resolvedTags(resultTags: result.tags, contextContent: contextContent)
         let tagsYAML = tags.map { "  - \($0)" }.joined(separator: "\n")
 
         var frontmatterFields = """
@@ -118,34 +119,45 @@ enum SummaryService {
                 .replacingOccurrences(of: "\n", with: "\\n")
             frontmatterFields += "\ntitle: \"\(escapedTitle)\""
         }
-        frontmatterFields += "\ntags:\n\(tagsYAML)"
+        if !tags.isEmpty {
+            frontmatterFields += "\ntags:\n\(tagsYAML)"
+        }
 
         let frontmatter = "---\n\(frontmatterFields)\n---"
 
         let markdown = frontmatter + "\n\n" + result.summary + "\n"
+        let bulletPointSummary = sanitizeBulletPointSummary(result.summary)
 
         // 同じ meeting_id の要約ファイルが既に存在すればそのパスに上書きする
         let fileURL: URL
-        if let existing = findSummaryFile(in: projectURL, meetingId: meetingId) {
+        if let existing = findSummaryFile(projectURL: projectURL, vaultURL: vaultURL, meetingId: meetingId) {
             fileURL = existing
         } else {
             let datePrefix = dateFormatter.string(from: createdAt)
             let fileName = summaryFileName(datePrefix: datePrefix, title: result.title, meetingId: meetingId)
-            try FileManager.default.createDirectory(at: projectURL, withIntermediateDirectories: true)
-            fileURL = projectURL.appendingPathComponent("\(fileName).md")
+            let directoryURL = projectURL ?? vaultURL
+            try FileManager.default.createDirectory(at: directoryURL, withIntermediateDirectories: true)
+            fileURL = directoryURL.appendingPathComponent("\(fileName).md")
         }
         try Data(markdown.utf8).write(to: fileURL, options: .atomic)
 
-        return fileURL
+        return GeneratedSummary(
+            fileURL: fileURL,
+            title: result.title,
+            summary: result.summary,
+            bulletPointSummary: bulletPointSummary,
+            tags: tags
+        )
     }
 
-    /// プロジェクトフォルダ内の `.md` ファイルを走査し、frontmatter の `transcription_id` が一致するファイルを返す。
-    static func findSummaryFile(in projectURL: URL, meetingId: UUID) -> URL? {
+    /// 要約保存先ディレクトリ内の `.md` ファイルを走査し、frontmatter の `meeting_id` が一致するファイルを返す。
+    static func findSummaryFile(projectURL: URL?, vaultURL: URL, meetingId: UUID) -> URL? {
         let fm = FileManager.default
         let targetId = meetingId.uuidString.lowercased()
+        let directoryURL = projectURL ?? vaultURL
 
         guard let enumerator = fm.enumerator(
-            at: projectURL,
+            at: directoryURL,
             includingPropertiesForKeys: [.isRegularFileKey],
             options: [.skipsHiddenFiles, .skipsSubdirectoryDescendants]
         ) else { return nil }
@@ -164,6 +176,48 @@ enum SummaryService {
             }
         }
         return nil
+    }
+
+    static func resolvedTags(resultTags: [String], contextContent: String?) -> [String] {
+        var tags: [String] = []
+        appendUniqueTags(resultTags, to: &tags)
+        if let contextContent {
+            appendUniqueTags(parseFrontmatterTags(from: contextContent), to: &tags)
+        }
+        return tags
+    }
+
+    private static let obsidianLinkRegex = try! NSRegularExpression(
+        pattern: #"\[\[([^\]|]+)(?:\|([^\]]+))?\]\]"#
+    )
+
+    static func sanitizeBulletPointSummary(_ summary: String) -> String {
+        var sanitized = summary.replacingOccurrences(
+            of: #"\!\[\[[^\]]+\]\]"#,
+            with: "",
+            options: .regularExpression
+        )
+
+        let linkRegex = obsidianLinkRegex
+        let matches = linkRegex.matches(in: sanitized, range: NSRange(sanitized.startIndex..., in: sanitized))
+        for match in matches.reversed() {
+            guard let fullRange = Range(match.range(at: 0), in: sanitized) else { continue }
+            let replacement: String
+            if let aliasRange = Range(match.range(at: 2), in: sanitized) {
+                replacement = String(sanitized[aliasRange])
+            } else {
+                replacement = ""
+            }
+            sanitized.replaceSubrange(fullRange, with: replacement)
+        }
+
+        sanitized = sanitized.replacingOccurrences(of: #"\(\s*\)"#, with: "", options: .regularExpression)
+        sanitized = sanitized.replacingOccurrences(of: #"[ \t]+\n"#, with: "\n", options: .regularExpression)
+        sanitized = sanitized.replacingOccurrences(of: #"\n{3,}"#, with: "\n\n", options: .regularExpression)
+        sanitized = sanitized.replacingOccurrences(of: #"(?m)^[ \t]*[-*+]\s*$\n?"#, with: "", options: .regularExpression)
+        sanitized = sanitized.replacingOccurrences(of: #"(?m)^[ \t]*[-*+]\s+\[[ xX]\]\s*$\n?"#, with: "", options: .regularExpression)
+
+        return sanitized.trimmingCharacters(in: .whitespacesAndNewlines)
     }
 
     // MARK: - Private Helpers
@@ -249,5 +303,13 @@ enum SummaryService {
             }
         }
         return tags
+    }
+
+    private static func appendUniqueTags(_ candidates: [String], to tags: inout [String]) {
+        for candidate in candidates {
+            let trimmed = candidate.trimmingCharacters(in: .whitespacesAndNewlines)
+            guard !trimmed.isEmpty, !tags.contains(trimmed) else { continue }
+            tags.append(trimmed)
+        }
     }
 }

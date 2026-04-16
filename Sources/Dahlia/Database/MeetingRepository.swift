@@ -4,6 +4,8 @@ import GRDB
 /// ミーティング・セグメント・プロジェクト・保管庫の DB クエリを集約するリポジトリ。
 @MainActor
 final class MeetingRepository {
+    private static let generatedSummaryTagColorHex = "#808080"
+
     private let dbQueue: DatabaseQueue
 
     nonisolated init(dbQueue: DatabaseQueue) {
@@ -168,6 +170,50 @@ final class MeetingRepository {
             _ = try MeetingRecord
                 .filter(ids.contains(Column("id")))
                 .updateAll(db, Column("projectId").set(to: toProjectId))
+        }
+    }
+
+    func applyGeneratedSummary(toMeetingId meetingId: UUID, title: String, summary: String, tags: [String]) throws {
+        try dbQueue.write { db in
+            guard var record = try MeetingRecord.fetchOne(db, key: meetingId) else { return }
+
+            let trimmedTitle = title.trimmingCharacters(in: .whitespacesAndNewlines)
+            if !trimmedTitle.isEmpty {
+                record.name = trimmedTitle
+            }
+            record.bulletPointSummary = summary
+            record.updatedAt = Date()
+            try record.update(db)
+
+            let tagNames = tags.filter { !$0.isEmpty }
+            guard !tagNames.isEmpty else { return }
+
+            let existingTags = try TagRecord
+                .filter(tagNames.contains(Column("name")))
+                .fetchAll(db)
+            let existingByName = Dictionary(uniqueKeysWithValues: existingTags.compactMap { tag in
+                tag.id.map { (tag.name, $0) }
+            })
+
+            for name in tagNames {
+                let tagId: Int64
+                if let existingId = existingByName[name] {
+                    tagId = existingId
+                } else {
+                    let newTag = TagRecord(
+                        name: name,
+                        colorHex: Self.generatedSummaryTagColorHex,
+                        createdAt: Date()
+                    )
+                    try newTag.insert(db)
+                    tagId = db.lastInsertedRowID
+                }
+
+                try db.execute(
+                    sql: "INSERT OR IGNORE INTO meeting_tags (meetingId, tagId) VALUES (?, ?)",
+                    arguments: [meetingId, tagId]
+                )
+            }
         }
     }
 
@@ -345,4 +391,5 @@ final class MeetingRepository {
             return MeetingDetail(meeting: meeting, segments: segments, screenshots: screenshots, note: note, summary: summary)
         }
     }
+
 }

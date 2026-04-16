@@ -54,6 +54,7 @@ final class CaptionViewModel: ObservableObject {
     var isSummaryGenerating: Bool { summaryGeneratingMeetingId != nil }
     @Published var summaryError: String?
     @Published var lastSummaryURL: URL?
+    @Published var currentMeetingBulletPointSummary: String?
     /// Summary タブへの切り替えをリクエストするフラグ。
     @Published var requestShowSummaryTab = false
     /// 要約生成の進捗トースト状態。
@@ -78,6 +79,11 @@ final class CaptionViewModel: ObservableObject {
     @Published var availableWindows: [SCWindow] = []
     /// 選択中のウィンドウ ID。nil の場合はデスクトップ全体をキャプチャ。
     @Published var selectedWindowID: CGWindowID?
+
+    var hasCurrentMeetingSummary: Bool {
+        guard let currentMeetingBulletPointSummary else { return false }
+        return !currentMeetingBulletPointSummary.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty
+    }
 
     /// 録音中でなく、文字起こしを表示中の場合 true。
     var isViewingHistory: Bool {
@@ -177,6 +183,7 @@ final class CaptionViewModel: ObservableObject {
         let createdAt: Date?
         let segments: [TranscriptSegment]
         let screenshots: [MeetingScreenshotRecord]
+        let bulletPointSummary: String?
         let lastSummaryURL: URL?
         let note: MeetingNoteRecord?
     }
@@ -184,18 +191,24 @@ final class CaptionViewModel: ObservableObject {
     private nonisolated static func fetchLoadedMeetingData(
         meetingId: UUID,
         dbQueue: DatabaseQueue,
-        projectURL: URL?
+        projectURL: URL?,
+        vaultURL: URL
     ) throws -> LoadedMeetingData {
         let repo = MeetingRepository(dbQueue: dbQueue)
         let detail = try repo.fetchMeetingDetail(id: meetingId)
         let segments = detail.segments.map(TranscriptSegment.init(from:))
 
-        let lastSummaryURL = projectURL.flatMap { SummaryService.findSummaryFile(in: $0, meetingId: meetingId) }
+        let lastSummaryURL = SummaryService.findSummaryFile(
+            projectURL: projectURL,
+            vaultURL: vaultURL,
+            meetingId: meetingId
+        )
 
         return LoadedMeetingData(
             createdAt: detail.meeting?.createdAt,
             segments: segments,
             screenshots: detail.screenshots,
+            bulletPointSummary: detail.meeting?.bulletPointSummary,
             lastSummaryURL: lastSummaryURL,
             note: detail.note
         )
@@ -239,7 +252,7 @@ final class CaptionViewModel: ObservableObject {
             vaultURL: vaultURL
         )
 
-        meetingLoadTask = Task { [weak self, meetingId, dbQueue, projectURL] in
+        meetingLoadTask = Task { [weak self, meetingId, dbQueue, projectURL, vaultURL] in
             guard let self else { return }
 
             let loaded: LoadedMeetingData
@@ -248,7 +261,8 @@ final class CaptionViewModel: ObservableObject {
                     try Self.fetchLoadedMeetingData(
                         meetingId: meetingId,
                         dbQueue: dbQueue,
-                        projectURL: projectURL
+                        projectURL: projectURL,
+                        vaultURL: vaultURL
                     )
                 }.value
             } catch is CancellationError {
@@ -313,8 +327,7 @@ final class CaptionViewModel: ObservableObject {
             resubscribeStoreCancellable()
             screenshots = []
             resetNoteState()
-            lastSummaryURL = nil
-            summaryError = nil
+            resetSummaryState()
         } else {
             resetMeetingState()
         }
@@ -350,9 +363,10 @@ final class CaptionViewModel: ObservableObject {
     /// 現在の meetingId のノート・スクリーンショット・サマリーを DB から読み込み直す。
     private func reloadMeetingDetail() {
         guard let meetingId = currentMeetingId,
-              let dbQueue = currentDbQueue else { return }
+              let dbQueue = currentDbQueue,
+              let vaultURL = currentVaultURL else { return }
         let projectURL = currentProjectURL
-        meetingLoadTask = Task { [weak self, meetingId, dbQueue, projectURL] in
+        meetingLoadTask = Task { [weak self, meetingId, dbQueue, projectURL, vaultURL] in
             guard let self else { return }
             let loaded: LoadedMeetingData
             do {
@@ -360,7 +374,8 @@ final class CaptionViewModel: ObservableObject {
                     try Self.fetchLoadedMeetingData(
                         meetingId: meetingId,
                         dbQueue: dbQueue,
-                        projectURL: projectURL
+                        projectURL: projectURL,
+                        vaultURL: vaultURL
                     )
                 }.value
             } catch {
@@ -374,6 +389,7 @@ final class CaptionViewModel: ObservableObject {
     /// 読み込み済みデータのノート・スクリーンショット・サマリーを UI 状態に反映する。
     private func applyLoadedDetail(_ loaded: LoadedMeetingData) {
         screenshots = loaded.screenshots
+        currentMeetingBulletPointSummary = loaded.bulletPointSummary
         lastSummaryURL = loaded.lastSummaryURL
         noteText = loaded.note?.text ?? ""
         hasNote = loaded.note != nil
@@ -414,7 +430,13 @@ final class CaptionViewModel: ObservableObject {
         store.clear()
         screenshots = []
         resetNoteState()
+        resetSummaryState()
+    }
+
+    private func resetSummaryState() {
+        currentMeetingBulletPointSummary = nil
         lastSummaryURL = nil
+        requestShowSummaryTab = false
         summaryError = nil
     }
 
@@ -433,6 +455,7 @@ final class CaptionViewModel: ObservableObject {
         currentProjectName = projectName
         currentVaultURL = vaultURL
         currentDbQueue = dbQueue
+        resetSummaryState()
     }
 
     func updateCurrentProjectContext(projectURL: URL?, projectId: UUID?, projectName: String?) {
@@ -650,6 +673,7 @@ final class CaptionViewModel: ObservableObject {
         self.currentProjectName = projectName
         self.currentVaultURL = vaultURL
         self.currentDbQueue = dbQueue
+        resetSummaryState()
         guard analyzerReady else {
             errorMessage = L10n.speechRecognitionNotReady
             return
@@ -729,7 +753,7 @@ final class CaptionViewModel: ObservableObject {
             persistenceService = nil
 
             if let meetingId, !segments.isEmpty {
-                if AppSettings.shared.llmAutoSummaryEnabled, let projectURL {
+                if AppSettings.shared.llmAutoSummaryEnabled {
                     // 要約 + ファイル書き出しを並行実行
                     await generateSummary(
                         meetingId: meetingId,
@@ -788,15 +812,15 @@ final class CaptionViewModel: ObservableObject {
     /// 手動で要約を実行できるかどうか。
     var canGenerateSummary: Bool {
         guard currentMeetingId != nil,
-              currentProjectURL != nil else { return false }
+              currentVaultURL != nil else { return false }
         return !store.segments.isEmpty
     }
 
     /// プルダウンメニューから手動で要約を実行する。
     func triggerManualSummary() {
         guard let meetingId = currentMeetingId,
-              let projectURL = currentProjectURL,
               let vaultURL = currentVaultURL else { return }
+        let projectURL = currentProjectURL
         let transcriptText = store.exportForSummary()
         let createdAt = store.recordingStartTime ?? Date()
         let projectName = selectedProjectName ?? ""
@@ -818,7 +842,7 @@ final class CaptionViewModel: ObservableObject {
     func generateSummary(
         meetingId: UUID,
         transcriptText: String,
-        projectURL: URL,
+        projectURL: URL?,
         createdAt: Date,
         vaultURL: URL,
         projectName: String,
@@ -841,8 +865,9 @@ final class CaptionViewModel: ObservableObject {
         summaryProgress.show()
 
         do {
+            let dbQueue = currentDbQueue
             var screenshots: [MeetingScreenshotRecord] = []
-            if let queue = currentDbQueue {
+            if let queue = dbQueue {
                 let repo = MeetingRepository(dbQueue: queue)
                 screenshots = (try? repo.fetchScreenshots(forMeetingId: meetingId)) ?? []
             }
@@ -861,6 +886,7 @@ final class CaptionViewModel: ObservableObject {
             // LLM 要約とファイル書き出しを並行実行
             async let summaryResult = SummaryService.generateSummary(
                 projectURL: projectURL,
+                vaultURL: vaultURL,
                 meetingId: meetingId,
                 createdAt: createdAt,
                 transcriptText: transcriptText,
@@ -877,19 +903,27 @@ final class CaptionViewModel: ObservableObject {
                 screenshots: screenshotsForExport
             )
 
-            let fileURL = try await summaryResult
+            let generatedSummary = try await summaryResult
             summaryProgress.summaryGeneration = .completed
 
             _ = await fileExport
-            if currentMeetingId == meetingId {
-                lastSummaryURL = fileURL
+            if let dbQueue {
+                let repo = MeetingRepository(dbQueue: dbQueue)
+                try repo.applyGeneratedSummary(
+                    toMeetingId: meetingId,
+                    title: generatedSummary.title,
+                    summary: generatedSummary.bulletPointSummary,
+                    tags: generatedSummary.tags
+                )
             }
-
-            // サマリーを DB に保存
-            // TODO: SummaryService から SummaryResult を受け取り MeetingSummaryRecord として保存
+            if currentMeetingId == meetingId {
+                currentMeetingBulletPointSummary = generatedSummary.bulletPointSummary
+                lastSummaryURL = generatedSummary.fileURL
+            }
         } catch {
             if currentMeetingId == meetingId {
                 summaryError = error.localizedDescription
+                requestShowSummaryTab = false
             }
             summaryProgress.summaryGeneration = .failed(error.localizedDescription)
             ErrorReportingService.capture(error, context: ["source": "summaryGeneration"])

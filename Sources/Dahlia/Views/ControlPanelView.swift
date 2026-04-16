@@ -45,6 +45,7 @@ enum DetailTab: String, CaseIterable, Identifiable {
 private struct DetailTabBar: View {
     @Binding var selection: DetailTab
     @ObservedObject var viewModel: CaptionViewModel
+    let showsSummaryTab: Bool
     @Namespace private var tabNamespace
 
     /// フォルダ選択時（transcription 未選択）は全タブを無効化する。
@@ -53,10 +54,18 @@ private struct DetailTabBar: View {
         viewModel.currentMeetingId == nil && !viewModel.isListening
     }
 
+    private var visibleTabs: [DetailTab] {
+        if showsSummaryTab {
+            DetailTab.allCases
+        } else {
+            DetailTab.allCases.filter { $0 != .summary }
+        }
+    }
+
     var body: some View {
         VStack(spacing: 0) {
             HStack(spacing: 12) {
-                ForEach(DetailTab.allCases) { tab in
+                ForEach(visibleTabs) { tab in
                     DetailTabButton(
                         tab: tab,
                         isSelected: !isFolderOnly && selection == tab,
@@ -805,7 +814,7 @@ struct ControlPanelView: View {
             }
 
             // タブ切り替え（左寄せ）
-            DetailTabBar(selection: $selectedTab, viewModel: viewModel)
+            DetailTabBar(selection: $selectedTab, viewModel: viewModel, showsSummaryTab: hasSummaryTab)
 
             // タブコンテンツ
             Group {
@@ -859,15 +868,16 @@ struct ControlPanelView: View {
             }
         )
         .onChange(of: viewModel.requestShowSummaryTab) {
-            if viewModel.requestShowSummaryTab {
-                selectedTab = .summary
-                viewModel.requestShowSummaryTab = false
-            }
+            updateSummaryTabSelection()
+        }
+        .onChange(of: hasSummaryTab) {
+            updateSummaryTabSelection()
         }
         .onChange(of: currentMeetingItem?.meeting.id) { _, _ in
             if currentMeetingItem != nil {
                 selectedTab = .notes
             }
+            viewModel.requestShowSummaryTab = false
             cancelMeetingRename()
         }
         .navigationTitle(headerTitle)
@@ -896,17 +906,13 @@ struct ControlPanelView: View {
 
     @ViewBuilder
     private var summaryTabContent: some View {
-        if let summaryURL = viewModel.lastSummaryURL {
-            VStack {
-                Spacer()
-                Button(L10n.openSummary) {
-                    AppSettings.shared.markdownEditor.open(summaryURL)
-                }
-                .buttonStyle(.borderedProminent)
-                .pointerStyle(.link)
-                Spacer()
+        if let summary = viewModel.currentMeetingBulletPointSummary,
+           !summary.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty {
+            ScrollView {
+                MarkdownContentView(markdown: summary)
+                    .frame(maxWidth: .infinity, alignment: .leading)
+                    .padding(16)
             }
-            .frame(maxWidth: .infinity, maxHeight: .infinity)
         } else {
             ContentUnavailableView {
                 Label(L10n.summary, systemImage: "list.bullet.clipboard")
@@ -1038,6 +1044,10 @@ struct ControlPanelView: View {
         return sidebarViewModel.allMeetings.first(where: { $0.meetingId == meetingId })
     }
 
+    private var hasSummaryTab: Bool {
+        viewModel.hasCurrentMeetingSummary
+    }
+
     private var tabContentBackgroundColor: Color {
         selectedTab == .notes ? Color(nsColor: .textBackgroundColor) : Color(nsColor: .controlBackgroundColor)
     }
@@ -1091,6 +1101,15 @@ struct ControlPanelView: View {
             didTapInsideNotesField = false
         } else if isNotesFieldFocused {
             isNotesFieldFocused = false
+        }
+    }
+
+    private func updateSummaryTabSelection() {
+        if hasSummaryTab, viewModel.requestShowSummaryTab {
+            selectedTab = .summary
+            viewModel.requestShowSummaryTab = false
+        } else if !hasSummaryTab, selectedTab == .summary {
+            selectedTab = .notes
         }
     }
 
