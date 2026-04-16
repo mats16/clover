@@ -14,11 +14,15 @@
 "Home" = "Home";
 "Meetings" = "Meetings";
 "Projects" = "Projects";
+"Context" = "Context";
 "Action Items" = "Action Items";
 "Ask" = "Ask";
 "New Project" = "New Project";
 "New meeting" = "New meeting";
 "Project Name" = "Project Name";
+"Location" = "Location";
+"Latest Meeting" = "Latest Meeting";
+"Could not create CONTEXT.md." = "Could not create CONTEXT.md.";
 "Edit Context" = "Edit Context";
 "Open in Finder" = "Open in Finder";
 "Recreate Folder" = "Recreate Folder";

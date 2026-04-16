@@ -392,8 +392,11 @@ final class SidebarViewModel {
 
     func selectDestination(_ destination: SidebarDestination) {
         if selectedDestination == destination {
-            if destination == .meetings || destination == .projects {
+            if destination == .meetings {
                 clearMeetingSelection()
+            } else if destination == .projects {
+                clearProjectSelection()
+                deselectProject()
             }
             return
         }

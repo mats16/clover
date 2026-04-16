@@ -43,11 +43,15 @@ enum L10n {
     static var home: String { String(localized: "Home", bundle: bundle) }
     static var meetings: String { String(localized: "Meetings", bundle: bundle) }
     static var projects: String { String(localized: "Projects", bundle: bundle) }
+    static var context: String { String(localized: "Context", bundle: bundle) }
     static var actionItems: String { String(localized: "Action Items", bundle: bundle) }
     static var ask: String { String(localized: "Ask", bundle: bundle) }
     static var newProject: String { String(localized: "New Project", bundle: bundle) }
     static var newMeeting: String { String(localized: "New meeting", bundle: bundle) }
     static var projectName: String { String(localized: "Project Name", bundle: bundle) }
+    static var location: String { String(localized: "Location", bundle: bundle) }
+    static var latestMeeting: String { String(localized: "Latest Meeting", bundle: bundle) }
+    static var contextCreationFailed: String { String(localized: "Could not create CONTEXT.md.", bundle: bundle) }
     static var editContext: String { String(localized: "Edit Context", bundle: bundle) }
     static var openInFinder: String { String(localized: "Open in Finder", bundle: bundle) }
     static var recreateFolder: String { String(localized: "Recreate Folder", bundle: bundle) }

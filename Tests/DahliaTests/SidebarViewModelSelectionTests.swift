@@ -72,6 +72,26 @@ struct SidebarViewModelSelectionTests {
             #expect(viewModel.selectedMeetingIds == Set([meetingId]))
         }
     }
+
+    @Test
+    func reselectingProjectsReturnsToProjectsOverview() {
+        withTestVault {
+            let viewModel = SidebarViewModel()
+            let projectId = UUID.v7()
+            let meetingId = UUID.v7()
+
+            viewModel.selectedDestination = .projects
+            viewModel.selectProject(id: projectId, name: "Projects")
+            viewModel.selectMeeting(meetingId)
+            viewModel.selectedProjectIds = [projectId]
+
+            viewModel.selectDestination(.projects)
+
+            #expect(viewModel.selectedProject == nil)
+            #expect(viewModel.selectedMeetingId == nil)
+            #expect(viewModel.selectedProjectIds.isEmpty)
+        }
+    }
 }
 #elseif canImport(XCTest)
 import XCTest
@@ -138,6 +158,25 @@ final class SidebarViewModelSelectionTests: XCTestCase {
 
             XCTAssertEqual(viewModel.selectedMeetingId, meetingId)
             XCTAssertEqual(viewModel.selectedMeetingIds, Set([meetingId]))
+        }
+    }
+
+    func testReselectingProjectsReturnsToProjectsOverview() {
+        withTestVault {
+            let viewModel = SidebarViewModel()
+            let projectId = UUID.v7()
+            let meetingId = UUID.v7()
+
+            viewModel.selectedDestination = .projects
+            viewModel.selectProject(id: projectId, name: "Projects")
+            viewModel.selectMeeting(meetingId)
+            viewModel.selectedProjectIds = [projectId]
+
+            viewModel.selectDestination(.projects)
+
+            XCTAssertNil(viewModel.selectedProject)
+            XCTAssertNil(viewModel.selectedMeetingId)
+            XCTAssertTrue(viewModel.selectedProjectIds.isEmpty)
         }
     }
 }

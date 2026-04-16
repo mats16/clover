@@ -223,7 +223,17 @@ struct MeetingListView: View {
 
 /// Circleback 風ミーティング一覧行。
 struct MeetingListRow: View {
+    enum LayoutStyle {
+        case regular
+        case compact
+    }
+
     let meeting: MeetingRecord
+    var tags: [TagInfo] = []
+    var style: LayoutStyle = .regular
+    var showAvatar = true
+
+    private static let maxVisibleTags = 2
 
     private static let dayFormatter: DateFormatter = {
         let f = DateFormatter()
@@ -232,43 +242,60 @@ struct MeetingListRow: View {
     }()
 
     var body: some View {
-        HStack(spacing: 12) {
-            // アバター風サークルアイコン
-            ZStack {
-                Circle()
-                    .fill(avatarGradient)
-                    .frame(width: 40, height: 40)
-                Image(systemName: "waveform")
-                    .font(.system(size: 14, weight: .medium))
-                    .foregroundStyle(.white)
-                    .symbolEffect(.pulse, options: .repeating, isActive: meeting.isRecording)
-            }
+        HStack(alignment: .center, spacing: metrics.horizontalSpacing) {
+            avatar
 
-            // タイトル + サブテキスト
-            VStack(alignment: .leading, spacing: 3) {
-                Text(displayTitle)
-                    .font(.body.weight(.medium))
-                    .foregroundStyle(.primary)
-                    .lineLimit(1)
+            VStack(alignment: .leading, spacing: metrics.verticalSpacing) {
+                HStack(alignment: .center, spacing: 8) {
+                    Text(displayTitle)
+                        .font(metrics.titleFont)
+                        .foregroundStyle(.primary)
+                        .lineLimit(1)
+
+                    if !visibleTags.isEmpty || overflowTagCount > 0 {
+                        HStack(spacing: 5) {
+                            ForEach(visibleTags, id: \.name) { tag in
+                                MeetingListTagChip(tag: tag)
+                            }
+
+                            if overflowTagCount > 0 {
+                                MeetingListOverflowChip(count: overflowTagCount)
+                            }
+                        }
+                        .lineLimit(1)
+                    }
+                }
 
                 if let subtitle = displaySubtitle {
                     Text(subtitle)
-                        .font(.subheadline)
+                        .font(metrics.subtitleFont)
                         .foregroundStyle(.secondary)
                         .lineLimit(1)
                 }
             }
 
-            Spacer()
+            Spacer(minLength: 8)
 
-            // 日付（右寄せ）
             Text(relativeDate)
-                .font(.subheadline)
+                .font(metrics.dateFont)
                 .foregroundStyle(.tertiary)
         }
-        .padding(.vertical, 8)
+        .padding(.vertical, metrics.verticalPadding)
         .padding(.horizontal, 4)
         .contentShape(Rectangle())
+    }
+
+    private var avatar: some View {
+        ZStack {
+            Circle()
+                .fill(avatarGradient)
+                .frame(width: metrics.avatarSize, height: metrics.avatarSize)
+            Image(systemName: "waveform")
+                .font(.system(size: metrics.iconSize, weight: .medium))
+                .foregroundStyle(.white)
+                .symbolEffect(.pulse, options: .repeating, isActive: meeting.isRecording)
+        }
+        .opacity(showAvatar ? 1 : 0)
     }
 
     private var displayTitle: String {
@@ -280,7 +307,7 @@ struct MeetingListRow: View {
 
     private var displaySubtitle: String? {
         if meeting.isRecording {
-            return "録音中"
+            return L10n.recordingNow
         }
         if let duration = meeting.duration {
             let minutes = Int(duration / 60)
@@ -307,7 +334,6 @@ struct MeetingListRow: View {
                 endPoint: .bottomTrailing
             )
         }
-        // ミーティング名のハッシュから色を決定
         let colors: [(Color, Color)] = [
             (.blue, .cyan),
             (.purple, .pink),
@@ -323,5 +349,84 @@ struct MeetingListRow: View {
             startPoint: .topLeading,
             endPoint: .bottomTrailing
         )
+    }
+
+    private var visibleTags: ArraySlice<TagInfo> {
+        tags.prefix(Self.maxVisibleTags)
+    }
+
+    private var overflowTagCount: Int {
+        max(0, tags.count - visibleTags.count)
+    }
+
+    private var metrics: LayoutMetrics { .forStyle(style) }
+
+    private struct LayoutMetrics {
+        let avatarSize: CGFloat
+        let iconSize: CGFloat
+        let horizontalSpacing: CGFloat
+        let verticalSpacing: CGFloat
+        let verticalPadding: CGFloat
+        let titleFont: Font
+        let subtitleFont: Font
+        let dateFont: Font
+
+        static func forStyle(_ style: LayoutStyle) -> LayoutMetrics {
+            switch style {
+            case .regular:
+                LayoutMetrics(
+                    avatarSize: 40, iconSize: 14,
+                    horizontalSpacing: 12, verticalSpacing: 3, verticalPadding: 8,
+                    titleFont: .body.weight(.medium),
+                    subtitleFont: .subheadline, dateFont: .subheadline
+                )
+            case .compact:
+                LayoutMetrics(
+                    avatarSize: 32, iconSize: 12,
+                    horizontalSpacing: 10, verticalSpacing: 2, verticalPadding: 6,
+                    titleFont: .subheadline.weight(.medium),
+                    subtitleFont: .caption, dateFont: .caption
+                )
+            }
+        }
+    }
+}
+
+private struct MeetingListTagChip: View {
+    let tag: TagInfo
+
+    var body: some View {
+        HStack(spacing: 4) {
+            Circle()
+                .fill(Color(hex: tag.colorHex))
+                .frame(width: 6, height: 6)
+
+            Text(tag.name)
+                .font(.caption2.weight(.medium))
+                .foregroundStyle(.secondary)
+                .lineLimit(1)
+        }
+        .padding(.horizontal, 7)
+        .padding(.vertical, 2)
+        .background(
+            Capsule()
+                .fill(Color(hex: tag.colorHex).opacity(0.12))
+        )
+    }
+}
+
+private struct MeetingListOverflowChip: View {
+    let count: Int
+
+    var body: some View {
+        Text("+\(count)")
+            .font(.caption2.weight(.medium))
+            .foregroundStyle(.secondary)
+            .padding(.horizontal, 7)
+            .padding(.vertical, 2)
+            .background(
+                Capsule()
+                    .fill(Color.primary.opacity(0.05))
+            )
     }
 }

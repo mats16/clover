@@ -215,14 +215,13 @@ struct ContentView: View {
 
     @ViewBuilder
     private var projectsWorkspaceContent: some View {
-        if sidebarViewModel.selectedProject != nil {
-            meetingDetailOrList {
-                MeetingListView(
-                    viewModel: viewModel,
-                    sidebarViewModel: sidebarViewModel,
-                    onSelectMeeting: { _ in }
-                )
-            }
+        if sidebarViewModel.selectedMeetingId != nil {
+            meetingDetailView
+        } else if sidebarViewModel.selectedProject != nil {
+            ProjectDetailView(
+                sidebarViewModel: sidebarViewModel,
+                onStartNewMeeting: startNewMeeting
+            )
         } else {
             ProjectsOverviewView(sidebarViewModel: sidebarViewModel)
         }
