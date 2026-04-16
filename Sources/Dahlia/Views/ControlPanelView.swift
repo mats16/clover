@@ -86,18 +86,22 @@ struct FloatingActionBar: View {
     var onOpenRecordingMeeting: (() -> Void)?
 
     var body: some View {
-        HStack(spacing: 6) {
+        HStack(spacing: 0) {
             if let recordingMeetingTitle, let onOpenRecordingMeeting {
                 RecordingMeetingShortcutButton(
                     title: recordingMeetingTitle,
                     action: onOpenRecordingMeeting
                 )
+                FloatingActionBarSeparator()
             }
             SessionSettingsMenu(viewModel: viewModel)
+            FloatingActionBarSeparator()
             TranscribeButton(viewModel: viewModel, sidebarViewModel: sidebarViewModel)
             if shouldShowGenerateSummaryButton {
+                FloatingActionBarSeparator()
                 GenerateSummaryButton(viewModel: viewModel)
             }
+            FloatingActionBarSeparator()
             ScreenshotButton(viewModel: viewModel)
         }
         .padding(.horizontal, 12)
@@ -117,6 +121,16 @@ struct FloatingActionBar: View {
 
     private var shouldShowGenerateSummaryButton: Bool {
         !viewModel.isListening && viewModel.canGenerateSummary
+    }
+}
+
+private struct FloatingActionBarSeparator: View {
+    var body: some View {
+        Rectangle()
+            .fill(.quaternary)
+            .frame(width: 1, height: 24)
+            .padding(.horizontal, 4)
+            .accessibilityHidden(true)
     }
 }
 
