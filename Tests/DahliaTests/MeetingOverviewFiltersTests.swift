@@ -94,6 +94,7 @@ private func meeting(
         status: .ready,
         duration: nil,
         createdAt: Date(),
+        hasSummary: false,
         segmentCount: 0,
         latestSegmentText: nil,
         tags: tags,

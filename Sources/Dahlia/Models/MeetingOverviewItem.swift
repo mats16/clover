@@ -11,6 +11,7 @@ struct MeetingOverviewItem: Equatable, FetchableRecord, Identifiable {
     var status: MeetingStatus
     var duration: TimeInterval?
     var createdAt: Date
+    var hasSummary: Bool
     var segmentCount: Int
     var latestSegmentText: String?
     var tags: [TagInfo]
@@ -30,6 +31,7 @@ struct MeetingOverviewItem: Equatable, FetchableRecord, Identifiable {
         status: MeetingStatus,
         duration: TimeInterval?,
         createdAt: Date,
+        hasSummary: Bool,
         segmentCount: Int,
         latestSegmentText: String?,
         tags: [TagInfo]
@@ -42,6 +44,7 @@ struct MeetingOverviewItem: Equatable, FetchableRecord, Identifiable {
         self.status = status
         self.duration = duration
         self.createdAt = createdAt
+        self.hasSummary = hasSummary
         self.segmentCount = segmentCount
         self.latestSegmentText = latestSegmentText
         self.tags = tags
@@ -56,6 +59,7 @@ struct MeetingOverviewItem: Equatable, FetchableRecord, Identifiable {
         status = row["status"]
         duration = row["duration"]
         createdAt = row["createdAt"]
+        hasSummary = row["hasSummary"]
         segmentCount = row["segmentCount"]
         latestSegmentText = row["latestSegmentText"]
 

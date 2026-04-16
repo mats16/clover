@@ -253,6 +253,7 @@ final class SidebarViewModel {
                     meetings.status AS status,
                     meetings.duration AS duration,
                     meetings.createdAt AS createdAt,
+                    EXISTS(SELECT 1 FROM summaries WHERE summaries.meetingId = meetings.id) AS hasSummary,
                     COUNT(segments.id) AS segmentCount,
                     (
                         SELECT preview.text

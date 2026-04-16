@@ -875,7 +875,7 @@ struct ControlPanelView: View {
         }
         .onChange(of: currentMeetingItem?.meeting.id) { _, _ in
             if currentMeetingItem != nil {
-                selectedTab = .notes
+                selectedTab = initialTabSelection
             }
             viewModel.requestShowSummaryTab = false
             cancelMeetingRename()
@@ -916,7 +916,9 @@ struct ControlPanelView: View {
             ContentUnavailableView {
                 Label(L10n.summary, systemImage: "list.bullet.clipboard")
             } description: {
-                if viewModel.summaryGeneratingMeetingId == viewModel.currentMeetingId {
+                if persistedSummaryExists {
+                    ProgressView()
+                } else if viewModel.summaryGeneratingMeetingId == viewModel.currentMeetingId {
                     ProgressView(L10n.generatingSummary)
                 } else {
                     Text("要約はまだ生成されていません")
@@ -1043,8 +1045,12 @@ struct ControlPanelView: View {
         return sidebarViewModel.allMeetings.first(where: { $0.meetingId == meetingId })
     }
 
+    private var persistedSummaryExists: Bool {
+        currentMeetingItem?.hasSummary == true
+    }
+
     private var hasSummaryTab: Bool {
-        viewModel.hasCurrentMeetingSummary
+        persistedSummaryExists || viewModel.hasCurrentMeetingSummary
     }
 
     private var tabContentBackgroundColor: Color {
@@ -1110,6 +1116,10 @@ struct ControlPanelView: View {
         } else if !hasSummaryTab, selectedTab == .summary {
             selectedTab = .notes
         }
+    }
+
+    private var initialTabSelection: DetailTab {
+        hasSummaryTab ? .summary : .notes
     }
 
 }
