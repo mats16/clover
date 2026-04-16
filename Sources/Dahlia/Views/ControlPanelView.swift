@@ -225,10 +225,12 @@ private struct SessionSettingsMenu: View {
                     }
                     .pickerStyle(.inline)
                     .labelsHidden()
+                    .onChange(of: viewModel.selectedMicrophoneID) { oldValue, newValue in
+                        viewModel.handleMicrophoneSelectionChange(from: oldValue, to: newValue)
+                    }
                 } label: {
                     Label(L10n.microphone, systemImage: "mic.fill")
                 }
-                .disabled(viewModel.isListening)
                 .onAppear {
                     viewModel.refreshAvailableMicrophones()
                 }
@@ -242,10 +244,12 @@ private struct SessionSettingsMenu: View {
                     }
                     .pickerStyle(.inline)
                     .labelsHidden()
+                    .onChange(of: viewModel.isSystemAudioEnabled) { oldValue, newValue in
+                        viewModel.handleSystemAudioSelectionChange(from: oldValue, to: newValue)
+                    }
                 } label: {
                     Label(L10n.systemAudio, systemImage: "speaker.wave.2.fill")
                 }
-                .disabled(viewModel.isListening)
 
                 Menu {
                     Picker(selection: $viewModel.selectedLocale) {

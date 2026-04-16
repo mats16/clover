@@ -480,12 +480,22 @@ final class CaptionViewModel: ObservableObject {
         applyLocaleChange(from: oldLocale, to: newLocale)
     }
 
+    func handleMicrophoneSelectionChange(from oldID: AudioDeviceID?, to newID: AudioDeviceID?) {
+        guard oldID != newID else { return }
+        applyAudioSourceSelectionChange { self.selectedMicrophoneID = oldID }
+    }
+
+    func handleSystemAudioSelectionChange(from oldValue: Bool, to newValue: Bool) {
+        guard oldValue != newValue else { return }
+        applyAudioSourceSelectionChange { self.isSystemAudioEnabled = oldValue }
+    }
+
     private func applyLocaleChange(from oldLocale: String, to newLocale: String) {
         guard newLocale != oldLocale || !analyzerReady else { return }
         AppSettings.shared.transcriptionLocale = newLocale
 
         if isListening {
-            Task { await rebuildPipelines() }
+            Task { await rebuildPipelines(reason: .localeChange) }
         } else {
             analyzerReady = false
             pipelines.removeAll()
@@ -493,37 +503,110 @@ final class CaptionViewModel: ObservableObject {
         }
     }
 
-    /// 録音中にパイプラインを再構築する。オーディオキャプチャは維持し、Speech サービスのみ差し替え。
-    private func rebuildPipelines() async {
-        // 1. 全パイプラインを停止（オーディオキャプチャは維持）
+    private func applyAudioSourceSelectionChange(restoreSelection: @escaping @MainActor () -> Void) {
+        guard isListening else { return }
+
+        Task { @MainActor in
+            let applied = await rebuildPipelines(reason: .audioSourceChange)
+            if !applied {
+                restoreSelection()
+            }
+        }
+    }
+
+    private enum PipelineRebuildReason {
+        case localeChange
+        case audioSourceChange
+    }
+
+    @discardableResult
+    private func rebuildPipelines(reason: PipelineRebuildReason) async -> Bool {
+        await stopActivePipelines()
+        stopActiveCaptures()
+
+        let primaryLocale = Locale(identifier: selectedLocale)
+        do {
+            try await SpeechTranscriberService.ensureModelInstalled(locale: primaryLocale)
+        } catch {
+            setPipelineRebuildError(error, reason: reason)
+            return false
+        }
+
+        var sourceErrors: [Error] = []
+
+        if isMicEnabled {
+            do {
+                try await startMicrophonePipeline(locale: primaryLocale)
+            } catch {
+                sourceErrors.append(error)
+            }
+        }
+
+        if isSystemAudioEnabled {
+            do {
+                try await startSystemAudioPipeline(locale: primaryLocale)
+            } catch {
+                sourceErrors.append(error)
+            }
+        }
+
+        analyzerReady = true
+        if let firstError = sourceErrors.first {
+            setPipelineRebuildError(firstError, reason: reason)
+            return false
+        }
+
+        errorMessage = nil
+        return true
+    }
+
+    private func setPipelineRebuildError(_ error: Error, reason: PipelineRebuildReason) {
+        switch reason {
+        case .localeChange:
+            errorMessage = L10n.languageChangeFailed(error.localizedDescription)
+        case .audioSourceChange:
+            errorMessage = error.localizedDescription
+        }
+    }
+
+    private func stopActiveCaptures() {
+        audioManager?.onAudioBuffer = nil
+        audioManager?.stopCapture()
+        audioManager = nil
+
+        systemAudioManager?.onAudioBuffer = nil
+        systemAudioManager?.onStreamStopped = nil
+        systemAudioManager?.stopCapture()
+        systemAudioManager = nil
+    }
+
+    private func stopActivePipelines() async {
         for pipeline in pipelines {
             pipeline.bridge.finish()
             await pipeline.service.stopStreaming()
         }
         pipelines.removeAll()
+    }
 
-        // 2. 新しいパイプラインを構築
-        let primaryLocale = Locale(identifier: selectedLocale)
-
-        do {
-            try await SpeechTranscriberService.ensureModelInstalled(locale: primaryLocale)
-
-            if isMicEnabled {
-                let (service, bridge, _) = try await buildPipeline(locale: primaryLocale, speakerLabel: "mic")
-                audioManager?.onAudioBuffer = { [bridge] buffer in bridge.appendBuffer(buffer) }
-                pipelines.append((service: service, bridge: bridge))
-            }
-            if isSystemAudioEnabled {
-                let (service, bridge, _) = try await buildPipeline(locale: primaryLocale, speakerLabel: "system")
-                systemAudioManager?.onAudioBuffer = { [bridge] buffer in bridge.appendBuffer(buffer) }
-                pipelines.append((service: service, bridge: bridge))
-            }
-
-            self.analyzerReady = true
-            errorMessage = nil
-        } catch {
-            errorMessage = L10n.languageChangeFailed(error.localizedDescription)
+    private func startMicrophonePipeline(locale: Locale) async throws {
+        let hasMicPermission = await AudioCaptureManager.requestMicrophonePermission()
+        guard hasMicPermission else {
+            throw AudioCaptureError.microphonePermissionDenied
         }
+
+        let (service, bridge, format) = try await buildPipeline(locale: locale, speakerLabel: "mic")
+        try startMicrophoneCapture(
+            bridge: bridge,
+            targetFormat: format,
+            selectedDeviceID: selectedMicrophoneID
+        )
+        pipelines.append((service: service, bridge: bridge))
+    }
+
+    private func startSystemAudioPipeline(locale: Locale) async throws {
+        let (service, bridge, format) = try await buildPipeline(locale: locale, speakerLabel: "system")
+        try await startSystemAudioCapture(bridge: bridge, targetFormat: format)
+        pipelines.append((service: service, bridge: bridge))
     }
 
     // MARK: - Recording Control
@@ -602,30 +685,14 @@ final class CaptionViewModel: ObservableObject {
         }
 
         do {
-            // マイクが有効な場合のみ権限を要求
-            if isMicEnabled {
-                let hasMicPermission = await AudioCaptureManager.requestMicrophonePermission()
-                guard hasMicPermission else {
-                    throw AudioCaptureError.microphonePermissionDenied
-                }
-            }
-
             let primaryLocale = Locale(identifier: selectedLocale)
             try await SpeechTranscriberService.ensureModelInstalled(locale: primaryLocale)
 
             if isMicEnabled {
-                let (service, bridge, format) = try await buildPipeline(locale: primaryLocale, speakerLabel: "mic")
-                try startMicrophoneCapture(
-                    bridge: bridge,
-                    targetFormat: format,
-                    selectedDeviceID: selectedMicrophoneID
-                )
-                pipelines.append((service: service, bridge: bridge))
+                try await startMicrophonePipeline(locale: primaryLocale)
             }
             if isSystemAudioEnabled {
-                let (service, bridge, format) = try await buildPipeline(locale: primaryLocale, speakerLabel: "system")
-                try await startSystemAudioCapture(bridge: bridge, targetFormat: format)
-                pipelines.append((service: service, bridge: bridge))
+                try await startSystemAudioPipeline(locale: primaryLocale)
             }
 
             self.isListening = true
@@ -633,19 +700,13 @@ final class CaptionViewModel: ObservableObject {
         } catch {
             self.errorMessage = error.localizedDescription
             ErrorReportingService.capture(error, context: ["source": "startListening"])
-            audioManager?.stopCapture()
-            audioManager = nil
-            systemAudioManager?.stopCapture()
-            systemAudioManager = nil
-            pipelines.removeAll()
+            await stopActivePipelines()
+            stopActiveCaptures()
         }
     }
 
     func stopListening() {
-        audioManager?.stopCapture()
-        audioManager = nil
-        systemAudioManager?.stopCapture()
-        systemAudioManager = nil
+        stopActiveCaptures()
         isListening = false
 
         // ナビゲーション済みの場合、録音コンテキストからデータを取得
@@ -663,11 +724,7 @@ final class CaptionViewModel: ObservableObject {
         guard let vaultURL else { return }
 
         Task {
-            for pipeline in pipelines {
-                pipeline.bridge.finish()
-                await pipeline.service.stopStreaming()
-            }
-            pipelines.removeAll()
+            await stopActivePipelines()
             persistenceService?.stop()
             persistenceService = nil
 
