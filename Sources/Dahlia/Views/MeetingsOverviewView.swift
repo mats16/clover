@@ -22,7 +22,6 @@ struct MeetingsOverviewView: View {
         }
     }
 
-    @ObservedObject var viewModel: CaptionViewModel
     var sidebarViewModel: SidebarViewModel
     var onSelectMeeting: (UUID) -> Void
 
@@ -136,12 +135,12 @@ struct MeetingsOverviewView: View {
                     ContentUnavailableView {
                         Label(L10n.noMeetingsYet, systemImage: "calendar")
                     } description: {
-                        Text(hasAnyFilterApplied ? L10n.noMeetingsMatchFilter : L10n.newTranscription)
+                        if hasAnyFilterApplied {
+                            Text(L10n.noMeetingsMatchFilter)
+                        }
                     } actions: {
                         if hasAnyFilterApplied {
                             Button(L10n.all, action: resetFilter)
-                        } else {
-                            Button(L10n.newTranscription, action: createNewMeeting)
                         }
                     }
                     .frame(maxWidth: .infinity, minHeight: 320)
@@ -214,27 +213,6 @@ struct MeetingsOverviewView: View {
             projectId: item.projectId,
             projectName: item.projectName
         )
-    }
-
-    private func createNewMeeting() {
-        guard let dbQueue = sidebarViewModel.dbQueue,
-              let vault = sidebarViewModel.currentVault
-        else { return }
-
-        sidebarViewModel.deselectProjectKeepingMeetingSelection()
-        viewModel.createEmptyMeeting(
-            dbQueue: dbQueue,
-            projectURL: nil,
-            vaultId: vault.id,
-            projectId: nil,
-            projectName: nil,
-            vaultURL: vault.url
-        )
-
-        if let newId = viewModel.currentMeetingId {
-            sidebarViewModel.selectMeeting(newId)
-            onSelectMeeting(newId)
-        }
     }
 
     private func deleteSelection() {

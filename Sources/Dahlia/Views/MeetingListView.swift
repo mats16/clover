@@ -232,6 +232,7 @@ struct MeetingListRow: View {
     var tags: [TagInfo] = []
     var style: LayoutStyle = .regular
     var showAvatar = true
+    var showsSubtitle = true
 
     private static let maxVisibleTags = 2
 
@@ -266,7 +267,7 @@ struct MeetingListRow: View {
                     }
                 }
 
-                if let subtitle = displaySubtitle {
+                if showsSubtitle, let subtitle = displaySubtitle {
                     Text(subtitle)
                         .font(metrics.subtitleFont)
                         .foregroundStyle(.secondary)

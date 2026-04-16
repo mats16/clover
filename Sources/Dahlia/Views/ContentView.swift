@@ -218,10 +218,7 @@ struct ContentView: View {
         if sidebarViewModel.selectedMeetingId != nil {
             meetingDetailView
         } else if sidebarViewModel.selectedProject != nil {
-            ProjectDetailView(
-                sidebarViewModel: sidebarViewModel,
-                onStartNewMeeting: startNewMeeting
-            )
+            ProjectDetailView(sidebarViewModel: sidebarViewModel)
         } else {
             ProjectsOverviewView(sidebarViewModel: sidebarViewModel)
         }
@@ -230,7 +227,6 @@ struct ContentView: View {
     private var meetingsOverviewContent: some View {
         meetingDetailOrList {
             MeetingsOverviewView(
-                viewModel: viewModel,
                 sidebarViewModel: sidebarViewModel,
                 onSelectMeeting: { _ in }
             )

@@ -200,7 +200,8 @@ private struct ProjectDetailMeetingRow: View {
                     meeting: meeting,
                     tags: tags,
                     style: .compact,
-                    showAvatar: !showSelectionControl
+                    showAvatar: !showSelectionControl,
+                    showsSubtitle: false
                 )
                 .padding(.horizontal, 4)
                 .background(
@@ -228,7 +229,6 @@ private struct ProjectDetailMeetingRow: View {
 
 struct ProjectDetailView: View {
     var sidebarViewModel: SidebarViewModel
-    var onStartNewMeeting: () -> Void = {}
 
     @State private var selectedTab: ProjectDetailTab = .meetings
     @State private var isEditingProjectName = false
@@ -331,11 +331,7 @@ struct ProjectDetailView: View {
     private var meetingsTabContent: some View {
         if meetings.isEmpty {
             ContentUnavailableView {
-                Label(L10n.newTranscription, systemImage: "waveform")
-            } description: {
-                Text(L10n.noMeetingsYet)
-            } actions: {
-                Button(L10n.newTranscription, action: onStartNewMeeting)
+                Label(L10n.noMeetingsYet, systemImage: "waveform")
             }
             .frame(maxWidth: .infinity, maxHeight: .infinity)
         } else {
@@ -425,49 +421,29 @@ struct ProjectDetailView: View {
 
     private var settingsTabContent: some View {
         ScrollView {
-            VStack(alignment: .leading, spacing: 16) {
-                GroupBox {
-                    VStack(alignment: .leading, spacing: 12) {
-                        ProjectSettingRow(title: L10n.projectName, value: currentProject?.name ?? "")
-                        ProjectSettingRow(title: L10n.meetings, value: L10n.meetingCount(meetings.count))
-                        ProjectSettingRow(title: L10n.location, value: currentProjectURL?.path ?? "")
-
-                        if let latestMeetingDate {
-                            ProjectSettingRow(
-                                title: L10n.latestMeeting,
-                                value: latestMeetingDate.formatted(date: .abbreviated, time: .shortened)
-                            )
-                        }
-
-                        if isCurrentProjectMissingOnDisk {
-                            Label(L10n.folderMissing, systemImage: "exclamationmark.triangle.fill")
-                                .font(.subheadline)
-                                .foregroundStyle(.orange)
-                        }
-                    }
+            VStack(alignment: .leading, spacing: 20) {
+                ProjectSettingRow(title: L10n.projectName) {
+                    Text(currentProject?.name ?? "")
+                        .font(.subheadline)
+                        .textSelection(.enabled)
                 }
 
-                GroupBox {
-                    HStack(spacing: 12) {
+                ProjectSettingRow(title: L10n.location) {
+                    HStack(alignment: .center, spacing: 12) {
+                        Text(currentProjectURL?.path ?? "")
+                            .font(.subheadline)
+                            .textSelection(.enabled)
+                            .lineLimit(1)
+                            .truncationMode(.middle)
+                            .frame(maxWidth: .infinity, alignment: .leading)
+
                         Button(L10n.openInFinder) {
                             guard let currentProjectURL else { return }
                             NSWorkspace.shared.open(currentProjectURL)
                         }
+                        .buttonStyle(.link)
                         .disabled(isCurrentProjectMissingOnDisk || currentProjectURL == nil)
-
-                        Button(L10n.editContext) {
-                            openContextInExternalEditor()
-                        }
-                        .disabled(isCurrentProjectMissingOnDisk || currentProjectURL == nil)
-
-                        if let currentProject, isCurrentProjectMissingOnDisk {
-                            Button(L10n.recreateFolder) {
-                                sidebarViewModel.recreateFolder(name: currentProject.name)
-                                loadContextForCurrentProject()
-                            }
-                        }
                     }
-                    .frame(maxWidth: .infinity, alignment: .leading)
                 }
             }
             .padding(16)
@@ -500,16 +476,19 @@ struct ProjectDetailView: View {
         )
     }
 
-    private var latestMeetingDate: Date? {
-        currentProjectItem?.latestMeetingDate
-    }
-
     private var isCurrentProjectMissingOnDisk: Bool {
         currentProjectItem?.missingOnDisk ?? false
     }
 
     private var tabContentBackgroundColor: Color {
-        selectedTab == .context ? Color(nsColor: .textBackgroundColor) : Color(nsColor: .controlBackgroundColor)
+        switch selectedTab {
+        case .context:
+            Color(nsColor: .textBackgroundColor)
+        case .settings:
+            .clear
+        case .meetings:
+            Color(nsColor: .controlBackgroundColor)
+        }
     }
 
     private var isMultiSelectMode: Bool {
@@ -678,29 +657,24 @@ struct ProjectDetailView: View {
             contextErrorMessage = error.localizedDescription
         }
     }
-
-    private func openContextInExternalEditor() {
-        guard let currentProjectURL,
-              let fileURL = folderService.ensureContextFileExists(at: currentProjectURL) else { return }
-
-        persistContextIfNeeded()
-        AppSettings.shared.markdownEditor.open(fileURL)
-    }
 }
 
-private struct ProjectSettingRow: View {
+private struct ProjectSettingRow<Content: View>: View {
     let title: String
-    let value: String
+    let content: Content
+
+    init(title: String, @ViewBuilder content: () -> Content) {
+        self.title = title
+        self.content = content()
+    }
 
     var body: some View {
         VStack(alignment: .leading, spacing: 4) {
             Text(title)
-                .font(.caption)
+                .font(.headline)
                 .foregroundStyle(.secondary)
 
-            Text(value)
-                .font(.subheadline)
-                .textSelection(.enabled)
+            content
                 .frame(maxWidth: .infinity, alignment: .leading)
         }
     }
