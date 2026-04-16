@@ -108,7 +108,10 @@ final class CaptionViewModel: ObservableObject {
     private var recordingContext: RecordingContext?
 
     /// 録音対象の文字起こし ID。
-    var recordingMeetingId: UUID? { recordingContext?.meetingId }
+    /// recordingContext 初期化前（録音開始〜別トランスクリプトへ遷移前）は currentMeetingId で補う。
+    var recordingMeetingId: UUID? {
+        recordingContext?.meetingId ?? (isListening ? currentMeetingId : nil)
+    }
 
     /// 録音中かつ録音対象とは別のトランスクリプトを閲覧中。
     var isViewingOtherWhileRecording: Bool {
