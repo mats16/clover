@@ -2,6 +2,8 @@
 "Delete" = "削除";
 "Rename" = "名前を変更";
 "Create" = "作成";
+"Apply" = "適用";
+"Clear" = "クリア";
 "Close" = "閉じる";
 "Expand" = "展開";
 "Collapse" = "折りたたむ";
@@ -28,6 +30,8 @@
 "Filter" = "フィルター";
 "Search filters..." = "フィルターを検索...";
 "Tags" = "タグ";
+"Project is" = "プロジェクト";
+"Tag is" = "タグ";
 "Add tag" = "タグを追加";
 "Search or create tag..." = "タグを検索または作成...";
 "Search or create project..." = "プロジェクトを検索または作成...";

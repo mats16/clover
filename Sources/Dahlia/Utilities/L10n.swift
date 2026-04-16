@@ -30,6 +30,8 @@ enum L10n {
     static var delete: String { String(localized: "Delete", bundle: bundle) }
     static var rename: String { String(localized: "Rename", bundle: bundle) }
     static var create: String { String(localized: "Create", bundle: bundle) }
+    static var apply: String { String(localized: "Apply", bundle: bundle) }
+    static var clear: String { String(localized: "Clear", bundle: bundle) }
     static var close: String { String(localized: "Close", bundle: bundle) }
     static var expand: String { String(localized: "Expand", bundle: bundle) }
     static var collapse: String { String(localized: "Collapse", bundle: bundle) }
@@ -57,6 +59,8 @@ enum L10n {
     static var filter: String { String(localized: "Filter", bundle: bundle) }
     static var searchFilters: String { String(localized: "Search filters...", bundle: bundle) }
     static var tags: String { String(localized: "Tags", bundle: bundle) }
+    static var projectIs: String { String(localized: "Project is", bundle: bundle) }
+    static var tagIs: String { String(localized: "Tag is", bundle: bundle) }
     static var today: String { String(localized: "Today", bundle: bundle) }
     static var inProgress: String { String(localized: "In Progress", bundle: bundle) }
     static var noMeetingsYet: String { String(localized: "No meetings yet", bundle: bundle) }

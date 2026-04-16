@@ -27,22 +27,26 @@ struct MeetingsOverviewView: View {
     var onSelectMeeting: (UUID) -> Void
 
     @State private var filter: Filter = .all
-    @State private var selectedProjectIds: Set<UUID> = []
-    @State private var selectedTagNames: Set<String> = []
+    @State private var appliedFilterSelection = MeetingOverviewFilterSelection()
+    @State private var draftFilterSelection = MeetingOverviewFilterSelection()
     @State private var showFilterPopover = false
 
     private var hasActiveFilters: Bool {
-        !selectedProjectIds.isEmpty || !selectedTagNames.isEmpty
+        !appliedFilterSelection.isEmpty
+    }
+
+    private var hasAnyFilterApplied: Bool {
+        filter != .all || hasActiveFilters
     }
 
     private var activeFilterChips: [FilterChipData] {
         var chips: [FilterChipData] = []
-        for projectId in selectedProjectIds {
+        for projectId in appliedFilterSelection.projectIds {
             if let project = availableProjects.first(where: { $0.id == projectId }) {
                 chips.append(FilterChipData(kind: .project(projectId), label: project.name))
             }
         }
-        for tag in availableTags.filter({ selectedTagNames.contains($0.name) }) {
+        for tag in availableTags.filter({ appliedFilterSelection.tagNames.contains($0.name) }) {
             chips.append(FilterChipData(kind: .tag(tag.name), label: tag.name, tagColorHex: tag.colorHex))
         }
         return chips
@@ -50,28 +54,21 @@ struct MeetingsOverviewView: View {
 
     private func removeFilterChip(_ chip: FilterChipData) {
         switch chip.kind {
-        case .project(let id):
-            selectedProjectIds.remove(id)
-        case .tag(let name):
-            selectedTagNames.remove(name)
+        case let .project(id):
+            appliedFilterSelection.projectIds.remove(id)
+            draftFilterSelection.projectIds.remove(id)
+        case let .tag(name):
+            appliedFilterSelection.tagNames.remove(name)
+            draftFilterSelection.tagNames.remove(name)
         }
     }
 
-    private var availableProjects: [(id: UUID, name: String)] {
-        let all = sidebarViewModel.allMeetings
-        var seen = Set<UUID>()
-        var result: [(id: UUID, name: String)] = []
-        for m in all {
-            guard let projectId = m.projectId,
-                  let projectName = m.projectName,
-                  seen.insert(projectId).inserted else { continue }
-            result.append((id: projectId, name: projectName))
-        }
-        return result.sorted { $0.name.localizedCaseInsensitiveCompare($1.name) == .orderedAscending }
+    private var availableProjects: [MeetingOverviewProjectOption] {
+        MeetingOverviewFilters.projectOptions(from: sidebarViewModel.allProjectItems)
     }
 
     private var availableTags: [TagInfo] {
-        sidebarViewModel.allAvailableTags
+        MeetingOverviewFilters.tagOptions(from: sidebarViewModel.allMeetings)
     }
 
     private var meetings: [MeetingOverviewItem] {
@@ -87,19 +84,7 @@ struct MeetingsOverviewView: View {
             result = result.filter { $0.status == .recording }
         }
 
-        if !selectedProjectIds.isEmpty {
-            result = result.filter { meeting in
-                guard let projectId = meeting.projectId else { return false }
-                return selectedProjectIds.contains(projectId)
-            }
-        }
-        if !selectedTagNames.isEmpty {
-            result = result.filter { meeting in
-                meeting.tags.contains(where: { selectedTagNames.contains($0.name) })
-            }
-        }
-
-        return result
+        return MeetingOverviewFilters.apply(selection: appliedFilterSelection, to: result)
     }
 
     private var isMultiSelectMode: Bool {
@@ -144,7 +129,8 @@ struct MeetingsOverviewView: View {
 
                     HStack(spacing: 8) {
                         Button {
-                            showFilterPopover.toggle()
+                            draftFilterSelection = appliedFilterSelection
+                            showFilterPopover = true
                         } label: {
                             Label(L10n.filter, systemImage: "line.3.horizontal.decrease")
                                 .font(.body)
@@ -153,10 +139,16 @@ struct MeetingsOverviewView: View {
                         .buttonStyle(.plain)
                         .popover(isPresented: $showFilterPopover, arrowEdge: .bottom) {
                             FilterDropdown(
-                                selectedProjectIds: $selectedProjectIds,
-                                selectedTagNames: $selectedTagNames,
+                                selection: $draftFilterSelection,
                                 availableProjects: availableProjects,
-                                availableTags: availableTags
+                                availableTags: availableTags,
+                                onApply: {
+                                    appliedFilterSelection = draftFilterSelection
+                                    showFilterPopover = false
+                                },
+                                onReset: {
+                                    draftFilterSelection = MeetingOverviewFilterSelection()
+                                }
                             )
                         }
 
@@ -172,12 +164,12 @@ struct MeetingsOverviewView: View {
                     ContentUnavailableView {
                         Label(L10n.noMeetingsYet, systemImage: "calendar")
                     } description: {
-                        Text(filter == .all ? L10n.newTranscription : L10n.noMeetingsMatchFilter)
+                        Text(hasAnyFilterApplied ? L10n.noMeetingsMatchFilter : L10n.newTranscription)
                     } actions: {
-                        if filter == .all {
-                            Button(L10n.newTranscription, action: createNewMeeting)
-                        } else {
+                        if hasAnyFilterApplied {
                             Button(L10n.all, action: resetFilter)
+                        } else {
+                            Button(L10n.newTranscription, action: createNewMeeting)
                         }
                     }
                     .frame(maxWidth: .infinity, minHeight: 320)
@@ -208,10 +200,9 @@ struct MeetingsOverviewView: View {
 
     private func resetFilter() {
         filter = .all
-        selectedProjectIds.removeAll()
-        selectedTagNames.removeAll()
+        appliedFilterSelection = MeetingOverviewFilterSelection()
+        draftFilterSelection = MeetingOverviewFilterSelection()
     }
-
 
     private func handleRowActivation(_ item: MeetingOverviewItem) {
         let flags = NSEvent.modifierFlags
@@ -506,7 +497,7 @@ private struct MeetingsOverviewRow: View {
             subtitleText,
             relativeDate,
         ]
-        .compactMap { $0 }
+        .compactMap(\.self)
         .joined(separator: ", ")
     }
 
@@ -703,15 +694,15 @@ private struct FilterChipData: Identifiable {
 
     var id: String {
         switch kind {
-        case .project(let id): "project-\(id)"
-        case .tag(let tag): "tag-\(tag)"
+        case let .project(id): "project-\(id)"
+        case let .tag(tag): "tag-\(tag)"
         }
     }
 
     var prefix: String {
         switch kind {
-        case .project: "\(L10n.projects) is"
-        case .tag: "\(L10n.tags) is"
+        case .project: L10n.projectIs
+        case .tag: L10n.tagIs
         }
     }
 
@@ -759,10 +750,11 @@ private struct FilterChip: View {
 // MARK: - Filter Dropdown
 
 private struct FilterDropdown: View {
-    @Binding var selectedProjectIds: Set<UUID>
-    @Binding var selectedTagNames: Set<String>
-    let availableProjects: [(id: UUID, name: String)]
+    @Binding var selection: MeetingOverviewFilterSelection
+    let availableProjects: [MeetingOverviewProjectOption]
     let availableTags: [TagInfo]
+    let onApply: () -> Void
+    let onReset: () -> Void
 
     @State private var expandedSection: Section?
     @State private var searchText = ""
@@ -775,11 +767,10 @@ private struct FilterDropdown: View {
     var body: some View {
         VStack(alignment: .leading, spacing: 0) {
             if expandedSection == nil {
-                // Category list
                 FilterDropdownRow(
                     title: L10n.projects,
                     systemImage: "folder",
-                    badgeCount: selectedProjectIds.count,
+                    badgeCount: selection.projectIds.count,
                     showChevron: true
                 ) {
                     expandedSection = .projects
@@ -791,14 +782,13 @@ private struct FilterDropdown: View {
                 FilterDropdownRow(
                     title: L10n.tags,
                     systemImage: "tag",
-                    badgeCount: selectedTagNames.count,
+                    badgeCount: selection.tagNames.count,
                     showChevron: true
                 ) {
                     expandedSection = .tags
                     searchText = ""
                 }
             } else {
-                // Back + search + items
                 FilterDropdownRow(
                     title: expandedSection == .projects ? L10n.projects : L10n.tags,
                     systemImage: "chevron.left",
@@ -820,40 +810,65 @@ private struct FilterDropdown: View {
                 Divider().padding(.horizontal, 8)
 
                 ScrollView {
-                    VStack(alignment: .leading, spacing: 0) {
+                    LazyVStack(alignment: .leading, spacing: 0) {
                         switch expandedSection {
                         case .projects:
-                            ForEach(filteredProjects, id: \.id) { project in
-                                FilterDropdownItem(
-                                    title: project.name,
-                                    isSelected: selectedProjectIds.contains(project.id)
-                                ) {
-                                    selectedProjectIds.toggle(project.id)
+                            if filteredProjects.isEmpty {
+                                FilterDropdownEmptyState()
+                            } else {
+                                ForEach(filteredProjects) { project in
+                                    FilterDropdownItem(
+                                        title: project.name,
+                                        isSelected: selection.projectIds.contains(project.id)
+                                    ) {
+                                        toggleProject(project.id)
+                                    }
                                 }
                             }
                         case .tags:
-                            ForEach(filteredTags, id: \.name) { tag in
-                                FilterDropdownItem(
-                                    title: tag.name,
-                                    isSelected: selectedTagNames.contains(tag.name),
-                                    dotColor: Color(hex: tag.colorHex)
-                                ) {
-                                    selectedTagNames.toggle(tag.name)
+                            if filteredTags.isEmpty {
+                                FilterDropdownEmptyState()
+                            } else {
+                                ForEach(filteredTags, id: \.name) { tag in
+                                    FilterDropdownItem(
+                                        title: tag.name,
+                                        isSelected: selection.tagNames.contains(tag.name),
+                                        dotColor: Color(hex: tag.colorHex)
+                                    ) {
+                                        toggleTag(tag.name)
+                                    }
                                 }
                             }
                         case nil:
                             EmptyView()
                         }
                     }
+                    .frame(maxWidth: .infinity, alignment: .topLeading)
                 }
+                .defaultScrollAnchor(.top)
+                .frame(maxWidth: .infinity, minHeight: 120, maxHeight: 180, alignment: .top)
             }
+
+            Divider().padding(.horizontal, 8)
+
+            HStack(spacing: 12) {
+                Button(L10n.clear, action: onReset)
+                    .disabled(selection.isEmpty)
+
+                Spacer()
+
+                Button(L10n.apply, action: onApply)
+                    .keyboardShortcut(.defaultAction)
+            }
+            .padding(.horizontal, 12)
+            .padding(.vertical, 10)
         }
         .padding(.vertical, 6)
-        .frame(width: 220)
-        .frame(maxHeight: 300)
+        .frame(width: 260)
+        .frame(maxHeight: 340)
     }
 
-    private var filteredProjects: [(id: UUID, name: String)] {
+    private var filteredProjects: [MeetingOverviewProjectOption] {
         guard !searchText.isEmpty else { return availableProjects }
         return availableProjects.filter { $0.name.localizedCaseInsensitiveContains(searchText) }
     }
@@ -861,6 +876,18 @@ private struct FilterDropdown: View {
     private var filteredTags: [TagInfo] {
         guard !searchText.isEmpty else { return availableTags }
         return availableTags.filter { $0.name.localizedCaseInsensitiveContains(searchText) }
+    }
+
+    private func toggleProject(_ id: UUID) {
+        var updated = selection
+        updated.projectIds.toggle(id)
+        selection = updated
+    }
+
+    private func toggleTag(_ name: String) {
+        var updated = selection
+        updated.tagNames.toggle(name)
+        selection = updated
     }
 }
 
@@ -955,5 +982,16 @@ private struct FilterDropdownItem: View {
         .buttonStyle(.plain)
         .onHover { isHovered = $0 }
         .padding(.horizontal, 4)
+    }
+}
+
+private struct FilterDropdownEmptyState: View {
+    var body: some View {
+        Text(L10n.noResultsFound)
+            .font(.subheadline)
+            .foregroundStyle(.secondary)
+            .frame(maxWidth: .infinity, alignment: .leading)
+            .padding(.horizontal, 12)
+            .padding(.vertical, 12)
     }
 }

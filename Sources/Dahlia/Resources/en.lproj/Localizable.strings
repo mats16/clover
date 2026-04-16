@@ -2,6 +2,8 @@
 "Delete" = "Delete";
 "Rename" = "Rename";
 "Create" = "Create";
+"Apply" = "Apply";
+"Clear" = "Clear";
 "Close" = "Close";
 "Expand" = "Expand";
 "Collapse" = "Collapse";
@@ -28,6 +30,8 @@
 "Filter" = "Filter";
 "Search filters..." = "Search filters...";
 "Tags" = "Tags";
+"Project is" = "Project is";
+"Tag is" = "Tag is";
 "Add tag" = "Add tag";
 "Search or create tag..." = "Search or create tag...";
 "Search or create project..." = "Search or create project...";

@@ -21,6 +21,32 @@ struct MeetingOverviewItem: Equatable, FetchableRecord, Identifiable {
     private static let fieldSeparator: Character = "\u{1E}"
     private static let recordSeparator: Character = "\u{1F}"
 
+    init(
+        meetingId: UUID,
+        vaultId: UUID,
+        projectId: UUID?,
+        projectName: String?,
+        meetingName: String,
+        status: MeetingStatus,
+        duration: TimeInterval?,
+        createdAt: Date,
+        segmentCount: Int,
+        latestSegmentText: String?,
+        tags: [TagInfo]
+    ) {
+        self.meetingId = meetingId
+        self.vaultId = vaultId
+        self.projectId = projectId
+        self.projectName = projectName
+        self.meetingName = meetingName
+        self.status = status
+        self.duration = duration
+        self.createdAt = createdAt
+        self.segmentCount = segmentCount
+        self.latestSegmentText = latestSegmentText
+        self.tags = tags
+    }
+
     init(row: Row) throws {
         meetingId = row["meetingId"]
         vaultId = row["vaultId"]

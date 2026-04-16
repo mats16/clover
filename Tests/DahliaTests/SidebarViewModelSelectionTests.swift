@@ -163,6 +163,7 @@ private func withTestVault(_ body: () -> Void) {
 private func testMeeting(id: UUID, projectId: UUID) -> MeetingRecord {
     MeetingRecord(
         id: id,
+        vaultId: UUID.v7(),
         projectId: projectId,
         name: "",
         status: .ready,
