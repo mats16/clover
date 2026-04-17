@@ -32,10 +32,6 @@ struct ContentView: View {
             }
 
             detailArea
-                .frame(maxWidth: .infinity, maxHeight: .infinity)
-                .overlay(alignment: .bottom) {
-                    bottomOverlayBar
-                }
         }
         .background(WindowTitlebarConfigurator())
         .toolbar(content: windowToolbarContent)
@@ -117,13 +113,21 @@ struct ContentView: View {
     private var detailArea: some View {
         switch sidebarViewModel.selectedDestination {
         case .home:
-            HomeOverviewView(onSelectEvent: startDraftMeeting)
+            workspaceContent {
+                HomeOverviewView(onSelectEvent: startDraftMeeting)
+            }
         case .meetings:
-            meetingsOverviewContent
+            workspaceContent {
+                meetingsOverviewContent
+            }
         case .projects:
-            projectsWorkspaceContent
+            workspaceContent {
+                projectsWorkspaceContent
+            }
         case .actionItems:
-            actionItemsOverviewContent
+            workspaceContent {
+                actionItemsOverviewContent
+            }
         case .ask:
             askWorkspaceContent
         }
@@ -270,6 +274,10 @@ struct ContentView: View {
         shouldShowFloatingActionBar || shouldShowBatchSelectionBar
     }
 
+    private var shouldShowWorkspaceAgentSidebar: Bool {
+        appSettings.agentEnabled && isAgentSidebarPresented && sidebarViewModel.selectedDestination != .ask
+    }
+
     @ViewBuilder
     private var bottomOverlayBar: some View {
         if shouldShowBottomOverlayBar {
@@ -318,25 +326,11 @@ struct ContentView: View {
         }
     }
 
-    @ViewBuilder
     private var meetingDetailView: some View {
-        let controlPanel = ControlPanelView(
+        ControlPanelView(
             viewModel: viewModel,
             sidebarViewModel: sidebarViewModel
         )
-
-        if appSettings.agentEnabled, isAgentSidebarPresented {
-            HSplitView {
-                controlPanel
-                    .frame(maxWidth: .infinity, maxHeight: .infinity)
-
-                AgentSidebarView(viewModel: viewModel, sidebarViewModel: sidebarViewModel)
-                    .frame(minWidth: 280, idealWidth: 340, maxWidth: 480, maxHeight: .infinity)
-                    .background(.background)
-            }
-        } else {
-            controlPanel
-        }
     }
 
     @ViewBuilder
@@ -386,6 +380,29 @@ struct ContentView: View {
             meetingDetailView
         } else {
             listContent()
+        }
+    }
+
+    @ViewBuilder
+    private func workspaceContent<Content: View>(@ViewBuilder content: () -> Content) -> some View {
+        if shouldShowWorkspaceAgentSidebar {
+            HSplitView {
+                content()
+                    .frame(maxWidth: .infinity, maxHeight: .infinity)
+                    .overlay(alignment: .bottom) {
+                        bottomOverlayBar
+                    }
+
+                AgentSidebarView(viewModel: viewModel, sidebarViewModel: sidebarViewModel)
+                    .frame(minWidth: 280, idealWidth: 340, maxWidth: 480, maxHeight: .infinity)
+                    .background(.background)
+            }
+        } else {
+            content()
+                .frame(maxWidth: .infinity, maxHeight: .infinity)
+                .overlay(alignment: .bottom) {
+                    bottomOverlayBar
+                }
         }
     }
 

@@ -156,6 +156,10 @@ final class CaptionViewModel: ObservableObject {
         recordingContext?.meetingId ?? currentMeetingId
     }
 
+    var activeTranscriptStoreForAgent: TranscriptStore {
+        recordingContext?.store ?? store
+    }
+
     var canTakeScreenshot: Bool {
         activeMeetingIdForSessionControls != nil && activeDbQueueForSessionControls != nil
     }
@@ -943,10 +947,10 @@ final class CaptionViewModel: ObservableObject {
     /// `workingDirectory` を渡すと `currentProjectURL` より優先して使用する。
     func startAgent(mode: AgentStartMode, initialMessage: String? = nil, workingDirectory: URL? = nil) {
         guard agentService == nil,
-              let projectURL = workingDirectory ?? currentProjectURL else { return }
+              let workingDirectory = workingDirectory ?? currentProjectURL ?? currentVaultURL else { return }
         let service = AgentService()
         self.agentService = service
-        service.start(workingDirectory: projectURL, mode: mode, initialMessage: initialMessage)
+        service.start(workingDirectory: workingDirectory, mode: mode, initialMessage: initialMessage)
     }
 
     /// Agent を明示的に停止する。
@@ -958,7 +962,7 @@ final class CaptionViewModel: ObservableObject {
     /// transcript 切替時に Agent のセグメント追跡をリセットする（transcript モードのみ）。
     func resetAgentSegmentTrackingIfNeeded() {
         guard let service = agentService, service.mode.isTranscript else { return }
-        service.resetSegmentTracking(store: store)
+        service.resetSegmentTracking(store: activeTranscriptStoreForAgent)
     }
 
     // MARK: - Summary Generation
