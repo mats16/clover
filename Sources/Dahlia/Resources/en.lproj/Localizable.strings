@@ -31,7 +31,6 @@
 "Recreate Folder" = "Recreate Folder";
 "Folder missing on disk" = "Folder missing on disk";
 "Home is under construction." = "Home is under construction.";
-"Home shows the next 7 days of events from your selected Google calendars." = "Home shows the next 7 days of events from your selected Google calendars.";
 "Action items will appear here." = "Action items will appear here.";
 "Select a project from Projects." = "Select a project from Projects.";
 "Open Projects" = "Open Projects";
@@ -144,7 +143,7 @@
 "No calendars are available for this Google account." = "No calendars are available for this Google account.";
 "Loading Google Calendar…" = "Loading Google Calendar…";
 "Retry" = "Retry";
-"Meeting link" = "Meeting link";
+"Join" = "Join";
 "All day" = "All day";
 "Google Calendar is not configured" = "Google Calendar is not configured";
 "Set GOOGLE_CLIENT_ID before connecting Google Calendar." = "Set GOOGLE_CLIENT_ID before connecting Google Calendar.";

@@ -343,15 +343,10 @@ extension GoogleCalendarAPIClient {
 }
 
 private extension Calendar {
-    static let googleCalendarDateFormatter: DateFormatter = {
+    func googleCalendarDate(from value: String) throws -> Date {
         let formatter = DateFormatter()
         formatter.locale = Locale(identifier: "en_US_POSIX")
         formatter.dateFormat = "yyyy-MM-dd"
-        return formatter
-    }()
-
-    func googleCalendarDate(from value: String) throws -> Date {
-        let formatter = Self.googleCalendarDateFormatter
         formatter.calendar = self
         formatter.timeZone = timeZone
         guard let date = formatter.date(from: value) else {

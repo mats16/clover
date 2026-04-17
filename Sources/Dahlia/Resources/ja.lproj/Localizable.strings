@@ -31,7 +31,6 @@
 "Recreate Folder" = "フォルダを再作成";
 "Folder missing on disk" = "フォルダがディスク上に見つかりません";
 "Home is under construction." = "Home は工事中です。";
-"Home shows the next 7 days of events from your selected Google calendars." = "Home には選択した Google カレンダーの今後 7 日間の予定を表示します。";
 "Action items will appear here." = "Action Items は今後ここに表示されます。";
 "Select a project from Projects." = "Projects からプロジェクトを選択してください。";
 "Open Projects" = "Projects を開く";
@@ -144,7 +143,7 @@
 "No calendars are available for this Google account." = "この Google アカウントで利用できるカレンダーがありません。";
 "Loading Google Calendar…" = "Google カレンダーを読み込み中…";
 "Retry" = "再試行";
-"Meeting link" = "会議リンク";
+"Join" = "参加";
 "All day" = "終日";
 "Google Calendar is not configured" = "Google カレンダーが未設定です";
 "Set GOOGLE_CLIENT_ID before connecting Google Calendar." = "Google カレンダーを接続する前に GOOGLE_CLIENT_ID を設定してください。";

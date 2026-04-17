@@ -581,7 +581,7 @@ struct ContentView: View {
 
         let repository = MeetingRepository(dbQueue: dbQueue)
         if let existingMeetingId = try? repository.fetchMeetingIdForCalendarEvent(
-            platform: "GoogleCalendar",
+            platform: CalendarEventRecord.googleCalendarPlatform,
             platformId: event.platformId
         ) {
             sidebarViewModel.deselectProject()

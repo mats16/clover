@@ -1,24 +1,22 @@
 import Foundation
 
 enum GoogleCalendarConfiguration {
-    private static let infoPlistClientIDKey = "GOOGLE_CLIENT_ID"
-    private static let legacyInfoPlistClientIDKey = "GIDClientID"
-    private static let infoPlistClientSecretKey = "GOOGLE_CLIENT_SECRET"
-    private static let environmentClientIDKey = "GOOGLE_CLIENT_ID"
-    private static let environmentClientSecretKey = "GOOGLE_CLIENT_SECRET"
+    private static let clientIDKey = "GOOGLE_CLIENT_ID"
+    private static let legacyClientIDKey = "GIDClientID"
+    private static let clientSecretKey = "GOOGLE_CLIENT_SECRET"
 
     static var clientID: String? {
         nonEmptyValue(
-            infoDictionaryValue(forKey: infoPlistClientIDKey) ??
-                infoDictionaryValue(forKey: legacyInfoPlistClientIDKey) ??
-                ProcessInfo.processInfo.environment[environmentClientIDKey]
+            infoDictionaryValue(forKey: clientIDKey) ??
+                infoDictionaryValue(forKey: legacyClientIDKey) ??
+                ProcessInfo.processInfo.environment[clientIDKey]
         )
     }
 
     static var clientSecret: String? {
         nonEmptyValue(
-            infoDictionaryValue(forKey: infoPlistClientSecretKey) ??
-                ProcessInfo.processInfo.environment[environmentClientSecretKey]
+            infoDictionaryValue(forKey: clientSecretKey) ??
+                ProcessInfo.processInfo.environment[clientSecretKey]
         )
     }
 

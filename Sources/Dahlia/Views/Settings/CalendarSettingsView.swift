@@ -1,7 +1,7 @@
 import SwiftUI
 
 struct CalendarSettingsView: View {
-    @StateObject private var calendarStore = GoogleCalendarStore.shared
+    @ObservedObject private var calendarStore = GoogleCalendarStore.shared
 
     var body: some View {
         SettingsPage {
@@ -60,7 +60,7 @@ struct CalendarSettingsView: View {
             }
         }
         .task {
-            await calendarStore.restoreSessionIfNeeded()
+            await calendarStore.refreshIfNeeded()
         }
     }
 

@@ -426,26 +426,11 @@ final class CaptionViewModel: ObservableObject {
             createdAt: now,
             updatedAt: now
         )
-        let calendarEventRecord = draftMeeting.linkedCalendarEvent.map { event in
-            CalendarEventRecord(
-                meetingId: meetingId,
-                createdAt: now,
-                updatedAt: now,
-                platform: "GoogleCalendar",
-                platformId: event.platformId,
-                description: event.description,
-                icalUid: event.icalUid,
-                start: event.startDate,
-                end: event.endDate,
-                meetingUrl: event.meetingURL?.absoluteString
-            )
-        }
-
         do {
             try dbQueue.write { db in
                 try record.insert(db)
-                if let calendarEventRecord {
-                    try calendarEventRecord.insert(db)
+                if let event = draftMeeting.linkedCalendarEvent {
+                    try CalendarEventRecord(meetingId: meetingId, now: now, event: event).insert(db)
                 }
             }
         } catch {
@@ -466,10 +451,6 @@ final class CaptionViewModel: ObservableObject {
             saveNoteImmediately()
         }
         return meetingId
-    }
-
-    func discardDraftMeeting() {
-        draftMeeting = nil
     }
 
     /// 現在の文字起こし表示をクリアして初期状態に戻す。

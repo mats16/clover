@@ -33,6 +33,7 @@ enum L10n {
     static var apply: String { String(localized: "Apply", bundle: bundle) }
     static var clear: String { String(localized: "Clear", bundle: bundle) }
     static var close: String { String(localized: "Close", bundle: bundle) }
+    static var join: String { String(localized: "Join", bundle: bundle) }
     static var expand: String { String(localized: "Expand", bundle: bundle) }
     static var collapse: String { String(localized: "Collapse", bundle: bundle) }
     static var back: String { String(localized: "Back", bundle: bundle) }
@@ -60,10 +61,6 @@ enum L10n {
     static var recreateFolder: String { String(localized: "Recreate Folder", bundle: bundle) }
     static var folderMissing: String { String(localized: "Folder missing on disk", bundle: bundle) }
     static var homeUnderConstruction: String { String(localized: "Home is under construction.", bundle: bundle) }
-    static var googleCalendarHomeDescription: String { String(
-        localized: "Home shows the next 7 days of events from your selected Google calendars.",
-        bundle: bundle
-    ) }
     static var actionItemsComingSoon: String { String(localized: "Action items will appear here.", bundle: bundle) }
     static var selectProjectFromProjects: String { String(localized: "Select a project from Projects.", bundle: bundle) }
     static var openProjects: String { String(localized: "Open Projects", bundle: bundle) }
@@ -227,7 +224,6 @@ enum L10n {
     static var googleCalendarNoCalendars: String { String(localized: "No calendars are available for this Google account.", bundle: bundle) }
     static var googleCalendarLoading: String { String(localized: "Loading Google Calendar…", bundle: bundle) }
     static var googleCalendarRetry: String { String(localized: "Retry", bundle: bundle) }
-    static var googleCalendarMeetingLinkAvailable: String { String(localized: "Meeting link", bundle: bundle) }
     static var googleCalendarAllDay: String { String(localized: "All day", bundle: bundle) }
     static var googleCalendarClientIDMissingTitle: String { String(localized: "Google Calendar is not configured", bundle: bundle) }
     static var googleCalendarClientIDMissingMessage: String { String(

@@ -133,7 +133,7 @@ final class GoogleCalendarStore: ObservableObject {
         }
 
         guard !selectedCalendarIDs.isEmpty else {
-            upcomingEvents = []
+            if !upcomingEvents.isEmpty { upcomingEvents = [] }
             lastRefreshAt = nil
             recomputeState()
             return
@@ -174,11 +174,7 @@ final class GoogleCalendarStore: ObservableObject {
 
     func toggleCalendarSelection(id: String) {
         var nextSelection = selectedCalendarIDs
-        if nextSelection.contains(id) {
-            nextSelection.remove(id)
-        } else {
-            nextSelection.insert(id)
-        }
+        nextSelection.toggle(id)
 
         updateSelectedCalendarIDs(nextSelection)
         Task {
@@ -202,7 +198,7 @@ final class GoogleCalendarStore: ObservableObject {
 
         if refreshEvents {
             if selectedCalendarIDs.isEmpty {
-                upcomingEvents = []
+                if !upcomingEvents.isEmpty { upcomingEvents = [] }
                 lastRefreshAt = nil
                 recomputeState()
             } else {
@@ -254,9 +250,9 @@ final class GoogleCalendarStore: ObservableObject {
 
     private func clearRuntimeState(clearSelection: Bool) {
         currentSession = nil
-        account = nil
-        availableCalendars = []
-        upcomingEvents = []
+        if account != nil { account = nil }
+        if !availableCalendars.isEmpty { availableCalendars = [] }
+        if !upcomingEvents.isEmpty { upcomingEvents = [] }
         lastRefreshAt = nil
 
         if clearSelection {
