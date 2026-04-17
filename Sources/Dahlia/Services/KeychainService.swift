@@ -28,9 +28,14 @@ enum KeychainService {
         case encodingFailed
     }
 
+    enum AccessPolicy: Equatable {
+        case standard
+        case userPresence
+    }
+
     // MARK: - Public API
 
-    static func save(key: String, value: String) throws {
+    static func save(key: String, value: String, accessPolicy: AccessPolicy = .userPresence) throws {
         guard let data = value.data(using: .utf8) else {
             throw KeychainError.encodingFailed
         }
@@ -39,7 +44,7 @@ enum KeychainService {
         deleteFromBothKeychains(key: key)
 
         if dataProtectionAvailable != false {
-            let status = saveProtected(key: key, data: data)
+            let status = saveProtected(key: key, data: data, accessPolicy: accessPolicy)
             if status == errSecSuccess {
                 dataProtectionAvailable = true
                 return
@@ -57,9 +62,9 @@ enum KeychainService {
         }
     }
 
-    static func load(key: String) -> String? {
+    static func load(key: String, accessPolicy: AccessPolicy = .userPresence) -> String? {
         if dataProtectionAvailable != false {
-            let (data, status) = loadProtected(key: key)
+            let (data, status) = loadProtected(key: key, accessPolicy: accessPolicy)
             if status == errSecSuccess, let data {
                 dataProtectionAvailable = true
                 return String(data: data, encoding: .utf8)
@@ -118,24 +123,31 @@ enum KeychainService {
 
     // MARK: - Data Protection Keychain (Protected)
 
-    private static func saveProtected(key: String, data: Data) -> OSStatus {
-        guard let accessControl = makeAccessControl() else {
-            return errSecInternalComponent
-        }
+    private static func saveProtected(key: String, data: Data, accessPolicy: AccessPolicy) -> OSStatus {
         var query = baseQuery(key: key)
         query[kSecValueData as String] = data
         query[kSecUseDataProtectionKeychain as String] = true
-        query[kSecAttrAccessControl as String] = accessControl
-        query[kSecUseAuthenticationContext as String] = makeAuthContext()
+        switch accessPolicy {
+        case .standard:
+            query[kSecAttrAccessible as String] = kSecAttrAccessibleWhenUnlockedThisDeviceOnly
+        case .userPresence:
+            guard let accessControl = makeAccessControl() else {
+                return errSecInternalComponent
+            }
+            query[kSecAttrAccessControl as String] = accessControl
+            query[kSecUseAuthenticationContext as String] = makeAuthContext()
+        }
         return SecItemAdd(query as CFDictionary, nil)
     }
 
-    private static func loadProtected(key: String) -> (Data?, OSStatus) {
+    private static func loadProtected(key: String, accessPolicy: AccessPolicy) -> (Data?, OSStatus) {
         var query = baseQuery(key: key)
         query[kSecReturnData as String] = true
         query[kSecMatchLimit as String] = kSecMatchLimitOne
         query[kSecUseDataProtectionKeychain as String] = true
-        query[kSecUseAuthenticationContext as String] = makeAuthContext()
+        if accessPolicy == .userPresence {
+            query[kSecUseAuthenticationContext as String] = makeAuthContext()
+        }
         var result: AnyObject?
         let status = SecItemCopyMatching(query as CFDictionary, &result)
         return (result as? Data, status)

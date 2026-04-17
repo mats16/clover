@@ -29,7 +29,10 @@ struct DahliaApp: App {
                     )
                 }
             }
-            .task { initializeAppIfNeeded() }
+            .task {
+                initializeAppIfNeeded()
+                await GoogleCalendarStore.shared.restoreSessionIfNeeded()
+            }
         }
         .windowResizability(.contentMinSize)
         .windowToolbarStyle(.unifiedCompact(showsTitle: false))

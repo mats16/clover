@@ -60,6 +60,10 @@ enum L10n {
     static var recreateFolder: String { String(localized: "Recreate Folder", bundle: bundle) }
     static var folderMissing: String { String(localized: "Folder missing on disk", bundle: bundle) }
     static var homeUnderConstruction: String { String(localized: "Home is under construction.", bundle: bundle) }
+    static var googleCalendarHomeDescription: String { String(
+        localized: "Home shows the next 7 days of events from your selected Google calendars.",
+        bundle: bundle
+    ) }
     static var actionItemsComingSoon: String { String(localized: "Action items will appear here.", bundle: bundle) }
     static var selectProjectFromProjects: String { String(localized: "Select a project from Projects.", bundle: bundle) }
     static var openProjects: String { String(localized: "Open Projects", bundle: bundle) }
@@ -73,6 +77,7 @@ enum L10n {
     static var projectIs: String { String(localized: "Project is", bundle: bundle) }
     static var tagIs: String { String(localized: "Tag is", bundle: bundle) }
     static var today: String { String(localized: "Today", bundle: bundle) }
+    static var tomorrow: String { String(localized: "Tomorrow", bundle: bundle) }
     static var inProgress: String { String(localized: "In Progress", bundle: bundle) }
     static var noMeetingsYet: String { String(localized: "No meetings yet", bundle: bundle) }
     static var noMeetingsMatchFilter: String { String(localized: "No meetings match the current filter.", bundle: bundle) }
@@ -170,6 +175,7 @@ enum L10n {
     // MARK: - Settings
 
     static var general: String { String(localized: "General", bundle: bundle) }
+    static var calendar: String { String(localized: "Calendar", bundle: bundle) }
     static var aiSummary: String { String(localized: "AI Summary", bundle: bundle) }
     static var editor: String { String(localized: "Editor", bundle: bundle) }
     static var vault: String { String(localized: "Vault", bundle: bundle) }
@@ -196,6 +202,75 @@ enum L10n {
     ) }
     static var connectionDiagnosticsDescription: String { String(
         localized: "Run a quick request to validate your endpoint, model, and token.",
+        bundle: bundle
+    ) }
+    static var googleCalendar: String { String(localized: "Google Calendar", bundle: bundle) }
+    static var googleCalendarSettingsDescription: String { String(
+        localized: "Connect a Google account and choose which calendars appear on Home.",
+        bundle: bundle
+    ) }
+    static var googleCalendarDisplayCalendars: String { String(localized: "Display Calendars", bundle: bundle) }
+    static var googleCalendarDisplayCalendarsDescription: String { String(
+        localized: "Only selected calendars are shown on Home.",
+        bundle: bundle
+    ) }
+    static var googleCalendarConnect: String { String(localized: "Connect", bundle: bundle) }
+    static var googleCalendarDisconnect: String { String(localized: "Disconnect", bundle: bundle) }
+    static var googleCalendarConnectDescription: String { String(
+        localized: "Sign in with Google to load your upcoming schedule.",
+        bundle: bundle
+    ) }
+    static var googleCalendarConnected: String { String(localized: "Connected", bundle: bundle) }
+    static var googleCalendarNotConnected: String { String(localized: "No Google account connected", bundle: bundle) }
+    static var googleCalendarPrimaryCalendar: String { String(localized: "Primary calendar", bundle: bundle) }
+    static var googleCalendarNoCalendars: String { String(localized: "No calendars are available for this Google account.", bundle: bundle) }
+    static var googleCalendarLoading: String { String(localized: "Loading Google Calendar…", bundle: bundle) }
+    static var googleCalendarRetry: String { String(localized: "Retry", bundle: bundle) }
+    static var googleCalendarMeetingLinkAvailable: String { String(localized: "Meeting link", bundle: bundle) }
+    static var googleCalendarAllDay: String { String(localized: "All day", bundle: bundle) }
+    static var googleCalendarClientIDMissingTitle: String { String(localized: "Google Calendar is not configured", bundle: bundle) }
+    static var googleCalendarClientIDMissingMessage: String { String(
+        localized: "Set GOOGLE_CLIENT_ID before connecting Google Calendar.",
+        bundle: bundle
+    ) }
+    static var googleCalendarSignInRequiredTitle: String { String(localized: "Connect Google Calendar", bundle: bundle) }
+    static var googleCalendarSignInRequiredMessage: String { String(
+        localized: "Connect Google Calendar from Settings to show your upcoming events on Home.",
+        bundle: bundle
+    ) }
+    static var googleCalendarSelectionRequiredTitle: String { String(localized: "Choose calendars to show", bundle: bundle) }
+    static var googleCalendarSelectionRequiredMessage: String { String(
+        localized: "Select at least one calendar in Settings to show events on Home.",
+        bundle: bundle
+    ) }
+    static var googleCalendarNoUpcomingEventsTitle: String { String(localized: "No upcoming events", bundle: bundle) }
+    static var googleCalendarNoUpcomingEventsMessage: String { String(
+        localized: "There are no events in the next 7 days for the selected calendars.",
+        bundle: bundle
+    ) }
+    static var googleCalendarLoadFailedTitle: String { String(localized: "Could not load Google Calendar", bundle: bundle) }
+    static var googleCalendarMissingPresentingWindow: String { String(
+        localized: "No window is available to present Google sign-in.",
+        bundle: bundle
+    ) }
+    static var googleCalendarNoPreviousSession: String { String(localized: "No previous Google Calendar session was found.", bundle: bundle) }
+    static var googleCalendarClientSecretMissingMessage: String { String(
+        localized: "This Google OAuth client requires a client secret. Set GOOGLE_CLIENT_SECRET to the value from Google Cloud Console and relaunch Dahlia.",
+        bundle: bundle
+    ) }
+    static var googleCalendarKeychainConfigurationMessage: String { String(
+        localized: "Google sign-in could not access Keychain. Rebuild the app with ./scripts/run-dev.sh so it is code signed with the required Keychain entitlements.",
+        bundle: bundle
+    ) }
+    static var googleCalendarUnknownAccount: String { String(localized: "Google Account", bundle: bundle) }
+    static var googleCalendarUntitledEvent: String { String(localized: "Untitled event", bundle: bundle) }
+    static var googleCalendarUnexpectedResponse: String { String(localized: "Unexpected response from Google Calendar", bundle: bundle) }
+    static func googleCalendarHTTPError(_ code: Int, _ detail: String) -> String { String(
+        localized: "Google Calendar HTTP \(code): \(detail)",
+        bundle: bundle
+    ) }
+    static func googleCalendarInvalidDate(_ value: String) -> String { String(
+        localized: "Could not parse Google Calendar date: \(value)",
         bundle: bundle
     ) }
 
