@@ -40,11 +40,16 @@ struct ContentView: View {
         .background(WindowTitlebarConfigurator())
         .toolbar(content: windowToolbarContent)
         .onAppear(perform: initializeNavigationHistoryIfNeeded)
-        .onChange(of: sidebarViewModel.selectedMeetingId) { oldId, newId in
-            guard oldId != newId else { return }
-            if let newId {
-                handleMeetingSelection(newId)
-            } else {
+        .onChange(of: sidebarViewModel.selectedMeetingSelection) { oldSelection, newSelection in
+            guard oldSelection != newSelection else { return }
+            switch newSelection {
+            case let .persisted(meetingId):
+                handleMeetingSelection(meetingId)
+            case let .draft(draftId):
+                if viewModel.draftMeeting?.id != draftId {
+                    viewModel.clearCurrentMeeting()
+                }
+            case nil:
                 viewModel.clearCurrentMeeting()
             }
         }
@@ -56,7 +61,7 @@ struct ContentView: View {
                 if let pendingMeetingSelectionAfterNavigation {
                     sidebarViewModel.selectMeeting(pendingMeetingSelectionAfterNavigation)
                     self.pendingMeetingSelectionAfterNavigation = nil
-                } else {
+                } else if sidebarViewModel.selectedMeetingSelection == nil {
                     sidebarViewModel.clearMeetingSelection()
                 }
             }
@@ -73,6 +78,11 @@ struct ContentView: View {
         .onChange(of: viewModel.currentMeetingId) { oldId, newId in
             guard oldId != newId else { return }
             viewModel.resetAgentSegmentTrackingIfNeeded()
+            if let newId,
+               sidebarViewModel.selectedDestination == .meetings,
+               sidebarViewModel.selectedMeetingSelection?.draftId != nil || sidebarViewModel.selectedMeetingSelection == nil {
+                sidebarViewModel.selectMeeting(newId)
+            }
         }
         .onChange(of: appSettings.agentEnabled) { _, isEnabled in
             if !isEnabled {
@@ -107,7 +117,7 @@ struct ContentView: View {
     private var detailArea: some View {
         switch sidebarViewModel.selectedDestination {
         case .home:
-            HomeOverviewView()
+            HomeOverviewView(onSelectEvent: startDraftMeeting)
         case .meetings:
             meetingsOverviewContent
         case .projects:
@@ -242,7 +252,7 @@ struct ContentView: View {
 
     private var shouldShowBatchMeetingSelectionBar: Bool {
         sidebarViewModel.selectedDestination == .meetings
-            && sidebarViewModel.selectedMeetingId == nil
+            && sidebarViewModel.selectedMeetingSelection == nil
             && !sidebarViewModel.selectedMeetingIds.isEmpty
     }
 
@@ -302,7 +312,7 @@ struct ContentView: View {
     private var isShowingMeetingDetail: Bool {
         switch sidebarViewModel.selectedDestination {
         case .meetings, .projects:
-            sidebarViewModel.selectedMeetingId != nil
+            sidebarViewModel.selectedMeetingSelection != nil
         case .home, .actionItems, .ask:
             false
         }
@@ -331,7 +341,7 @@ struct ContentView: View {
 
     @ViewBuilder
     private var projectsWorkspaceContent: some View {
-        if sidebarViewModel.selectedMeetingId != nil {
+        if sidebarViewModel.selectedMeetingSelection != nil {
             meetingDetailView
         } else if sidebarViewModel.selectedProject != nil {
             ProjectDetailView(sidebarViewModel: sidebarViewModel)
@@ -372,7 +382,7 @@ struct ContentView: View {
 
     @ViewBuilder
     private func meetingDetailOrList(@ViewBuilder listContent: () -> some View) -> some View {
-        if sidebarViewModel.selectedMeetingId != nil {
+        if sidebarViewModel.selectedMeetingSelection != nil {
             meetingDetailView
         } else {
             listContent()
@@ -563,6 +573,34 @@ struct ContentView: View {
                 sidebarViewModel.selectMeeting(newMeetingId)
             }
         }
+    }
+
+    private func startDraftMeeting(from event: GoogleCalendarEvent) {
+        guard let dbQueue = sidebarViewModel.dbQueue,
+              let vault = sidebarViewModel.currentVault else { return }
+
+        let repository = MeetingRepository(dbQueue: dbQueue)
+        if let existingMeetingId = try? repository.fetchMeetingIdForCalendarEvent(
+            platform: CalendarEventRecord.googleCalendarPlatform,
+            platformId: event.platformId
+        ) {
+            sidebarViewModel.deselectProject()
+            sidebarViewModel.selectDestination(.meetings)
+            sidebarViewModel.selectMeeting(existingMeetingId)
+            return
+        }
+
+        sidebarViewModel.deselectProject()
+        sidebarViewModel.clearMeetingSelection()
+        viewModel.beginDraftMeeting(
+            from: event,
+            dbQueue: dbQueue,
+            vaultURL: vault.url
+        )
+        if let draftId = viewModel.draftMeeting?.id {
+            sidebarViewModel.selectDraftMeeting(draftId)
+        }
+        sidebarViewModel.selectDestination(.meetings)
     }
 
     private func placeholderView(

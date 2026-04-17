@@ -14,25 +14,36 @@ final class MeetingPersistenceService {
     private let recordingStartDate: Date
 
     /// 新規ミーティングを作成して録音を開始する。
-    init(store: TranscriptStore, dbQueue: DatabaseQueue, vaultId: UUID, projectId: UUID?) {
+    init(
+        store: TranscriptStore,
+        dbQueue: DatabaseQueue,
+        vaultId: UUID,
+        projectId: UUID?,
+        initialName: String,
+        calendarEvent: GoogleCalendarEvent? = nil
+    ) throws {
         self.store = store
         self.dbQueue = dbQueue
         self.meetingId = .v7()
 
         let now = store.recordingStartTime ?? Date()
         self.recordingStartDate = now
+        let trimmedInitialName = initialName.trimmingCharacters(in: .whitespacesAndNewlines)
 
         let meeting = MeetingRecord(
             id: meetingId,
             vaultId: vaultId,
             projectId: projectId,
-            name: "",
+            name: trimmedInitialName,
             status: .recording,
             createdAt: now,
             updatedAt: now
         )
-        try? dbQueue.write { db in
+        try dbQueue.write { db in
             try meeting.insert(db)
+            if let calendarEvent {
+                try CalendarEventRecord(meetingId: meetingId, now: now, event: calendarEvent).insert(db)
+            }
         }
 
         startObserving()

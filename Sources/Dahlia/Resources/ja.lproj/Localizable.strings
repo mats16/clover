@@ -14,6 +14,9 @@
 
 /* Sidebar */
 "Home" = "Home";
+"Good morning" = "おはようございます";
+"Good afternoon" = "こんにちは";
+"Good evening" = "こんばんは";
 "Meetings" = "Meetings";
 "Projects" = "Projects";
 "Context" = "Context";
@@ -49,6 +52,7 @@
 "No results found" = "結果が見つかりません";
 "No project" = "未設定";
 "Today" = "今日";
+"Tomorrow" = "明日";
 "In Progress" = "進行中";
 "No meetings yet" = "まだ meeting がありません";
 "No meetings match the current filter." = "現在のフィルターに一致する meeting はありません。";
@@ -83,8 +87,9 @@
 "Screenshots" = "スクリーンショット";
 "Transcript" = "文字起こし";
 "Agent" = "エージェント";
+"Assignee" = "担当者";
 "Assign to me" = "自分に割り当てる";
-"Remove assignee" = "担当を外す";
+"Edit assignee" = "担当者を編集";
 "Mark action item complete" = "アクションアイテムを完了にする";
 "Mark action item incomplete" = "アクションアイテムを未完了に戻す";
 
@@ -115,6 +120,7 @@
 
 /* Settings */
 "General" = "一般";
+"Calendar" = "カレンダー";
 "AI Summary" = "要約";
 "Vault" = "保管庫";
 "Display" = "表示";
@@ -127,6 +133,39 @@
 "Configure automatic summaries and the LLM connection used to generate them." = "自動要約と、その生成に使う LLM 接続設定を管理します。";
 "Enable the built-in agent sidebar and assistant features." = "内蔵 Agent サイドバーと補助機能を有効にします。";
 "Run a quick request to validate your endpoint, model, and token." = "エンドポイント、モデル、トークンの組み合わせを簡易的に検証します。";
+"Google Calendar" = "Google カレンダー";
+"Connect a Google account and choose which calendars appear on Home." = "Google アカウントを接続し、Home に表示するカレンダーを選びます。";
+"Display Calendars" = "表示するカレンダー";
+"Only selected calendars are shown on Home." = "選択したカレンダーのみを Home に表示します。";
+"Connect" = "接続";
+"Disconnect" = "切断";
+"Sign in with Google to load your upcoming schedule." = "Google にサインインして今後の予定を読み込みます。";
+"Connected" = "接続済み";
+"No Google account connected" = "Google アカウント未接続";
+"Primary calendar" = "メインカレンダー";
+"No calendars are available for this Google account." = "この Google アカウントで利用できるカレンダーがありません。";
+"Loading Google Calendar…" = "Google カレンダーを読み込み中…";
+"Retry" = "再試行";
+"Join" = "参加";
+"All day" = "終日";
+"Google Calendar is not configured" = "Google カレンダーが未設定です";
+"Set GOOGLE_CLIENT_ID before connecting Google Calendar." = "Google カレンダーを接続する前に GOOGLE_CLIENT_ID を設定してください。";
+"Connect Google Calendar" = "Google カレンダーを接続";
+"Connect Google Calendar from Settings to show your upcoming events on Home." = "Home に予定を表示するには設定画面から Google カレンダーを接続してください。";
+"Choose calendars to show" = "表示するカレンダーを選択";
+"Select at least one calendar in Settings to show events on Home." = "Home に予定を表示するには設定画面で少なくとも 1 つのカレンダーを選択してください。";
+"No upcoming events" = "今後の予定はありません";
+"There are no events in the next 7 days for the selected calendars." = "選択したカレンダーには今後 7 日間の予定がありません。";
+"Could not load Google Calendar" = "Google カレンダーを読み込めませんでした";
+"No window is available to present Google sign-in." = "Google サインインを表示できるウィンドウがありません。";
+"No previous Google Calendar session was found." = "以前の Google カレンダーセッションは見つかりませんでした。";
+"This Google OAuth client requires a client secret. Set GOOGLE_CLIENT_SECRET to the value from Google Cloud Console and relaunch Dahlia." = "この Google OAuth クライアントには client secret が必要です。Google Cloud Console に表示されている値を GOOGLE_CLIENT_SECRET に設定し、Dahlia を再起動してください。";
+"Google sign-in could not access Keychain. Rebuild the app with ./scripts/run-dev.sh so it is code signed with the required Keychain entitlements." = "Google サインインが Keychain にアクセスできませんでした。必要な Keychain entitlement 付きでコード署名されるよう、./scripts/run-dev.sh でアプリを作り直してください。";
+"Google Account" = "Google アカウント";
+"Untitled event" = "タイトル未設定";
+"Unexpected response from Google Calendar" = "Google カレンダーから予期しないレスポンスが返されました";
+"Google Calendar HTTP %lld: %@" = "Google カレンダー HTTP %lld: %@";
+"Could not parse Google Calendar date: %@" = "Google カレンダーの日付を解析できませんでした: %@";
 
 /* Vault Picker */
 "Create New Vault" = "保管庫を新規作成する";

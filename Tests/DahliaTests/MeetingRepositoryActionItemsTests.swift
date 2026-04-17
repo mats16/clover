@@ -67,6 +67,29 @@ struct MeetingRepositoryActionItemsTests {
         #expect(remainingItems.isEmpty)
     }
 
+    @Test
+    func updatingActionItemAssigneeReplacesExistingValue() throws {
+        let context = try makeRepositoryContext()
+
+        try context.repo.applyGeneratedSummary(
+            toMeetingId: context.meeting.id,
+            title: "Weekly sync",
+            summary: "Summary body",
+            tags: [],
+            actionItems: [
+                SummaryActionItem(title: "Book next meeting", assignee: "Alex"),
+            ]
+        )
+
+        let actionItem = try #require(context.repo.fetchActionItems(forMeetingId: context.meeting.id).first)
+
+        try context.repo.setActionItemAssignee(id: actionItem.id, assignee: "  me  ")
+        #expect(context.repo.fetchActionItems(forMeetingId: context.meeting.id).first?.assignee == "me")
+
+        try context.repo.setActionItemAssignee(id: actionItem.id, assignee: "")
+        #expect(context.repo.fetchActionItems(forMeetingId: context.meeting.id).first?.assignee == "")
+    }
+
     private func makeRepositoryContext() throws -> RepositoryContext {
         let databaseURL = URL(fileURLWithPath: NSTemporaryDirectory(), isDirectory: true)
             .appendingPathComponent(UUID().uuidString)

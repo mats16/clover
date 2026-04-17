@@ -4,8 +4,22 @@ set -euo pipefail
 APP_NAME="Dahlia"
 SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
 PROJECT_DIR="$(dirname "$SCRIPT_DIR")"
+ENTITLEMENTS_PATH="${PROJECT_DIR}/Dahlia.entitlements"
+
+source "${SCRIPT_DIR}/common.sh"
+
+load_local_env() {
+    if [ -f .env.local ]; then
+        set -a
+        source .env.local
+        set +a
+    fi
+}
 
 cd "$PROJECT_DIR"
+load_local_env
+export CLANG_MODULE_CACHE_PATH="${TMPDIR:-/tmp}/dahlia-clang-module-cache"
+mkdir -p "$CLANG_MODULE_CACHE_PATH"
 
 echo "=== Building ${APP_NAME} ==="
 swift build -c release
@@ -22,6 +36,7 @@ mkdir -p "${CONTENTS}/Resources"
 
 cp "${BUILD_DIR}/${APP_NAME}" "${MACOS}/${APP_NAME}"
 cp "Resources/Info.plist" "${CONTENTS}/Info.plist"
+configure_google_calendar_plist "${CONTENTS}/Info.plist"
 
 # アイコン生成（.iconset → .icns）
 ICON_SRC="Sources/Dahlia/Resources/Assets.xcassets/AppIcon.appiconset/AppIcon.png"
@@ -46,8 +61,21 @@ if [ -d "$RESOURCE_BUNDLE" ]; then
     cp -R "$RESOURCE_BUNDLE" "${CONTENTS}/Resources/"
 fi
 
-# コード署名（CODESIGN_IDENTITY 環境変数で署名 ID をオーバーライド可能）
 SIGN_IDENTITY="${CODESIGN_IDENTITY:-Developer ID Application: Kazuki Matsuda (XCHHYPN52N)}"
-codesign --force --sign "$SIGN_IDENTITY" --entitlements "${PROJECT_DIR}/Dahlia.entitlements" "${APP_BUNDLE}"
+xattr -cr "${APP_BUNDLE}" || true
+
+SIGNED_RESOURCE_BUNDLE="${CONTENTS}/Resources/Dahlia_Dahlia.bundle"
+if [ -d "$SIGNED_RESOURCE_BUNDLE" ]; then
+    codesign_path "$SIGNED_RESOURCE_BUNDLE"
+fi
+
+if has_entitlements "$ENTITLEMENTS_PATH"; then
+    codesign_path "${MACOS}/${APP_NAME}" --entitlements "$ENTITLEMENTS_PATH"
+    codesign_path "${APP_BUNDLE}" --entitlements "$ENTITLEMENTS_PATH"
+else
+    codesign_path "${MACOS}/${APP_NAME}"
+    codesign_path "${APP_BUNDLE}"
+fi
+codesign --verify --deep --strict --verbose=2 "${APP_BUNDLE}"
 
 echo "=== Build complete: ${APP_BUNDLE} ==="

@@ -47,6 +47,7 @@ final class CaptionViewModel: ObservableObject {
     var currentProjectId: UUID?
     var currentProjectName: String?
     var currentVaultURL: URL?
+    @Published private(set) var draftMeeting: DraftMeeting?
 
     // MARK: - Summary State
 
@@ -84,6 +85,15 @@ final class CaptionViewModel: ObservableObject {
     var hasCurrentMeetingSummary: Bool {
         guard let currentMeetingSummary else { return false }
         return !currentMeetingSummary.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty
+    }
+
+    var hasDraftMeeting: Bool {
+        draftMeeting != nil
+    }
+
+    var draftMeetingTitle: String {
+        let trimmed = draftMeeting?.title.trimmingCharacters(in: .whitespacesAndNewlines) ?? ""
+        return trimmed.isEmpty ? L10n.newMeeting : trimmed
     }
 
     var sanitizedMeetingSummary: String? {
@@ -277,6 +287,7 @@ final class CaptionViewModel: ObservableObject {
         } else {
             resetMeetingState()
         }
+        draftMeeting = nil
 
         setMeetingContext(
             id: meetingId,
@@ -328,6 +339,7 @@ final class CaptionViewModel: ObservableObject {
         vaultURL: URL
     ) {
         resetMeetingState()
+        draftMeeting = nil
 
         let meetingId = UUID.v7()
         let now = Date()
@@ -353,6 +365,94 @@ final class CaptionViewModel: ObservableObject {
         )
     }
 
+    func beginDraftMeeting(
+        from event: GoogleCalendarEvent,
+        dbQueue: DatabaseQueue,
+        projectURL: URL? = nil,
+        projectId: UUID? = nil,
+        projectName: String? = nil,
+        vaultURL: URL
+    ) {
+        resetMeetingState()
+        let draftId = UUID.v7()
+        currentMeetingId = nil
+        currentProjectURL = projectURL
+        currentProjectId = projectId
+        currentProjectName = projectName
+        currentVaultURL = vaultURL
+        currentDbQueue = dbQueue
+        draftMeeting = DraftMeeting(
+            id: draftId,
+            title: event.title,
+            linkedCalendarEvent: event,
+            projectURL: projectURL,
+            projectId: projectId,
+            projectName: projectName
+        )
+        setupNoteAutoSave()
+    }
+
+    func updateDraftMeetingTitle(_ title: String) {
+        guard draftMeeting != nil else { return }
+        draftMeeting?.title = title
+    }
+
+    func materializeDraftMeeting(
+        projectURL: URL? = nil,
+        projectId: UUID? = nil,
+        projectName: String? = nil
+    ) -> UUID? {
+        if let currentMeetingId {
+            return currentMeetingId
+        }
+
+        guard let draftMeeting,
+              let dbQueue = currentDbQueue,
+              let vault = AppSettings.shared.currentVault,
+              let vaultURL = currentVaultURL else { return nil }
+
+        let resolvedProjectURL = projectURL ?? draftMeeting.projectURL ?? currentProjectURL
+        let resolvedProjectId = projectId ?? draftMeeting.projectId ?? currentProjectId
+        let resolvedProjectName = projectName ?? draftMeeting.projectName ?? currentProjectName
+        let meetingId = UUID.v7()
+        let now = Date()
+        let record = MeetingRecord(
+            id: meetingId,
+            vaultId: vault.id,
+            projectId: resolvedProjectId,
+            name: draftMeeting.title.trimmingCharacters(in: .whitespacesAndNewlines),
+            status: .transcriptNotFound,
+            duration: nil,
+            createdAt: now,
+            updatedAt: now
+        )
+        do {
+            try dbQueue.write { db in
+                try record.insert(db)
+                if let event = draftMeeting.linkedCalendarEvent {
+                    try CalendarEventRecord(meetingId: meetingId, now: now, event: event).insert(db)
+                }
+            }
+        } catch {
+            errorMessage = error.localizedDescription
+            ErrorReportingService.capture(error, context: ["source": "materializeDraftMeeting"])
+            return nil
+        }
+
+        setMeetingContext(
+            id: meetingId,
+            dbQueue: dbQueue,
+            projectURL: resolvedProjectURL,
+            projectId: resolvedProjectId,
+            projectName: resolvedProjectName,
+            vaultURL: vaultURL
+        )
+        if !noteText.isEmpty {
+            saveNoteImmediately()
+        }
+        return meetingId
+    }
+
     /// 現在の文字起こし表示をクリアして初期状態に戻す。
     /// 録音中はバックグラウンド録音を維持したまま表示のみクリアする。
     func clearCurrentMeeting() {
@@ -371,6 +471,7 @@ final class CaptionViewModel: ObservableObject {
         currentProjectId = nil
         currentProjectName = nil
         currentVaultURL = nil
+        draftMeeting = nil
     }
 
     /// 録音対象のトランスクリプトに表示を復帰する。
@@ -387,6 +488,7 @@ final class CaptionViewModel: ObservableObject {
         currentProjectName = ctx.projectName
         currentVaultURL = ctx.vaultURL
         currentDbQueue = ctx.dbQueue
+        draftMeeting = nil
 
         store = ctx.store
         resubscribeStoreCancellable()
@@ -467,6 +569,7 @@ final class CaptionViewModel: ObservableObject {
         screenshots = []
         resetNoteState()
         resetSummaryState()
+        draftMeeting = nil
     }
 
     private func resetSummaryState() {
@@ -492,7 +595,9 @@ final class CaptionViewModel: ObservableObject {
         currentProjectName = projectName
         currentVaultURL = vaultURL
         currentDbQueue = dbQueue
+        draftMeeting = nil
         resetSummaryState()
+        setupNoteAutoSave()
     }
 
     func updateCurrentProjectContext(projectURL: URL?, projectId: UUID?, projectName: String?) {
@@ -711,6 +816,7 @@ final class CaptionViewModel: ObservableObject {
         self.currentVaultURL = vaultURL
         self.currentDbQueue = dbQueue
         resetSummaryState()
+        let activeDraftMeeting = draftMeeting
         guard analyzerReady else {
             errorMessage = L10n.speechRecognitionNotReady
             return
@@ -723,27 +829,7 @@ final class CaptionViewModel: ObservableObject {
 
         pipelines.removeAll()
         store.recordingStartTime = Date()
-
-        if let existingMeetingId {
-            // 追記モード: 既存セグメント ID を取得して PersistenceService に渡す
-            let repo = MeetingRepository(dbQueue: dbQueue)
-            let existingIds = (try? repo.fetchSegmentIds(forMeetingId: existingMeetingId)) ?? []
-            persistenceService = MeetingPersistenceService(
-                store: store,
-                dbQueue: dbQueue,
-                existingMeetingId: existingMeetingId,
-                existingSegmentIds: existingIds
-            )
-            currentMeetingId = existingMeetingId
-        } else {
-            persistenceService = MeetingPersistenceService(
-                store: store,
-                dbQueue: dbQueue,
-                vaultId: vaultId,
-                projectId: projectId
-            )
-            currentMeetingId = persistenceService?.meetingId
-        }
+        persistenceService = nil
 
         do {
             let primaryLocale = Locale(identifier: selectedLocale)
@@ -756,6 +842,33 @@ final class CaptionViewModel: ObservableObject {
                 try await startSystemAudioPipeline(locale: primaryLocale)
             }
 
+            if let existingMeetingId {
+                // 追記モード: 既存セグメント ID を取得して PersistenceService に渡す
+                let repo = MeetingRepository(dbQueue: dbQueue)
+                let existingIds = (try? repo.fetchSegmentIds(forMeetingId: existingMeetingId)) ?? []
+                persistenceService = MeetingPersistenceService(
+                    store: store,
+                    dbQueue: dbQueue,
+                    existingMeetingId: existingMeetingId,
+                    existingSegmentIds: existingIds
+                )
+                currentMeetingId = existingMeetingId
+            } else {
+                let initialName = activeDraftMeeting?.title.trimmingCharacters(in: .whitespacesAndNewlines) ?? ""
+                persistenceService = try MeetingPersistenceService(
+                    store: store,
+                    dbQueue: dbQueue,
+                    vaultId: vaultId,
+                    projectId: projectId,
+                    initialName: initialName,
+                    calendarEvent: activeDraftMeeting?.linkedCalendarEvent
+                )
+                currentMeetingId = persistenceService?.meetingId
+                draftMeeting = nil
+                setupNoteAutoSave()
+                saveNoteImmediately()
+            }
+
             self.isListening = true
             self.errorMessage = nil
         } catch {
@@ -763,6 +876,10 @@ final class CaptionViewModel: ObservableObject {
             ErrorReportingService.capture(error, context: ["source": "startListening"])
             await stopActivePipelines()
             stopActiveCaptures()
+            persistenceService = nil
+            if existingMeetingId == nil {
+                currentMeetingId = nil
+            }
         }
     }
 
@@ -1287,10 +1404,6 @@ final class CaptionViewModel: ObservableObject {
             Logger(subsystem: "com.dahlia", category: "CaptionViewModel")
                 .error("Failed to delete action item: \(error)")
         }
-    }
-
-    func toggleActionItemAssignedToMe(_ actionItem: ActionItemRecord) {
-        setActionItemAssignee(actionItem, assignee: actionItem.isExplicitlyAssignedToMe ? "" : SummaryActionItem.selfAssigneeKey)
     }
 
     func setActionItemAssignee(_ actionItem: ActionItemRecord, assignee: String) {

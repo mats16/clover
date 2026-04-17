@@ -92,10 +92,10 @@ struct ActionItemsOverviewView: View {
                                 onToggleCompleted: { isCompleted in
                                     sidebarViewModel.setActionItemCompleted(id: item.actionItemId, isCompleted: isCompleted)
                                 },
-                                onToggleAssignedToMe: {
+                                onSetAssignee: { assignee in
                                     sidebarViewModel.setActionItemAssignee(
                                         id: item.actionItemId,
-                                        assignee: item.isExplicitlyAssignedToMe ? "" : SummaryActionItem.selfAssigneeKey
+                                        assignee: assignee
                                     )
                                 },
                                 onDelete: {
@@ -122,7 +122,7 @@ struct ActionItemsOverviewView: View {
 private struct ActionItemsOverviewRow: View {
     let item: ActionItemOverviewItem
     let onToggleCompleted: (Bool) -> Void
-    let onToggleAssignedToMe: () -> Void
+    let onSetAssignee: (String) -> Void
     let onDelete: () -> Void
 
     @State private var isHovering = false
@@ -138,9 +138,8 @@ private struct ActionItemsOverviewRow: View {
                 title: item.title,
                 assignee: item.assignee,
                 isCompleted: item.isCompleted,
-                isExplicitlyAssignedToMe: item.isExplicitlyAssignedToMe,
                 onToggleCompleted: { onToggleCompleted(!item.isCompleted) },
-                onToggleAssignedToMe: onToggleAssignedToMe,
+                onSetAssignee: onSetAssignee,
                 onDelete: onDelete
             )
 

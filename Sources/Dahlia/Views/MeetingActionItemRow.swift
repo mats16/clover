@@ -4,51 +4,12 @@ struct ActionItemRowContent: View {
     let title: String
     let assignee: String
     let isCompleted: Bool
-    let isExplicitlyAssignedToMe: Bool
     let onToggleCompleted: () -> Void
-    let onToggleAssignedToMe: () -> Void
+    let onSetAssignee: (String) -> Void
     let onDelete: () -> Void
-
-    @State private var isAssigneeHovering = false
-
-    private var trimmedAssignee: String {
-        assignee.trimmingCharacters(in: .whitespacesAndNewlines)
-    }
 
     private var completionLabel: String {
         isCompleted ? L10n.markActionItemIncomplete : L10n.markActionItemComplete
-    }
-
-    private var assigneeActionLabel: String {
-        isExplicitlyAssignedToMe ? L10n.removeAssignee : L10n.assignToMe
-    }
-
-    @ViewBuilder
-    private var assigneeLabel: some View {
-        if isExplicitlyAssignedToMe {
-            Button(action: onToggleAssignedToMe) {
-                Label(L10n.me, systemImage: isAssigneeHovering ? "xmark.circle.fill" : "person.fill")
-                    .font(.caption)
-                    .foregroundStyle(isAssigneeHovering ? .secondary : Color.accentColor)
-            }
-            .buttonStyle(.plain)
-            .onHover { hovering in
-                isAssigneeHovering = hovering
-            }
-            .accessibilityLabel(assigneeActionLabel)
-        } else if !trimmedAssignee.isEmpty {
-            Label(trimmedAssignee, systemImage: "person")
-                .font(.caption)
-                .foregroundStyle(.secondary)
-        } else {
-            Button(assigneeActionLabel, systemImage: "person.badge.plus") {
-                onToggleAssignedToMe()
-            }
-            .buttonStyle(.plain)
-            .labelStyle(.iconOnly)
-            .foregroundStyle(Color.secondary.opacity(0.6))
-            .accessibilityLabel(assigneeActionLabel)
-        }
     }
 
     var body: some View {
@@ -69,7 +30,10 @@ struct ActionItemRowContent: View {
                     .multilineTextAlignment(.leading)
                     .frame(maxWidth: .infinity, alignment: .leading)
 
-                assigneeLabel
+                ActionItemAssigneeButton(
+                    assignee: assignee,
+                    onSetAssignee: onSetAssignee
+                )
 
                 Button(L10n.delete, systemImage: "trash") {
                     onDelete()
@@ -92,9 +56,8 @@ struct MeetingActionItemRow: View {
             title: actionItem.title,
             assignee: actionItem.assignee,
             isCompleted: actionItem.isCompleted,
-            isExplicitlyAssignedToMe: actionItem.isExplicitlyAssignedToMe,
             onToggleCompleted: { viewModel.toggleActionItemCompletion(actionItem) },
-            onToggleAssignedToMe: { viewModel.toggleActionItemAssignedToMe(actionItem) },
+            onSetAssignee: { viewModel.setActionItemAssignee(actionItem, assignee: $0) },
             onDelete: { viewModel.deleteActionItem(actionItem) }
         )
         .padding(.horizontal, 12)

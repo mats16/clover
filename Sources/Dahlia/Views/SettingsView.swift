@@ -3,6 +3,7 @@ import SwiftUI
 /// 設定画面のカテゴリ。
 enum SettingsCategory: String, CaseIterable, Identifiable {
     case general
+    case calendar
     case transcription
     case aiSummary
     case agent
@@ -12,6 +13,7 @@ enum SettingsCategory: String, CaseIterable, Identifiable {
     var label: String {
         switch self {
         case .general: L10n.general
+        case .calendar: L10n.calendar
         case .transcription: L10n.transcription
         case .aiSummary: L10n.aiSummary
         case .agent: L10n.agent
@@ -21,6 +23,7 @@ enum SettingsCategory: String, CaseIterable, Identifiable {
     var systemImage: String {
         switch self {
         case .general: "gearshape"
+        case .calendar: "calendar"
         case .transcription: "waveform"
         case .aiSummary: "sparkles"
         case .agent: "cpu"
@@ -62,6 +65,8 @@ struct SettingsView: View {
         switch selection ?? .general {
         case .general:
             GeneralSettingsView()
+        case .calendar:
+            CalendarSettingsView()
         case .transcription:
             TranscriptionSettingsView()
         case .aiSummary:

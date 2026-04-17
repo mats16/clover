@@ -14,6 +14,9 @@
 
 /* Sidebar */
 "Home" = "Home";
+"Good morning" = "Good morning";
+"Good afternoon" = "Good afternoon";
+"Good evening" = "Good evening";
 "Meetings" = "Meetings";
 "Projects" = "Projects";
 "Context" = "Context";
@@ -49,6 +52,7 @@
 "No results found" = "No results found";
 "No project" = "No project";
 "Today" = "Today";
+"Tomorrow" = "Tomorrow";
 "In Progress" = "In Progress";
 "No meetings yet" = "No meetings yet";
 "No meetings match the current filter." = "No meetings match the current filter.";
@@ -83,8 +87,9 @@
 "Screenshots" = "Screenshots";
 "Transcript" = "Transcript";
 "Agent" = "Agent";
+"Assignee" = "Assignee";
 "Assign to me" = "Assign to me";
-"Remove assignee" = "Remove assignee";
+"Edit assignee" = "Edit assignee";
 "Mark action item complete" = "Mark action item complete";
 "Mark action item incomplete" = "Mark action item incomplete";
 
@@ -115,6 +120,7 @@
 
 /* Settings */
 "General" = "General";
+"Calendar" = "Calendar";
 "AI Summary" = "Summary";
 "Vault" = "Vault";
 "Display" = "Display";
@@ -127,6 +133,39 @@
 "Configure automatic summaries and the LLM connection used to generate them." = "Configure automatic summaries and the LLM connection used to generate them.";
 "Enable the built-in agent sidebar and assistant features." = "Enable the built-in agent sidebar and assistant features.";
 "Run a quick request to validate your endpoint, model, and token." = "Run a quick request to validate your endpoint, model, and token.";
+"Google Calendar" = "Google Calendar";
+"Connect a Google account and choose which calendars appear on Home." = "Connect a Google account and choose which calendars appear on Home.";
+"Display Calendars" = "Display Calendars";
+"Only selected calendars are shown on Home." = "Only selected calendars are shown on Home.";
+"Connect" = "Connect";
+"Disconnect" = "Disconnect";
+"Sign in with Google to load your upcoming schedule." = "Sign in with Google to load your upcoming schedule.";
+"Connected" = "Connected";
+"No Google account connected" = "No Google account connected";
+"Primary calendar" = "Primary calendar";
+"No calendars are available for this Google account." = "No calendars are available for this Google account.";
+"Loading Google Calendar…" = "Loading Google Calendar…";
+"Retry" = "Retry";
+"Join" = "Join";
+"All day" = "All day";
+"Google Calendar is not configured" = "Google Calendar is not configured";
+"Set GOOGLE_CLIENT_ID before connecting Google Calendar." = "Set GOOGLE_CLIENT_ID before connecting Google Calendar.";
+"Connect Google Calendar" = "Connect Google Calendar";
+"Connect Google Calendar from Settings to show your upcoming events on Home." = "Connect Google Calendar from Settings to show your upcoming events on Home.";
+"Choose calendars to show" = "Choose calendars to show";
+"Select at least one calendar in Settings to show events on Home." = "Select at least one calendar in Settings to show events on Home.";
+"No upcoming events" = "No upcoming events";
+"There are no events in the next 7 days for the selected calendars." = "There are no events in the next 7 days for the selected calendars.";
+"Could not load Google Calendar" = "Could not load Google Calendar";
+"No window is available to present Google sign-in." = "No window is available to present Google sign-in.";
+"No previous Google Calendar session was found." = "No previous Google Calendar session was found.";
+"This Google OAuth client requires a client secret. Set GOOGLE_CLIENT_SECRET to the value from Google Cloud Console and relaunch Dahlia." = "This Google OAuth client requires a client secret. Set GOOGLE_CLIENT_SECRET to the value from Google Cloud Console and relaunch Dahlia.";
+"Google sign-in could not access Keychain. Rebuild the app with ./scripts/run-dev.sh so it is code signed with the required Keychain entitlements." = "Google sign-in could not access Keychain. Rebuild the app with ./scripts/run-dev.sh so it is code signed with the required Keychain entitlements.";
+"Google Account" = "Google Account";
+"Untitled event" = "Untitled event";
+"Unexpected response from Google Calendar" = "Unexpected response from Google Calendar";
+"Google Calendar HTTP %lld: %@" = "Google Calendar HTTP %lld: %@";
+"Could not parse Google Calendar date: %@" = "Could not parse Google Calendar date: %@";
 
 /* Vault Picker */
 "Create New Vault" = "Create New Vault";
