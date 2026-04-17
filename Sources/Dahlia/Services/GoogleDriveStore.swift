@@ -260,13 +260,12 @@ final class GoogleDriveStore: ObservableObject {
     }
 
     private func recomputeState() {
-        let newState: State
-        if !isConfigured {
-            newState = .unconfigured
+        let newState: State = if !isConfigured {
+            .unconfigured
         } else if !isAuthorized {
-            newState = .signedOut
+            .signedOut
         } else {
-            newState = .connected
+            .connected
         }
         if state != newState {
             state = newState

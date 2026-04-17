@@ -259,15 +259,14 @@ final class GoogleCalendarStore: ObservableObject {
     }
 
     private func recomputeState() {
-        let newState: State
-        if !isConfigured {
-            newState = .unconfigured
+        let newState: State = if !isConfigured {
+            .unconfigured
         } else if currentSession == nil || !isAuthorized {
-            newState = .signedOut
+            .signedOut
         } else if !availableCalendars.isEmpty, selectedCalendarIDs.isEmpty {
-            newState = .needsCalendarSelection
+            .needsCalendarSelection
         } else {
-            newState = .loaded
+            .loaded
         }
         if state != newState {
             state = newState
@@ -324,7 +323,7 @@ final class GoogleCalendarStore: ObservableObject {
     }
 
     private static func loadSelectedCalendarIDs(from userDefaults: UserDefaults) -> Set<String> {
-        guard let json = userDefaults.string(forKey: Self.selectedCalendarIDsKey),
+        guard let json = userDefaults.string(forKey: selectedCalendarIDsKey),
               let data = json.data(using: .utf8),
               let ids = try? JSONDecoder().decode([String].self, from: data)
         else {

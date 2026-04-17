@@ -321,9 +321,9 @@ struct GoogleDriveFolderPickerView: View {
     private var currentBreadcrumbNodes: [BrowserNode] {
         switch selectedTab {
         case .myDrive:
-            return myDrivePath
+            myDrivePath
         case .sharedDrives:
-            return [BrowserNode(id: "shared-drives-root", name: L10n.googleDriveSharedDrives)] + sharedDrivePath
+            [BrowserNode(id: "shared-drives-root", name: L10n.googleDriveSharedDrives)] + sharedDrivePath
         }
     }
 

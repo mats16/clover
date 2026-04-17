@@ -305,13 +305,13 @@ extension GoogleCalendarAPIClient {
                 return nil
             }
 
-            nonisolated(unsafe) private static let googleCalendarWithFractionalSeconds: ISO8601DateFormatter = {
+            private nonisolated(unsafe) static let googleCalendarWithFractionalSeconds: ISO8601DateFormatter = {
                 let formatter = ISO8601DateFormatter()
                 formatter.formatOptions = [.withInternetDateTime, .withFractionalSeconds]
                 return formatter
             }()
 
-            nonisolated(unsafe) private static let googleCalendar: ISO8601DateFormatter = {
+            private nonisolated(unsafe) static let googleCalendar: ISO8601DateFormatter = {
                 let formatter = ISO8601DateFormatter()
                 formatter.formatOptions = [.withInternetDateTime]
                 return formatter

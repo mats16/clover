@@ -54,11 +54,11 @@ struct NonAutofocusingSearchField: NSViewRepresentable {
             self.parent = parent
         }
 
-        func controlTextDidBeginEditing(_ notification: Notification) {
+        func controlTextDidBeginEditing(_: Notification) {
             parent.isFocused = true
         }
 
-        func controlTextDidEndEditing(_ notification: Notification) {
+        func controlTextDidEndEditing(_: Notification) {
             parent.isFocused = false
         }
 
@@ -67,13 +67,13 @@ struct NonAutofocusingSearchField: NSViewRepresentable {
             parent.text = field.stringValue
         }
 
-        func control(_ control: NSControl, textView: NSTextView, doCommandBy commandSelector: Selector) -> Bool {
+        func control(_: NSControl, textView _: NSTextView, doCommandBy commandSelector: Selector) -> Bool {
             guard commandSelector == #selector(NSResponder.insertNewline(_:)) else { return false }
             parent.onSubmit()
             return true
         }
 
-        @objc func submitFromAction(_ sender: Any?) {
+        @objc func submitFromAction(_: Any?) {
             parent.onSubmit()
         }
     }

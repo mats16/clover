@@ -177,13 +177,12 @@ final class GoogleDriveAPIClient: GoogleDriveAPIClientProviding, @unchecked Send
         )
 
         return files.map { file in
-            let detail: String
-            if let driveId = file.driveId, !driveId.isEmpty {
-                detail = "Shared Drive (\(driveId))"
+            let detail: String = if let driveId = file.driveId, !driveId.isEmpty {
+                "Shared Drive (\(driveId))"
             } else if let parentId = file.parents?.first, let parentName = parentNames[parentId] {
-                detail = parentName
+                parentName
             } else {
-                detail = file.id
+                file.id
             }
             return GoogleDriveFolderItem(id: file.id, name: file.name, detail: detail)
         }
@@ -379,7 +378,8 @@ final class GoogleDriveAPIClient: GoogleDriveAPIClientProviding, @unchecked Send
         value.replacingOccurrences(of: "'", with: "\\'")
     }
 
-    private static let uploadURLForCreate = URL(string: "https://www.googleapis.com/upload/drive/v3/files?uploadType=multipart&supportsAllDrives=true")!
+    private static let uploadURLForCreate =
+        URL(string: "https://www.googleapis.com/upload/drive/v3/files?uploadType=multipart&supportsAllDrives=true")!
     private static let googleDocumentMimeType = "application/vnd.google-apps.document"
 
     private static func uploadURL(forUpdating id: String) -> URL {

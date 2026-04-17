@@ -14,15 +14,15 @@ struct GoogleSession: Equatable {
 }
 
 enum GoogleOAuthScope {
-    static let base: Set<String> = [
+    static let base: Set = [
         "openid",
         "email",
         "profile",
     ]
-    static let calendar: Set<String> = [
+    static let calendar: Set = [
         "https://www.googleapis.com/auth/calendar.readonly",
     ]
-    static let drive: Set<String> = [
+    static let drive: Set = [
         "https://www.googleapis.com/auth/drive.file",
         "https://www.googleapis.com/auth/drive.metadata.readonly",
         "https://www.googleapis.com/auth/drive.readonly",
@@ -527,7 +527,7 @@ private final class LoopbackRedirectServer: @unchecked Sendable {
 
     private func handle(connection: NWConnection) {
         connection.start(queue: queue)
-        connection.receive(minimumIncompleteLength: 1, maximumLength: 16_384) { [weak self] data, _, _, error in
+        connection.receive(minimumIncompleteLength: 1, maximumLength: 16384) { [weak self] data, _, _, error in
             guard let self else { return }
             if let error {
                 callbackContinuation?.resume(throwing: error)
