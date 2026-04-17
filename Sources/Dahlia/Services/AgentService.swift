@@ -58,6 +58,7 @@ final class AgentService: ObservableObject {
 
     /// 起動時に選択されたモード。
     private(set) var mode: AgentStartMode = .project
+    private(set) var workingDirectoryURL: URL?
 
     // MARK: - Private State
 
@@ -79,6 +80,7 @@ final class AgentService: ObservableObject {
 
     func start(workingDirectory: URL, mode: AgentStartMode, initialMessage: String? = nil) {
         self.mode = mode
+        self.workingDirectoryURL = workingDirectory
         guard !isRunning else { return }
 
         let systemPrompt = switch mode {
@@ -181,6 +183,7 @@ final class AgentService: ObservableObject {
         process = nil
         stdinPipe = nil
         stdoutPipe = nil
+        workingDirectoryURL = nil
     }
 
     /// transcript 切替時にセグメント追跡をリセットし、新しい store を再観測する。

@@ -8,9 +8,12 @@ struct AgentSidebarView: View {
     var body: some View {
         VStack(spacing: 0) {
             if let service = viewModel.agentService {
-                agentHeader(service: service)
-                Divider()
-                AgentChatView(service: service)
+                AgentChatView(
+                    service: service,
+                    projectName: headerDirectoryName(service: service)
+                ) {
+                    viewModel.stopAgent()
+                }
             } else {
                 AgentLauncherView(viewModel: viewModel, sidebarViewModel: sidebarViewModel)
             }
@@ -19,27 +22,22 @@ struct AgentSidebarView: View {
 
     // MARK: - Agent Header
 
-    private func agentHeader(service: AgentService) -> some View {
-        HStack {
-            Image(systemName: "sparkles")
-                .foregroundStyle(.purple)
-            Text(service.mode.isTranscript ? L10n.agentTranscriptMode : L10n.agentProjectMode)
-                .font(.caption)
-                .foregroundStyle(.secondary)
-            Spacer()
-            Button {
-                viewModel.stopAgent()
-            } label: {
-                Label(L10n.stopAgent, systemImage: "stop.fill")
-                    .labelStyle(.iconOnly)
-                    .font(.caption)
-                    .foregroundStyle(.red)
-            }
-            .buttonStyle(.plain)
-            .help(L10n.stopAgent)
+    private func headerDirectoryName(service: AgentService) -> String {
+        if let projectName = service.workingDirectoryURL?.lastPathComponent,
+           !projectName.isEmpty {
+            return projectName
         }
-        .padding(.horizontal, 12)
-        .padding(.vertical, 8)
+
+        if let projectName = sidebarViewModel.selectedProject?.name ?? viewModel.currentProjectName,
+           !projectName.isEmpty {
+            return projectName
+        }
+
+        if let workingDirectory = viewModel.currentProjectURL ?? sidebarViewModel.currentVault?.url ?? viewModel.currentVaultURL {
+            return workingDirectory.lastPathComponent
+        }
+
+        return L10n.agent
     }
 }
 
@@ -54,33 +52,52 @@ private struct AgentLauncherView: View {
         !inputText.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty
     }
 
+    private var effectiveProjectURL: URL? {
+        sidebarViewModel.selectedProjectURL ?? viewModel.currentProjectURL
+    }
+
+    private var effectiveProjectId: UUID? {
+        sidebarViewModel.selectedProject?.id ?? viewModel.currentProjectId
+    }
+
+    private var effectiveProjectName: String? {
+        sidebarViewModel.selectedProject?.name ?? viewModel.currentProjectName
+    }
+
+    private var effectiveWorkingDirectory: URL? {
+        effectiveProjectURL ?? sidebarViewModel.currentVault?.url ?? viewModel.currentVaultURL
+    }
+
     private var isDisabled: Bool {
-        sidebarViewModel.selectedProjectURL == nil
+        effectiveWorkingDirectory == nil
     }
 
     var body: some View {
-        VStack(spacing: 0) {
-            Spacer()
+        ZStack(alignment: .bottom) {
+            VStack(spacing: 0) {
+                Spacer()
 
-            Image(systemName: "sparkles")
-                .font(.system(size: 36))
-                .foregroundStyle(.purple)
-                .padding(.bottom, 8)
+                Image(systemName: "sparkles")
+                    .font(.system(size: 36))
+                    .foregroundStyle(.purple)
+                    .padding(.bottom, 8)
 
-            Text(L10n.agent)
-                .font(.headline)
-                .padding(.bottom, 4)
+                Text(L10n.agent)
+                    .font(.headline)
+                    .padding(.bottom, 4)
 
-            Text(hasContent ? L10n.agentProjectModeDescription : L10n.agentTranscriptModeDescription)
-                .font(.caption)
-                .foregroundStyle(.secondary)
-                .multilineTextAlignment(.center)
-                .padding(.horizontal, 20)
+                Text(hasContent ? L10n.agentProjectModeDescription : L10n.agentTranscriptModeDescription)
+                    .font(.caption)
+                    .foregroundStyle(.secondary)
+                    .multilineTextAlignment(.center)
+                    .padding(.horizontal, 20)
 
-            Spacer()
+                Spacer()
+            }
+            .padding(.bottom, AgentFloatingInputMetrics.contentBottomInset)
 
-            Divider()
             agentLauncherInputBar
+                .padding(.bottom, AgentFloatingInputMetrics.bottomPadding)
         }
         .frame(maxWidth: .infinity, maxHeight: .infinity)
     }
@@ -125,7 +142,7 @@ private struct AgentLauncherView: View {
     private func launchProjectMode() {
         let message = inputText.trimmingCharacters(in: .whitespacesAndNewlines)
         guard !message.isEmpty else { return }
-        viewModel.startAgent(mode: .project, initialMessage: message, workingDirectory: sidebarViewModel.selectedProjectURL)
+        viewModel.startAgent(mode: .project, initialMessage: message, workingDirectory: effectiveWorkingDirectory)
         inputText = ""
     }
 
@@ -134,23 +151,21 @@ private struct AgentLauncherView: View {
             // 録音中でなければ文字起こしも同時に開始する
             if !viewModel.isListening,
                let dbQueue = sidebarViewModel.dbQueue,
-               let projectURL = sidebarViewModel.selectedProjectURL,
-               let project = sidebarViewModel.selectedProject,
                let vault = sidebarViewModel.currentVault {
                 await viewModel.startListening(
                     dbQueue: dbQueue,
-                    projectURL: projectURL,
+                    projectURL: effectiveProjectURL,
                     vaultId: vault.id,
-                    projectId: project.id,
-                    projectName: project.name,
+                    projectId: effectiveProjectId,
+                    projectName: effectiveProjectName,
                     vaultURL: vault.url
                 )
             }
 
             viewModel.startAgent(
-                mode: .transcript(store: viewModel.store),
+                mode: .transcript(store: viewModel.activeTranscriptStoreForAgent),
                 initialMessage: "文字起こしモードを開始します。リアルタイムの文字起こしが随時送信されます。準備ができたら教えてください。",
-                workingDirectory: sidebarViewModel.selectedProjectURL
+                workingDirectory: effectiveWorkingDirectory
             )
         }
     }
@@ -159,10 +174,12 @@ private struct AgentLauncherView: View {
 /// AgentService を直接 @ObservedObject で監視するチャットビュー。
 private struct AgentChatView: View {
     @ObservedObject var service: AgentService
+    let projectName: String
+    let onStop: () -> Void
     @State private var inputText = ""
 
     var body: some View {
-        VStack(spacing: 0) {
+        ZStack(alignment: .bottom) {
             // メッセージ一覧
             if service.messages.isEmpty {
                 VStack(spacing: 12) {
@@ -180,6 +197,7 @@ private struct AgentChatView: View {
                     }
                 }
                 .frame(maxWidth: .infinity, maxHeight: .infinity)
+                .padding(.bottom, AgentFloatingInputMetrics.contentBottomInset)
             } else {
                 ScrollViewReader { proxy in
                     ScrollView {
@@ -205,7 +223,9 @@ private struct AgentChatView: View {
                                 .frame(height: 1)
                                 .id("agent-bottom")
                         }
-                        .padding(12)
+                        .padding(.horizontal, 12)
+                        .padding(.top, 12)
+                        .padding(.bottom, AgentFloatingInputMetrics.scrollBottomInset)
                     }
                     .onAppear {
                         proxy.scrollTo("agent-bottom", anchor: .bottom)
@@ -218,18 +238,64 @@ private struct AgentChatView: View {
                 }
             }
 
-            // 入力欄（インスペクター内では初回フォーカスが当たらないことがあるため明示的にフォーカスする）
-            Divider()
-            ChatInputBar(
-                text: $inputText,
-                isEnabled: service.isRunning
-            ) {
-                let message = inputText.trimmingCharacters(in: .whitespacesAndNewlines)
-                guard !message.isEmpty else { return }
-                service.sendUserMessage(message)
-                inputText = ""
+            VStack(spacing: 0) {
+                AgentSessionBar(
+                    projectName: projectName,
+                    isLiveMode: service.mode.isTranscript,
+                    onStop: onStop
+                )
+
+                ChatInputBar(
+                    text: $inputText,
+                    isEnabled: service.isRunning
+                ) {
+                    let message = inputText.trimmingCharacters(in: .whitespacesAndNewlines)
+                    guard !message.isEmpty else { return }
+                    service.sendUserMessage(message)
+                    inputText = ""
+                }
             }
+            .padding(.bottom, AgentFloatingInputMetrics.bottomPadding)
         }
+        .frame(maxWidth: .infinity, maxHeight: .infinity)
+    }
+}
+
+private struct AgentSessionBar: View {
+    let projectName: String
+    let isLiveMode: Bool
+    let onStop: () -> Void
+
+    var body: some View {
+        HStack(spacing: 8) {
+            Label(projectName, systemImage: "folder.fill")
+                .font(.caption)
+                .foregroundStyle(.primary)
+                .lineLimit(1)
+                .truncationMode(.middle)
+
+            if isLiveMode {
+                Text(L10n.agentLiveMode)
+                    .font(.caption2.weight(.medium))
+                    .foregroundStyle(.purple)
+                    .padding(.horizontal, 8)
+                    .padding(.vertical, 4)
+                    .background(.purple.opacity(0.12), in: Capsule())
+            }
+
+            Spacer()
+
+            Button(action: onStop) {
+                Label(L10n.stopAgent, systemImage: "stop.fill")
+                    .labelStyle(.iconOnly)
+                    .font(.caption)
+                    .foregroundStyle(.red)
+            }
+            .buttonStyle(.plain)
+            .help(L10n.stopAgent)
+        }
+        .padding(.horizontal, 16)
+        .padding(.bottom, 4)
     }
 }
 
@@ -578,11 +644,18 @@ private struct ToolUseCardView: View {
 
 private var capsuleInputBarBackground: some View {
     Capsule()
-        .fill(.quaternary.opacity(0.8))
+        .fill(.ultraThinMaterial)
         .overlay {
             Capsule()
                 .strokeBorder(.separator.opacity(0.35), lineWidth: 1)
         }
+        .shadow(color: .black.opacity(0.08), radius: 12, y: 6)
         .padding(.horizontal, 12)
         .padding(.vertical, 8)
+}
+
+private enum AgentFloatingInputMetrics {
+    static let bottomPadding: CGFloat = 24
+    static let contentBottomInset: CGFloat = 102
+    static let scrollBottomInset: CGFloat = 110
 }

@@ -100,6 +100,7 @@
 "Continuously feed transcript to Claude Code." = "Continuously feed transcript to Claude Code.";
 "Start Agent" = "Start";
 "Stop Agent" = "Stop";
+"Live mode" = "Live mode";
 "Thinking…" = "Thinking…";
 "Enable Agent in Settings to use Ask." = "Enable Agent in Settings to use Ask.";
 

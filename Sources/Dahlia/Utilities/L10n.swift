@@ -148,6 +148,7 @@ enum L10n {
     ) }
     static var startAgent: String { String(localized: "Start Agent", bundle: bundle) }
     static var stopAgent: String { String(localized: "Stop Agent", bundle: bundle) }
+    static var agentLiveMode: String { String(localized: "Live mode", bundle: bundle) }
     static var agentProcessing: String { String(localized: "Thinking…", bundle: bundle) }
     static var agentDisabledDescription: String { String(
         localized: "Enable Agent in Settings to use Ask.",
