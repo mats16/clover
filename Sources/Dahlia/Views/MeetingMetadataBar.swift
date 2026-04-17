@@ -4,14 +4,18 @@ import SwiftUI
 /// タグチップ群 + プロジェクトピッカーを横並びで表示する。
 struct MeetingMetadataBar: View {
     @ObservedObject var viewModel: CaptionViewModel
-    let meeting: MeetingRecord
-    let tags: [TagInfo]
     var sidebarViewModel: SidebarViewModel
+
+    private var tags: [TagInfo] {
+        guard let meetingId = viewModel.currentMeetingId,
+              let item = sidebarViewModel.allMeetings.first(where: { $0.meetingId == meetingId }) else { return [] }
+        return item.tags
+    }
 
     var body: some View {
         HStack(spacing: 8) {
-            MeetingProjectPicker(viewModel: viewModel, meeting: meeting, sidebarViewModel: sidebarViewModel)
-            MeetingTagsView(meetingId: meeting.id, tags: tags, sidebarViewModel: sidebarViewModel)
+            MeetingProjectPicker(viewModel: viewModel, sidebarViewModel: sidebarViewModel)
+            MeetingTagsView(viewModel: viewModel, tags: tags, sidebarViewModel: sidebarViewModel)
             Spacer(minLength: 0)
         }
     }
@@ -20,7 +24,7 @@ struct MeetingMetadataBar: View {
 // MARK: - Tag Management
 
 private struct MeetingTagsView: View {
-    let meetingId: UUID
+    @ObservedObject var viewModel: CaptionViewModel
     let tags: [TagInfo]
     var sidebarViewModel: SidebarViewModel
 
@@ -49,6 +53,7 @@ private struct MeetingTagsView: View {
         FlowLayout(spacing: 6) {
             ForEach(tags, id: \.name) { tag in
                 TagChip(tag: tag) {
+                    guard let meetingId = viewModel.currentMeetingId else { return }
                     sidebarViewModel.removeTagFromMeeting(id: meetingId, tag: tag.name)
                 }
             }
@@ -125,7 +130,9 @@ private struct MeetingTagsView: View {
 
     private func tagSuggestionRow(name: String, colorHex: String?, isNew: Bool) -> some View {
         Button {
+            guard let meetingId = ensureMeetingId() else { return }
             sidebarViewModel.addTagToMeeting(id: meetingId, tag: name)
+            sidebarViewModel.selectMeeting(meetingId)
             tagInput = ""
         } label: {
             HStack(spacing: 6) {
@@ -151,8 +158,17 @@ private struct MeetingTagsView: View {
 
     private func submitTagInput() {
         guard !trimmedTagInput.isEmpty else { return }
+        guard let meetingId = ensureMeetingId() else { return }
         sidebarViewModel.addTagToMeeting(id: meetingId, tag: trimmedTagInput.localizedLowercase)
+        sidebarViewModel.selectMeeting(meetingId)
         tagInput = ""
+    }
+
+    private func ensureMeetingId() -> UUID? {
+        if let meetingId = viewModel.currentMeetingId {
+            return meetingId
+        }
+        return viewModel.materializeDraftMeeting()
     }
 }
 
@@ -204,7 +220,6 @@ private struct TagChip: View {
 
 private struct MeetingProjectPicker: View {
     @ObservedObject var viewModel: CaptionViewModel
-    let meeting: MeetingRecord
     var sidebarViewModel: SidebarViewModel
 
     @State private var showProjectPopover = false
@@ -217,7 +232,7 @@ private struct MeetingProjectPicker: View {
     }
 
     private var currentProjectName: String? {
-        guard let projectId = meeting.projectId else { return nil }
+        guard let projectId = viewModel.currentProjectId else { return nil }
         return sidebarViewModel.flatProjects.first(where: { $0.id == projectId })?.name
     }
 
@@ -246,9 +261,9 @@ private struct MeetingProjectPicker: View {
                 Image(systemName: "folder")
                     .font(.caption2)
                     .foregroundStyle(.secondary)
-                    .opacity(isHovered && meeting.projectId != nil ? 0 : 1)
+                    .opacity(isHovered && viewModel.currentProjectId != nil ? 0 : 1)
 
-                if meeting.projectId != nil {
+                if viewModel.currentProjectId != nil {
                     Button(action: clearProject) {
                         Image(systemName: "xmark")
                             .font(.system(size: 8, weight: .bold))
@@ -311,7 +326,7 @@ private struct MeetingProjectPicker: View {
                         popoverRow(
                             icon: "minus.circle",
                             name: L10n.noProject,
-                            isSelected: meeting.projectId == nil,
+                            isSelected: viewModel.currentProjectId == nil,
                             action: clearProject
                         )
 
@@ -319,7 +334,7 @@ private struct MeetingProjectPicker: View {
                             popoverRow(
                                 icon: "folder",
                                 name: project.name,
-                                isSelected: project.id == meeting.projectId
+                                isSelected: project.id == viewModel.currentProjectId
                             ) {
                                 assignMeeting(to: project.id, projectName: project.name)
                             }
@@ -403,30 +418,39 @@ private struct MeetingProjectPicker: View {
     }
 
     private func clearProject() {
-        guard meeting.projectId != nil else {
+        guard viewModel.currentProjectId != nil else {
             projectInput = ""
             showProjectPopover = false
             return
         }
 
-        sidebarViewModel.moveMeeting(id: meeting.id, toProjectId: nil)
+        guard let meetingId = viewModel.materializeDraftMeeting() else { return }
+        sidebarViewModel.moveMeeting(id: meetingId, toProjectId: nil)
         sidebarViewModel.deselectProjectKeepingMeetingSelection()
         viewModel.updateCurrentProjectContext(projectURL: nil, projectId: nil, projectName: nil)
+        sidebarViewModel.selectMeeting(meetingId)
         projectInput = ""
         showProjectPopover = false
     }
 
     private func assignMeeting(to projectId: UUID, projectName: String) {
-        if projectId != meeting.projectId {
-            sidebarViewModel.moveMeeting(id: meeting.id, toProjectId: projectId)
+        let projectURL = sidebarViewModel.projectURL(for: projectName)
+        guard let meetingId = viewModel.materializeDraftMeeting(
+            projectURL: projectURL,
+            projectId: projectId,
+            projectName: projectName
+        ) else { return }
+
+        if projectId != viewModel.currentProjectId {
+            sidebarViewModel.moveMeeting(id: meetingId, toProjectId: projectId)
         }
         sidebarViewModel.selectProject(id: projectId, name: projectName)
         viewModel.updateCurrentProjectContext(
-            projectURL: sidebarViewModel.projectURL(for: projectName),
+            projectURL: projectURL,
             projectId: projectId,
             projectName: projectName
         )
-        sidebarViewModel.selectedMeetingId = meeting.id
+        sidebarViewModel.selectMeeting(meetingId)
         projectInput = ""
         showProjectPopover = false
     }

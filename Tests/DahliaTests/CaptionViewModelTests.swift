@@ -77,6 +77,141 @@ struct CaptionViewModelTests {
     }
 
     @Test
+    func beginDraftMeetingDoesNotPersistMeetingRecord() throws {
+        let viewModel = CaptionViewModel()
+        let database = try AppDatabaseManager(path: ":memory:")
+        let event = GoogleCalendarEvent(
+            id: "primary::event-1",
+            calendarID: "primary",
+            calendarName: "Primary",
+            calendarColorHex: "#4285F4",
+            platformId: "event-1",
+            title: "Design review",
+            description: "Review launch checklist",
+            icalUid: "event-1@google.com",
+            startDate: Date(timeIntervalSince1970: 1_776_384_000),
+            endDate: Date(timeIntervalSince1970: 1_776_387_600),
+            isAllDay: false,
+            meetingURL: URL(string: "https://meet.google.com/test-link")
+        )
+        let vaultId = UUID.v7()
+        try database.dbQueue.write { db in
+            try VaultRecord(
+                id: vaultId,
+                path: testVaultURL.path,
+                name: "Test Vault",
+                createdAt: Date(),
+                lastOpenedAt: Date()
+            ).insert(db)
+        }
+
+        viewModel.beginDraftMeeting(
+            from: event,
+            dbQueue: database.dbQueue,
+            vaultURL: testVaultURL
+        )
+
+        let counts = try database.dbQueue.read { db in
+            (
+                try MeetingRecord.fetchCount(db),
+                try CalendarEventRecord.fetchCount(db)
+            )
+        }
+
+        #expect(viewModel.hasDraftMeeting)
+        #expect(viewModel.draftMeetingTitle == "Design review")
+        #expect(counts.0 == 0)
+        #expect(counts.1 == 0)
+    }
+
+    @Test
+    func clearCurrentMeetingDiscardsDraftMeeting() {
+        let viewModel = CaptionViewModel()
+        let event = GoogleCalendarEvent(
+            id: "primary::event-1",
+            calendarID: "primary",
+            calendarName: "Primary",
+            calendarColorHex: "#4285F4",
+            platformId: "event-1",
+            title: "Design review",
+            description: "",
+            icalUid: "event-1@google.com",
+            startDate: Date(timeIntervalSince1970: 1_776_384_000),
+            endDate: Date(timeIntervalSince1970: 1_776_387_600),
+            isAllDay: false,
+            meetingURL: nil
+        )
+
+        viewModel.beginDraftMeeting(
+            from: event,
+            dbQueue: try! DatabaseQueue(path: ":memory:"),
+            vaultURL: testVaultURL
+        )
+        viewModel.clearCurrentMeeting()
+
+        #expect(!viewModel.hasDraftMeeting)
+        #expect(viewModel.currentMeetingId == nil)
+    }
+
+    @Test
+    func materializeDraftMeetingPersistsMeetingAndCalendarEvent() throws {
+        let viewModel = CaptionViewModel()
+        let database = try AppDatabaseManager(path: ":memory:")
+        let vaultId = UUID.v7()
+        try database.dbQueue.write { db in
+            try VaultRecord(
+                id: vaultId,
+                path: testVaultURL.path,
+                name: "Test Vault",
+                createdAt: Date(),
+                lastOpenedAt: Date()
+            ).insert(db)
+        }
+        let previousVault = AppSettings.shared.currentVault
+        AppSettings.shared.currentVault = VaultRecord(
+            id: vaultId,
+            path: testVaultURL.path,
+            name: "Test Vault",
+            createdAt: Date(),
+            lastOpenedAt: Date()
+        )
+        defer { AppSettings.shared.currentVault = previousVault }
+
+        viewModel.beginDraftMeeting(
+            from: GoogleCalendarEvent(
+                id: "primary::event-1",
+                calendarID: "primary",
+                calendarName: "Primary",
+                calendarColorHex: "#4285F4",
+                platformId: "event-1",
+                title: "Design review",
+                description: "Review launch checklist",
+                icalUid: "event-1@google.com",
+                startDate: Date(timeIntervalSince1970: 1_776_384_000),
+                endDate: Date(timeIntervalSince1970: 1_776_387_600),
+                isAllDay: false,
+                meetingURL: URL(string: "https://meet.google.com/test-link")
+            ),
+            dbQueue: database.dbQueue,
+            vaultURL: testVaultURL
+        )
+
+        let meetingId = try #require(viewModel.materializeDraftMeeting())
+        let persisted = try database.dbQueue.read { db in
+            (
+                try #require(MeetingRecord.fetchOne(db, key: meetingId)),
+                try #require(CalendarEventRecord.filter(Column("meetingId") == meetingId).fetchOne(db))
+            )
+        }
+
+        #expect(persisted.0.name == "Design review")
+        #expect(persisted.1.platformId == "event-1")
+        #expect(persisted.1.meetingUrl == "https://meet.google.com/test-link")
+        #expect(!viewModel.hasDraftMeeting)
+        #expect(viewModel.currentMeetingId == meetingId)
+    }
+
+    @Test
     func emptyAssigneeIsNotExplicitlyAssignedToMe() {
         let actionItem = ActionItemRecord(
             id: .v7(),
@@ -140,6 +275,139 @@ final class CaptionViewModelTests: XCTestCase {
         XCTAssertEqual(ObjectIdentifier(viewModel.store), storeIdentity)
         XCTAssertEqual(viewModel.store.segments, [initialSegment])
         XCTAssertEqual(viewModel.recordingMeetingId, meetingId)
+    }
+
+    func testBeginDraftMeetingDoesNotPersistMeetingRecord() throws {
+        let viewModel = CaptionViewModel()
+        let database = try AppDatabaseManager(path: ":memory:")
+        let event = GoogleCalendarEvent(
+            id: "primary::event-1",
+            calendarID: "primary",
+            calendarName: "Primary",
+            calendarColorHex: "#4285F4",
+            platformId: "event-1",
+            title: "Design review",
+            description: "Review launch checklist",
+            icalUid: "event-1@google.com",
+            startDate: Date(timeIntervalSince1970: 1_776_384_000),
+            endDate: Date(timeIntervalSince1970: 1_776_387_600),
+            isAllDay: false,
+            meetingURL: URL(string: "https://meet.google.com/test-link")
+        )
+        let vaultId = UUID.v7()
+        try database.dbQueue.write { db in
+            try VaultRecord(
+                id: vaultId,
+                path: testVaultURL.path,
+                name: "Test Vault",
+                createdAt: Date(),
+                lastOpenedAt: Date()
+            ).insert(db)
+        }
+
+        viewModel.beginDraftMeeting(
+            from: event,
+            dbQueue: database.dbQueue,
+            vaultURL: testVaultURL
+        )
+
+        let counts = try database.dbQueue.read { db in
+            (
+                try MeetingRecord.fetchCount(db),
+                try CalendarEventRecord.fetchCount(db)
+            )
+        }
+
+        XCTAssertTrue(viewModel.hasDraftMeeting)
+        XCTAssertEqual(viewModel.draftMeetingTitle, "Design review")
+        XCTAssertEqual(counts.0, 0)
+        XCTAssertEqual(counts.1, 0)
+    }
+
+    func testClearCurrentMeetingDiscardsDraftMeeting() throws {
+        let viewModel = CaptionViewModel()
+        let event = GoogleCalendarEvent(
+            id: "primary::event-1",
+            calendarID: "primary",
+            calendarName: "Primary",
+            calendarColorHex: "#4285F4",
+            platformId: "event-1",
+            title: "Design review",
+            description: "",
+            icalUid: "event-1@google.com",
+            startDate: Date(timeIntervalSince1970: 1_776_384_000),
+            endDate: Date(timeIntervalSince1970: 1_776_387_600),
+            isAllDay: false,
+            meetingURL: nil
+        )
+
+        let dbQueue = try DatabaseQueue(path: ":memory:")
+        viewModel.beginDraftMeeting(
+            from: event,
+            dbQueue: dbQueue,
+            vaultURL: testVaultURL
+        )
+        viewModel.clearCurrentMeeting()
+
+        XCTAssertFalse(viewModel.hasDraftMeeting)
+        XCTAssertNil(viewModel.currentMeetingId)
+    }
+
+    func testMaterializeDraftMeetingPersistsMeetingAndCalendarEvent() throws {
+        let viewModel = CaptionViewModel()
+        let database = try AppDatabaseManager(path: ":memory:")
+        let vaultId = UUID.v7()
+        try database.dbQueue.write { db in
+            try VaultRecord(
+                id: vaultId,
+                path: testVaultURL.path,
+                name: "Test Vault",
+                createdAt: Date(),
+                lastOpenedAt: Date()
+            ).insert(db)
+        }
+        let previousVault = AppSettings.shared.currentVault
+        AppSettings.shared.currentVault = VaultRecord(
+            id: vaultId,
+            path: testVaultURL.path,
+            name: "Test Vault",
+            createdAt: Date(),
+            lastOpenedAt: Date()
+        )
+        defer { AppSettings.shared.currentVault = previousVault }
+
+        viewModel.beginDraftMeeting(
+            from: GoogleCalendarEvent(
+                id: "primary::event-1",
+                calendarID: "primary",
+                calendarName: "Primary",
+                calendarColorHex: "#4285F4",
+                platformId: "event-1",
+                title: "Design review",
+                description: "Review launch checklist",
+                icalUid: "event-1@google.com",
+                startDate: Date(timeIntervalSince1970: 1_776_384_000),
+                endDate: Date(timeIntervalSince1970: 1_776_387_600),
+                isAllDay: false,
+                meetingURL: URL(string: "https://meet.google.com/test-link")
+            ),
+            dbQueue: database.dbQueue,
+            vaultURL: testVaultURL
+        )
+
+        let meetingId = try XCTUnwrap(viewModel.materializeDraftMeeting())
+        let persisted = try database.dbQueue.read { db in
+            (
+                try XCTUnwrap(MeetingRecord.fetchOne(db, key: meetingId)),
+                try XCTUnwrap(CalendarEventRecord.filter(Column("meetingId") == meetingId).fetchOne(db))
+            )
+        }
+
+        XCTAssertEqual(persisted.0.name, "Design review")
+        XCTAssertEqual(persisted.1.platformId, "event-1")
+        XCTAssertEqual(persisted.1.meetingUrl, "https://meet.google.com/test-link")
+        XCTAssertFalse(viewModel.hasDraftMeeting)
+        XCTAssertEqual(viewModel.currentMeetingId, meetingId)
     }
 }
 #endif

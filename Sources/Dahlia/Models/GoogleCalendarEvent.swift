@@ -5,7 +5,10 @@ struct GoogleCalendarEvent: Identifiable, Equatable {
     let calendarID: String
     let calendarName: String
     let calendarColorHex: String?
+    let platformId: String
     let title: String
+    let description: String
+    let icalUid: String?
     let startDate: Date
     let endDate: Date
     let isAllDay: Bool

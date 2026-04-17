@@ -70,6 +70,7 @@ struct VaultPickerView: View {
                         showFolderPicker = true
                     }
                     .buttonStyle(.borderedProminent)
+                    .disabled(repository == nil)
                 }
             }
             .glassEffect(.regular, in: RoundedRectangle(cornerRadius: 8))
@@ -116,6 +117,7 @@ struct VaultPickerView: View {
     }
 
     private func registerVault(url: URL) {
+        guard repository != nil else { return }
         let now = Date()
         let vault = VaultRecord(
             id: .v7(),

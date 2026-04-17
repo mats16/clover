@@ -3,6 +3,7 @@ import SwiftUI
 struct HomeOverviewView: View {
     @StateObject private var calendarStore = GoogleCalendarStore.shared
     @Environment(\.openSettings) private var openSettings
+    let onSelectEvent: (GoogleCalendarEvent) -> Void
 
     var body: some View {
         ScrollView {
@@ -92,7 +93,9 @@ struct HomeOverviewView: View {
 
                             VStack(spacing: 10) {
                                 ForEach(section.events) { event in
-                                    HomeCalendarEventRow(event: event)
+                                    HomeCalendarEventRow(event: event, onSelect: {
+                                        onSelectEvent(event)
+                                    })
                                 }
                             }
                         }
@@ -133,37 +136,41 @@ private struct HomeEventSection: Identifiable {
 
 private struct HomeCalendarEventRow: View {
     let event: GoogleCalendarEvent
+    let onSelect: () -> Void
 
     var body: some View {
-        HStack(alignment: .center, spacing: 14) {
-            Circle()
-                .fill(event.calendarColorHex.map(Color.init(hex:)) ?? Color.accentColor)
-                .frame(width: 10, height: 10)
+        Button(action: onSelect) {
+            HStack(alignment: .center, spacing: 14) {
+                Circle()
+                    .fill(event.calendarColorHex.map(Color.init(hex:)) ?? Color.accentColor)
+                    .frame(width: 10, height: 10)
 
-            VStack(alignment: .leading, spacing: 4) {
-                Text(event.title)
-                    .font(.headline)
-                    .foregroundStyle(.primary)
+                VStack(alignment: .leading, spacing: 4) {
+                    Text(event.title)
+                        .font(.headline)
+                        .foregroundStyle(.primary)
 
-                HStack(spacing: 10) {
-                    Text(timeLabel)
-                    if event.meetingURL != nil {
-                        Label(L10n.googleCalendarMeetingLinkAvailable, systemImage: "video")
+                    HStack(spacing: 10) {
+                        Text(timeLabel)
+                        if event.meetingURL != nil {
+                            Label(L10n.googleCalendarMeetingLinkAvailable, systemImage: "video")
+                        }
                     }
+                    .font(.callout)
+                    .foregroundStyle(.secondary)
                 }
-                .font(.callout)
-                .foregroundStyle(.secondary)
-            }
 
-            Spacer(minLength: 0)
+                Spacer(minLength: 0)
+            }
+            .padding(.horizontal, 16)
+            .padding(.vertical, 14)
+            .background(Color(nsColor: .controlBackgroundColor), in: RoundedRectangle(cornerRadius: 16))
+            .overlay {
+                RoundedRectangle(cornerRadius: 16)
+                    .stroke(Color(nsColor: .separatorColor).opacity(0.4), lineWidth: 1)
+            }
         }
-        .padding(.horizontal, 16)
-        .padding(.vertical, 14)
-        .background(Color(nsColor: .controlBackgroundColor), in: RoundedRectangle(cornerRadius: 16))
-        .overlay {
-            RoundedRectangle(cornerRadius: 16)
-                .stroke(Color(nsColor: .separatorColor).opacity(0.4), lineWidth: 1)
-        }
+        .buttonStyle(.plain)
     }
 
     private var timeLabel: String {

@@ -131,6 +131,17 @@ final class MeetingRepository {
         }
     }
 
+    func fetchMeetingIdForCalendarEvent(platform: String, platformId: String) throws -> UUID? {
+        try dbQueue.read { db in
+            try CalendarEventRecord
+                .select(Column("meetingId"))
+                .filter(Column("platform") == platform)
+                .filter(Column("platformId") == platformId)
+                .asRequest(of: UUID.self)
+                .fetchOne(db)
+        }
+    }
+
     func renameMeeting(id: UUID, newName: String) throws {
         try dbQueue.write { db in
             if var record = try MeetingRecord.fetchOne(db, key: id) {
@@ -401,6 +412,14 @@ final class MeetingRepository {
         }
     }
 
+    func fetchCalendarEvent(forMeetingId meetingId: UUID) throws -> CalendarEventRecord? {
+        try dbQueue.read { db in
+            try CalendarEventRecord
+                .filter(Column("meetingId") == meetingId)
+                .fetchOne(db)
+        }
+    }
+
     /// サマリーを保存する（insert or update）。
     nonisolated func upsertSummary(_ summary: SummaryRecord) throws {
         try dbQueue.write { db in
@@ -413,6 +432,7 @@ final class MeetingRepository {
     /// ミーティング詳細をまとめて取得する（単一トランザクション）。
     struct MeetingDetail {
         let meeting: MeetingRecord?
+        let calendarEvent: CalendarEventRecord?
         let segments: [TranscriptSegmentRecord]
         let screenshots: [MeetingScreenshotRecord]
         let note: MeetingNoteRecord?
@@ -423,6 +443,9 @@ final class MeetingRepository {
     nonisolated func fetchMeetingDetail(id meetingId: UUID) throws -> MeetingDetail {
         try dbQueue.read { db in
             let meeting = try MeetingRecord.fetchOne(db, key: meetingId)
+            let calendarEvent = try CalendarEventRecord
+                .filter(Column("meetingId") == meetingId)
+                .fetchOne(db)
             let segments = try TranscriptSegmentRecord
                 .filter(Column("meetingId") == meetingId)
                 .order(Column("startTime").asc)
@@ -436,6 +459,7 @@ final class MeetingRepository {
             let actionItems = try Self.actionItemsRequest(meetingId: meetingId).fetchAll(db)
             return MeetingDetail(
                 meeting: meeting,
+                calendarEvent: calendarEvent,
                 segments: segments,
                 screenshots: screenshots,
                 note: note,

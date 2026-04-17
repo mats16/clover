@@ -92,6 +92,22 @@ struct SidebarViewModelSelectionTests {
             #expect(viewModel.selectedProjectIds.isEmpty)
         }
     }
+
+    @Test
+    func reselectingMeetingsClearsDraftSelection() {
+        withTestVault {
+            let viewModel = SidebarViewModel()
+            let draftId = UUID.v7()
+
+            viewModel.selectedDestination = .meetings
+            viewModel.selectDraftMeeting(draftId)
+
+            viewModel.selectDestination(.meetings)
+
+            #expect(viewModel.selectedMeetingSelection == nil)
+            #expect(viewModel.selectedDraftMeetingId == nil)
+        }
+    }
 }
 #elseif canImport(XCTest)
 import XCTest
@@ -177,6 +193,21 @@ final class SidebarViewModelSelectionTests: XCTestCase {
             XCTAssertNil(viewModel.selectedProject)
             XCTAssertNil(viewModel.selectedMeetingId)
             XCTAssertTrue(viewModel.selectedProjectIds.isEmpty)
+        }
+    }
+
+    func testReselectingMeetingsClearsDraftSelection() {
+        withTestVault {
+            let viewModel = SidebarViewModel()
+            let draftId = UUID.v7()
+
+            viewModel.selectedDestination = .meetings
+            viewModel.selectDraftMeeting(draftId)
+
+            viewModel.selectDestination(.meetings)
+
+            XCTAssertNil(viewModel.selectedMeetingSelection)
+            XCTAssertNil(viewModel.selectedDraftMeetingId)
         }
     }
 }

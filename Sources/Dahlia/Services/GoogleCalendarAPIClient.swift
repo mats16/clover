@@ -126,7 +126,10 @@ final class GoogleCalendarAPIClient: GoogleCalendarAPIClientProviding {
             calendarID: calendarItem.id,
             calendarName: calendarItem.title,
             calendarColorHex: calendarItem.colorHex,
+            platformId: item.id,
             title: item.summary?.nilIfBlank ?? L10n.googleCalendarUntitledEvent,
+            description: item.description?.nilIfBlank ?? "",
+            icalUid: item.iCalUID?.nilIfBlank,
             startDate: start,
             endDate: max(end, start),
             isAllDay: item.start.date != nil,
@@ -325,6 +328,8 @@ extension GoogleCalendarAPIClient {
 
         let id: String
         let summary: String?
+        let description: String?
+        let iCalUID: String?
         let hangoutLink: String?
         let start: EventDateTime
         let end: EventDateTime

@@ -13,7 +13,7 @@ final class SidebarViewModel {
     var selectedDestination: SidebarDestination = .home
     var flatProjects: [FlatProjectRow] = []
     var selectedProject: ProjectRecord?
-    var selectedMeetingId: UUID?
+    var selectedMeetingSelection: MeetingScreenSelection?
     /// 複数選択中の文字起こし ID。
     var selectedMeetingIds: Set<UUID> = []
     /// 複数選択の範囲指定に使うアンカー。
@@ -38,6 +38,14 @@ final class SidebarViewModel {
     var meetingsForSelectedProject: [MeetingRecord] {
         guard let project = selectedProject else { return [] }
         return meetingsForProject[project.id] ?? []
+    }
+
+    var selectedMeetingId: UUID? {
+        selectedMeetingSelection?.meetingId
+    }
+
+    var selectedDraftMeetingId: UUID? {
+        selectedMeetingSelection?.draftId
     }
 
     // MARK: - Collapse State
@@ -449,8 +457,13 @@ final class SidebarViewModel {
     }
 
     func selectMeeting(_ id: UUID) {
-        selectedMeetingId = id
+        selectedMeetingSelection = .persisted(id)
         selectionAnchorMeetingId = id
+    }
+
+    func selectDraftMeeting(_ id: UUID) {
+        selectedMeetingSelection = .draft(id)
+        selectionAnchorMeetingId = nil
     }
 
     func selectDestination(_ destination: SidebarDestination) {
@@ -473,8 +486,8 @@ final class SidebarViewModel {
 
     /// ミーティング選択状態をクリアする（no-op ガード付き）。
     func clearMeetingSelection() {
-        if selectedMeetingId != nil {
-            selectedMeetingId = nil
+        if selectedMeetingSelection != nil {
+            selectedMeetingSelection = nil
         }
         if !selectedMeetingIds.isEmpty {
             selectedMeetingIds.removeAll()
@@ -612,7 +625,7 @@ final class SidebarViewModel {
         if let selected = selectedProject,
            selected.id == id || selected.name.hasPrefix(name + "/") {
             selectedProject = nil
-            selectedMeetingId = nil
+            selectedMeetingSelection = nil
         }
         // 削除対象プロジェクトの meeting 監視を停止
         stopMeetingObservation(projectId: id)
@@ -701,7 +714,7 @@ final class SidebarViewModel {
         try? meetingRepository?.deleteMeeting(id: id)
         selectedMeetingIds.remove(id)
         if selectedMeetingId == id {
-            selectedMeetingId = nil
+            selectedMeetingSelection = nil
         }
         if selectionAnchorMeetingId == id {
             selectionAnchorMeetingId = selectedMeetingIds.first
@@ -718,7 +731,7 @@ final class SidebarViewModel {
             return
         }
         if let selected = selectedMeetingId, ids.contains(selected) {
-            selectedMeetingId = nil
+            selectedMeetingSelection = nil
         }
         selectedMeetingIds.subtract(ids)
         if let anchor = selectionAnchorMeetingId, ids.contains(anchor) {
@@ -745,7 +758,7 @@ final class SidebarViewModel {
             return
         }
         if let selected = selectedMeetingId, ids.contains(selected) {
-            selectedMeetingId = nil
+            selectedMeetingSelection = nil
         }
         selectedMeetingIds.removeAll()
         selectionAnchorMeetingId = nil
@@ -776,7 +789,7 @@ final class SidebarViewModel {
             selectedMeetingIds = [existing]
             selectionAnchorMeetingId = existing
         }
-        selectedMeetingId = nil
+        selectedMeetingSelection = nil
 
         if selectedMeetingIds.contains(id) {
             selectedMeetingIds.remove(id)
@@ -796,7 +809,7 @@ final class SidebarViewModel {
         applyProjectContext(projectId: projectId, projectName: projectName)
         let meetings = selectionScopeMeetings(for: projectId)
         let anchorId = selectionAnchorMeetingId ?? selectedMeetingId
-        selectedMeetingId = nil
+        selectedMeetingSelection = nil
 
         guard let anchor = anchorId,
               let anchorIndex = meetings.firstIndex(where: { $0.id == anchor }),
@@ -814,7 +827,7 @@ final class SidebarViewModel {
     func singleSelectMeeting(_ id: UUID, projectId: UUID?, projectName: String?) {
         applyProjectContext(projectId: projectId, projectName: projectName)
         selectedMeetingIds = [id]
-        selectedMeetingId = id
+        selectedMeetingSelection = .persisted(id)
         selectionAnchorMeetingId = id
     }
 
@@ -903,7 +916,7 @@ final class SidebarViewModel {
         }
         if let selected = selectedProject, ids.contains(selected.id) {
             selectedProject = nil
-            selectedMeetingId = nil
+            selectedMeetingSelection = nil
         }
         selectedProjectIds.subtract(ids)
         if let anchor = selectionAnchorProjectId, ids.contains(anchor) {

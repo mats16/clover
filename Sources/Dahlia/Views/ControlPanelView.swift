@@ -51,7 +51,7 @@ private struct DetailTabBar: View {
     /// フォルダ選択時（transcription 未選択）は全タブを無効化する。
     /// 録音中は録音対象が存在するためタブを無効化しない。
     private var isFolderOnly: Bool {
-        viewModel.currentMeetingId == nil && !viewModel.isListening
+        viewModel.currentMeetingId == nil && !viewModel.isListening && !viewModel.hasDraftMeeting
     }
 
     private var visibleTabs: [DetailTab] {
@@ -487,10 +487,10 @@ private struct TranscribeButton: View {
                   let vault = sidebarViewModel.currentVault else { return }
             viewModel.toggleListening(
                 dbQueue: dbQueue,
-                projectURL: sidebarViewModel.selectedProjectURL,
+                projectURL: viewModel.currentProjectURL ?? sidebarViewModel.selectedProjectURL,
                 vaultId: vault.id,
-                projectId: sidebarViewModel.selectedProject?.id,
-                projectName: sidebarViewModel.selectedProject?.name,
+                projectId: viewModel.currentProjectId ?? sidebarViewModel.selectedProject?.id,
+                projectName: viewModel.currentProjectName ?? sidebarViewModel.selectedProject?.name,
                 vaultURL: vault.url
             )
         }
@@ -703,7 +703,7 @@ private struct DetailTabButton: View {
 
 /// ミーティング詳細のタイトル。クリックでインライン編集できる。
 private struct MeetingNameHeader: View {
-    let meeting: MeetingRecord
+    let title: String
     @Binding var isEditing: Bool
     @Binding var editingName: String
     @FocusState.Binding var isFocused: Bool
@@ -713,7 +713,7 @@ private struct MeetingNameHeader: View {
     let onEditorTap: () -> Void
 
     private var displayName: String {
-        let trimmed = meeting.name.trimmingCharacters(in: .whitespacesAndNewlines)
+        let trimmed = title.trimmingCharacters(in: .whitespacesAndNewlines)
         return trimmed.isEmpty ? L10n.newMeeting : trimmed
     }
 
@@ -737,7 +737,7 @@ private struct MeetingNameHeader: View {
                         }
                     )
                     .task {
-                        editingName = meeting.name
+                        editingName = title
                         try? await Task.sleep(for: .milliseconds(50))
                         isFocused = true
                     }
@@ -759,14 +759,9 @@ private struct MeetingNameHeader: View {
             }
         }
         .frame(maxWidth: .infinity, alignment: .leading)
-        .onChange(of: meeting.id) { _, _ in
+        .onChange(of: title) { _, newTitle in
             isEditing = false
-            editingName = meeting.name
-        }
-        .onChange(of: meeting.name) { _, newName in
-            if !isEditing {
-                editingName = newName
-            }
+            editingName = newTitle
         }
     }
 }
@@ -792,9 +787,9 @@ struct ControlPanelView: View {
                     .progressViewStyle(.linear)
             }
 
-            if let item = currentMeetingItem {
+            if let meetingTitle = displayedMeetingTitle {
                 MeetingNameHeader(
-                    meeting: item.meeting,
+                    title: meetingTitle,
                     isEditing: $isEditingMeetingName,
                     editingName: $editingMeetingName,
                     isFocused: $isMeetingNameFieldFocused,
@@ -804,11 +799,16 @@ struct ControlPanelView: View {
                     onEditorTap: markMeetingNameEditorTap
                 )
                 .padding(.top, -12)
+            }
 
+            if currentMeetingItem != nil {
                 MeetingMetadataBar(
                     viewModel: viewModel,
-                    meeting: item.meeting,
-                    tags: item.tags,
+                    sidebarViewModel: sidebarViewModel
+                )
+            } else if viewModel.hasDraftMeeting || viewModel.currentMeetingId != nil {
+                MeetingMetadataBar(
+                    viewModel: viewModel,
                     sidebarViewModel: sidebarViewModel
                 )
             }
@@ -873,8 +873,8 @@ struct ControlPanelView: View {
         .onChange(of: hasSummaryTab) {
             updateSummaryTabSelection()
         }
-        .onChange(of: currentMeetingItem?.meeting.id) { _, _ in
-            if currentMeetingItem != nil {
+        .onChange(of: displayedMeetingIdentity) { _, _ in
+            if displayedMeetingIdentity != nil {
                 selectedTab = initialTabSelection
             }
             viewModel.requestShowSummaryTab = false
@@ -1052,6 +1052,32 @@ struct ControlPanelView: View {
         return sidebarViewModel.allMeetings.first(where: { $0.meetingId == meetingId })
     }
 
+    private var displayedMeetingTitle: String? {
+        if let currentMeetingItem {
+            return currentMeetingItem.meeting.name
+        }
+        if viewModel.currentMeetingId != nil {
+            return ""
+        }
+        if viewModel.hasDraftMeeting {
+            return viewModel.draftMeeting?.title ?? ""
+        }
+        return nil
+    }
+
+    private var displayedMeetingIdentity: String? {
+        if let currentMeetingItem {
+            return currentMeetingItem.meeting.id.uuidString
+        }
+        if let currentMeetingId = viewModel.currentMeetingId {
+            return currentMeetingId.uuidString
+        }
+        if viewModel.hasDraftMeeting {
+            return "draft"
+        }
+        return nil
+    }
+
     private var persistedSummaryExists: Bool {
         currentMeetingItem?.hasSummary == true
     }
@@ -1067,32 +1093,41 @@ struct ControlPanelView: View {
     /// ヘッダーに表示する「プロジェクト名 - トランスクリプション名」。
     private var headerTitle: String {
         let item = currentMeetingItem
-        let projectName = item?.projectName ?? L10n.noProject
-        let meetingName: String = if let name = item?.meeting.name, !name.isEmpty {
-            name
+        let projectName = item?.projectName ?? viewModel.currentProjectName ?? L10n.noProject
+        let meetingName: String
+        if let displayedMeetingTitle {
+            let trimmed = displayedMeetingTitle.trimmingCharacters(in: .whitespacesAndNewlines)
+            meetingName = trimmed.isEmpty ? L10n.newMeeting : trimmed
         } else {
-            L10n.newMeeting
+            meetingName = L10n.newMeeting
         }
         return "\(projectName) - \(meetingName)"
     }
 
     private func beginMeetingRename() {
-        editingMeetingName = currentMeetingItem?.meeting.name ?? ""
+        editingMeetingName = displayedMeetingTitle ?? ""
         isEditingMeetingName = true
         didTapInsideMeetingNameEditor = false
     }
 
     private func cancelMeetingRename() {
-        editingMeetingName = currentMeetingItem?.meeting.name ?? ""
+        editingMeetingName = displayedMeetingTitle ?? ""
         isEditingMeetingName = false
         isMeetingNameFieldFocused = false
         didTapInsideMeetingNameEditor = false
     }
 
     private func commitMeetingRename() {
-        guard isEditingMeetingName, let meeting = currentMeetingItem?.meeting else { return }
+        guard isEditingMeetingName else { return }
         let trimmed = editingMeetingName.trimmingCharacters(in: .whitespacesAndNewlines)
-        sidebarViewModel.renameMeeting(id: meeting.id, newName: trimmed)
+        if let meeting = currentMeetingItem?.meeting {
+            sidebarViewModel.renameMeeting(id: meeting.id, newName: trimmed)
+        } else if viewModel.hasDraftMeeting {
+            viewModel.updateDraftMeetingTitle(trimmed)
+            if let meetingId = viewModel.materializeDraftMeeting() {
+                sidebarViewModel.selectMeeting(meetingId)
+            }
+        }
         isEditingMeetingName = false
         isMeetingNameFieldFocused = false
         didTapInsideMeetingNameEditor = false

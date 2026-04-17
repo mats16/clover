@@ -64,6 +64,41 @@ struct GoogleCalendarAPIClientTests {
         #expect(Set(eventTypes) == Set(["default", "focusTime", "fromGmail"]))
         #expect(!eventTypes.contains("outOfOffice"))
     }
+
+    @Test
+    func makeEventIncludesPersistenceFields() throws {
+        let item = GoogleCalendarAPIClient.EventItem(
+            id: "google-event-id",
+            summary: "Planning",
+            description: "Quarterly planning",
+            iCalUID: "planning@google.com",
+            hangoutLink: "https://meet.google.com/test-room",
+            start: .init(date: nil, dateTime: "2026-04-17T01:00:00Z"),
+            end: .init(date: nil, dateTime: "2026-04-17T02:00:00Z"),
+            conferenceData: nil,
+            eventType: nil
+        )
+
+        let event = try #require(
+            GoogleCalendarAPIClient.makeEvent(
+                from: item,
+                calendarItem: GoogleCalendarListItem(
+                    id: "primary",
+                    title: "Primary",
+                    colorHex: "#4285F4",
+                    isPrimary: true
+                ),
+                calendar: Calendar(identifier: .gregorian)
+            )
+        )
+
+        #expect(event.platformId == "google-event-id")
+        #expect(event.description == "Quarterly planning")
+        #expect(event.icalUid == "planning@google.com")
+        #expect(event.meetingURL?.absoluteString == "https://meet.google.com/test-room")
+        #expect(event.startDate == Date(timeIntervalSince1970: 1_776_459_600))
+        #expect(event.endDate == Date(timeIntervalSince1970: 1_776_463_200))
+    }
 }
 #elseif canImport(XCTest)
 import XCTest
@@ -125,6 +160,40 @@ final class GoogleCalendarAPIClientTests: XCTestCase {
 
         XCTAssertEqual(Set(eventTypes), Set(["default", "focusTime", "fromGmail"]))
         XCTAssertFalse(eventTypes.contains("outOfOffice"))
+    }
+
+    func testMakeEventIncludesPersistenceFields() throws {
+        let item = GoogleCalendarAPIClient.EventItem(
+            id: "google-event-id",
+            summary: "Planning",
+            description: "Quarterly planning",
+            iCalUID: "planning@google.com",
+            hangoutLink: "https://meet.google.com/test-room",
+            start: .init(date: nil, dateTime: "2026-04-17T01:00:00Z"),
+            end: .init(date: nil, dateTime: "2026-04-17T02:00:00Z"),
+            conferenceData: nil,
+            eventType: nil
+        )
+
+        let event = try XCTUnwrap(
+            GoogleCalendarAPIClient.makeEvent(
+                from: item,
+                calendarItem: GoogleCalendarListItem(
+                    id: "primary",
+                    title: "Primary",
+                    colorHex: "#4285F4",
+                    isPrimary: true
+                ),
+                calendar: Calendar(identifier: .gregorian)
+            )
+        )
+
+        XCTAssertEqual(event.platformId, "google-event-id")
+        XCTAssertEqual(event.description, "Quarterly planning")
+        XCTAssertEqual(event.icalUid, "planning@google.com")
+        XCTAssertEqual(event.meetingURL?.absoluteString, "https://meet.google.com/test-room")
+        XCTAssertEqual(event.startDate, Date(timeIntervalSince1970: 1_776_459_600))
+        XCTAssertEqual(event.endDate, Date(timeIntervalSince1970: 1_776_463_200))
     }
 }
 #endif

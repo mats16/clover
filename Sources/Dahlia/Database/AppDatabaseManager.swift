@@ -55,6 +55,7 @@ final class AppDatabaseManager: Sendable {
         try createScreenshotsTable(in: db)
         try createSummariesTable(in: db)
         try createActionItemsTable(in: db)
+        try createCalendarEventsTable(in: db)
     }
 
     private static func createVaultsTable(in db: Database) throws {
@@ -211,5 +212,24 @@ final class AppDatabaseManager: Sendable {
             on: "action_items",
             columns: ["meetingId"]
         )
+    }
+
+    private static func createCalendarEventsTable(in db: Database) throws {
+        try db.create(table: "calendar_events") { t in
+            t.autoIncrementedPrimaryKey("id")
+            t.column("meetingId", .blob).notNull()
+                .references("meetings", onDelete: .cascade)
+                .unique()
+            t.column("createdAt", .datetime).notNull()
+            t.column("updatedAt", .datetime).notNull()
+            t.column("platform", .text).notNull()
+            t.column("platformId", .text).notNull()
+            t.column("description", .text).notNull().defaults(to: "")
+            t.column("icalUid", .text)
+            t.column("start", .datetime).notNull()
+            t.column("end", .datetime).notNull()
+            t.column("meetingUrl", .text)
+            t.uniqueKey(["platform", "platformId"])
+        }
     }
 }

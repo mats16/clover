@@ -157,6 +157,8 @@ struct GoogleCalendarStoreTests {
         let conferenceItem = GoogleCalendarAPIClient.EventItem(
             id: "event-1",
             summary: "Weekly sync",
+            description: "Discuss launch plan",
+            iCalUID: "event-1@google.com",
             hangoutLink: nil,
             start: .init(date: nil, dateTime: "2026-04-17T01:00:00Z"),
             end: .init(date: nil, dateTime: "2026-04-17T02:00:00Z"),
@@ -172,6 +174,9 @@ struct GoogleCalendarStoreTests {
         )
 
         #expect(event.meetingURL?.absoluteString == "https://meet.google.com/abc-defg-hij")
+        #expect(event.platformId == "event-1")
+        #expect(event.description == "Discuss launch plan")
+        #expect(event.icalUid == "event-1@google.com")
         #expect(!event.isAllDay)
 
         let intervalEnd = Calendar.current.date(byAdding: .day, value: 7, to: fixtureNow)!
@@ -183,7 +188,10 @@ struct GoogleCalendarStoreTests {
                     calendarID: primaryCalendar.id,
                     calendarName: primaryCalendar.title,
                     calendarColorHex: nil,
+                    platformId: "late",
                     title: "Outside window",
+                    description: "",
+                    icalUid: nil,
                     startDate: Calendar.current.date(byAdding: .day, value: 9, to: fixtureNow)!,
                     endDate: Calendar.current.date(byAdding: .day, value: 9, to: fixtureNow)!,
                     isAllDay: true,
@@ -202,6 +210,8 @@ struct GoogleCalendarStoreTests {
         let allDayItem = GoogleCalendarAPIClient.EventItem(
             id: "event-2",
             summary: nil,
+            description: nil,
+            iCalUID: nil,
             hangoutLink: nil,
             start: .init(date: "2026-04-18", dateTime: nil),
             end: .init(date: "2026-04-19", dateTime: nil),
@@ -223,6 +233,8 @@ struct GoogleCalendarStoreTests {
         let outOfOfficeItem = GoogleCalendarAPIClient.EventItem(
             id: "event-3",
             summary: "Out of office",
+            description: nil,
+            iCalUID: nil,
             hangoutLink: nil,
             start: .init(date: nil, dateTime: "2026-04-18T01:00:00Z"),
             end: .init(date: nil, dateTime: "2026-04-18T02:00:00Z"),
@@ -339,7 +351,10 @@ private let fixtureEvent = GoogleCalendarEvent(
     calendarID: "primary",
     calendarName: "Primary",
     calendarColorHex: "#4285F4",
+    platformId: "event-1",
     title: "Design review",
+    description: "Review draft",
+    icalUid: "event-1@google.com",
     startDate: fixtureNow.addingTimeInterval(3600),
     endDate: fixtureNow.addingTimeInterval(7200),
     isAllDay: false,
