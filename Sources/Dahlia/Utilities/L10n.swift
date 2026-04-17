@@ -44,6 +44,9 @@ enum L10n {
     // MARK: - Sidebar
 
     static var home: String { String(localized: "Home", bundle: bundle) }
+    static var goodMorning: String { String(localized: "Good morning", bundle: bundle) }
+    static var goodAfternoon: String { String(localized: "Good afternoon", bundle: bundle) }
+    static var goodEvening: String { String(localized: "Good evening", bundle: bundle) }
     static var meetings: String { String(localized: "Meetings", bundle: bundle) }
     static var projects: String { String(localized: "Projects", bundle: bundle) }
     static var context: String { String(localized: "Context", bundle: bundle) }

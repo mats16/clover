@@ -23,10 +23,22 @@ struct HomeOverviewView: View {
     }
 
     private var header: some View {
-        VStack(alignment: .leading, spacing: 8) {
-            Text(L10n.home)
+        TimelineView(.everyMinute) { context in
+            Text(greeting(for: context.date))
                 .font(.largeTitle.weight(.semibold))
                 .foregroundStyle(.primary)
+        }
+    }
+
+    private func greeting(for date: Date, calendar: Calendar = .autoupdatingCurrent) -> String {
+        let hour = calendar.component(.hour, from: date)
+        switch hour {
+        case 5 ..< 12:
+            return L10n.goodMorning
+        case 12 ..< 18:
+            return L10n.goodAfternoon
+        default:
+            return L10n.goodEvening
         }
     }
 
