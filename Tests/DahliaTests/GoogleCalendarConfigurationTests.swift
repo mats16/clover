@@ -6,6 +6,13 @@ import Testing
 
 struct GoogleCalendarConfigurationTests {
     @Test
+    func clientIDIsReadFromEnvironment() {
+        withTemporaryEnvironmentValue("GOOGLE_CLIENT_ID", value: "client-id-from-env") {
+            #expect(GoogleCalendarConfiguration.clientID == "client-id-from-env")
+        }
+    }
+
+    @Test
     func clientSecretIsReadFromEnvironment() {
         withTemporaryEnvironmentValue("GOOGLE_CLIENT_SECRET", value: "secret-from-env") {
             #expect(GoogleCalendarConfiguration.clientSecret == "secret-from-env")
@@ -29,6 +36,12 @@ struct GoogleCalendarConfigurationTests {
 import XCTest
 
 final class GoogleCalendarConfigurationTests: XCTestCase {
+    func testClientIDIsReadFromEnvironment() {
+        withTemporaryEnvironmentValue("GOOGLE_CLIENT_ID", value: "client-id-from-env") {
+            XCTAssertEqual(GoogleCalendarConfiguration.clientID, "client-id-from-env")
+        }
+    }
+
     func testClientSecretIsReadFromEnvironment() {
         withTemporaryEnvironmentValue("GOOGLE_CLIENT_SECRET", value: "secret-from-env") {
             XCTAssertEqual(GoogleCalendarConfiguration.clientSecret, "secret-from-env")

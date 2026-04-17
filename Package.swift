@@ -10,7 +10,6 @@ let package = Package(
     dependencies: [
         .package(url: "https://github.com/groue/GRDB.swift.git", from: "7.0.0"),
         .package(url: "https://github.com/getsentry/sentry-cocoa", from: "9.10.0"),
-        .package(url: "https://github.com/google/GoogleSignIn-iOS.git", from: "9.0.0"),
     ],
     targets: [
         .executableTarget(
@@ -18,7 +17,6 @@ let package = Package(
             dependencies: [
                 .product(name: "GRDB", package: "GRDB.swift"),
                 .product(name: "Sentry", package: "sentry-cocoa"),
-                .product(name: "GoogleSignIn", package: "GoogleSignIn-iOS"),
             ],
             path: "Sources/Dahlia",
             resources: [.process("Resources")]
