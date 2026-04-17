@@ -147,7 +147,6 @@ private struct HomeCalendarEventRow: View {
 
                 HStack(spacing: 10) {
                     Text(timeLabel)
-                    Text(event.calendarName)
                     if event.meetingURL != nil {
                         Label(L10n.googleCalendarMeetingLinkAvailable, systemImage: "video")
                     }
