@@ -98,7 +98,7 @@ struct MeetingActionItemRow: View {
             onDelete: { viewModel.deleteActionItem(actionItem) }
         )
         .padding(.horizontal, 12)
-        .padding(.vertical, 6)
+        .padding(.vertical, 4)
         .background(
             RoundedRectangle(cornerRadius: 10)
                 .fill(Color(nsColor: .controlBackgroundColor))

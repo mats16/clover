@@ -133,7 +133,7 @@ private struct ActionItemsOverviewRow: View {
     }
 
     var body: some View {
-        HStack(alignment: .top, spacing: 10) {
+        VStack(alignment: .leading, spacing: 6) {
             ActionItemRowContent(
                 title: item.title,
                 assignee: item.assignee,
@@ -143,8 +143,7 @@ private struct ActionItemsOverviewRow: View {
                 onToggleAssignedToMe: onToggleAssignedToMe,
                 onDelete: onDelete
             )
-        }
-        .overlay(alignment: .bottomLeading) {
+
             HStack(spacing: 10) {
                 if let projectName = item.projectName,
                    !projectName.isEmpty {
@@ -155,11 +154,9 @@ private struct ActionItemsOverviewRow: View {
             .font(.caption)
             .foregroundStyle(.secondary)
             .padding(.leading, 32)
-            .padding(.bottom, 7)
         }
         .padding(.horizontal, 12)
-        .padding(.top, 7)
-        .padding(.bottom, 28)
+        .padding(.vertical, 7)
         .background(
             RoundedRectangle(cornerRadius: 12)
                 .fill(isHovering ? Color.primary.opacity(0.04) : Color(nsColor: .controlBackgroundColor))

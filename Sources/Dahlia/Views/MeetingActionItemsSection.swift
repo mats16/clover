@@ -7,11 +7,11 @@ struct MeetingActionItemsSection: View {
         let actionItems = viewModel.orderedCurrentMeetingActionItems
 
         if !actionItems.isEmpty {
-            VStack(alignment: .leading, spacing: 10) {
+            VStack(alignment: .leading, spacing: 8) {
                 Text(L10n.actionItems)
                     .font(.headline)
 
-                VStack(alignment: .leading, spacing: 4) {
+                VStack(alignment: .leading, spacing: 2) {
                     ForEach(actionItems) { actionItem in
                         MeetingActionItemRow(actionItem: actionItem, viewModel: viewModel)
                     }
