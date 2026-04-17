@@ -160,7 +160,8 @@ struct GoogleCalendarStoreTests {
             hangoutLink: nil,
             start: .init(date: nil, dateTime: "2026-04-17T01:00:00Z"),
             end: .init(date: nil, dateTime: "2026-04-17T02:00:00Z"),
-            conferenceData: .init(entryPoints: [.init(uri: "https://meet.google.com/abc-defg-hij")])
+            conferenceData: .init(entryPoints: [.init(uri: "https://meet.google.com/abc-defg-hij")]),
+            eventType: nil
         )
         let event = try #require(
             GoogleCalendarAPIClient.makeEvent(
@@ -197,26 +198,45 @@ struct GoogleCalendarStoreTests {
     }
 
     @Test
-    func allDayEventUsesDateField() throws {
+    func allDayEventIsIgnored() throws {
         let allDayItem = GoogleCalendarAPIClient.EventItem(
             id: "event-2",
             summary: nil,
             hangoutLink: nil,
             start: .init(date: "2026-04-18", dateTime: nil),
             end: .init(date: "2026-04-19", dateTime: nil),
-            conferenceData: nil
+            conferenceData: nil,
+            eventType: nil
         )
 
-        let event = try #require(
-            GoogleCalendarAPIClient.makeEvent(
-                from: allDayItem,
-                calendarItem: secondaryCalendar,
-                calendar: Calendar(identifier: .gregorian)
-            )
+        let event = try GoogleCalendarAPIClient.makeEvent(
+            from: allDayItem,
+            calendarItem: secondaryCalendar,
+            calendar: Calendar(identifier: .gregorian)
         )
 
-        #expect(event.isAllDay)
-        #expect(event.title == L10n.googleCalendarUntitledEvent)
+        #expect(event == nil)
+    }
+
+    @Test
+    func outOfOfficeEventIsIgnored() throws {
+        let outOfOfficeItem = GoogleCalendarAPIClient.EventItem(
+            id: "event-3",
+            summary: "Out of office",
+            hangoutLink: nil,
+            start: .init(date: nil, dateTime: "2026-04-18T01:00:00Z"),
+            end: .init(date: nil, dateTime: "2026-04-18T02:00:00Z"),
+            conferenceData: nil,
+            eventType: "outOfOffice"
+        )
+
+        let event = try GoogleCalendarAPIClient.makeEvent(
+            from: outOfOfficeItem,
+            calendarItem: secondaryCalendar,
+            calendar: .current
+        )
+
+        #expect(event == nil)
     }
 }
 #elseif canImport(XCTest)

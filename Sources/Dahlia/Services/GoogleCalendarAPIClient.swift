@@ -115,6 +115,8 @@ final class GoogleCalendarAPIClient: GoogleCalendarAPIClientProviding {
         calendarItem: GoogleCalendarListItem,
         calendar: Calendar = .current
     ) throws -> GoogleCalendarEvent? {
+        guard !item.isIgnoredForUpcomingEvents else { return nil }
+
         guard let start = try item.start.resolvedDate(calendar: calendar),
               let end = try item.end.resolvedDate(calendar: calendar)
         else { return nil }
@@ -191,7 +193,9 @@ final class GoogleCalendarAPIClient: GoogleCalendarAPIClientProviding {
             URLQueryItem(name: "timeMin", value: now.ISO8601Format()),
             URLQueryItem(name: "timeMax", value: intervalEnd.ISO8601Format()),
             URLQueryItem(name: "maxResults", value: "250"),
-        ]
+        ] + Self.includedEventTypesForUpcomingEvents.map { eventType in
+            URLQueryItem(name: "eventTypes", value: eventType)
+        }
 
         let url = try Self.url(from: queryComponents)
         return try await authorizedGet(url: url, accessToken: accessToken, session: session)
@@ -227,6 +231,12 @@ final class GoogleCalendarAPIClient: GoogleCalendarAPIClientProviding {
 }
 
 extension GoogleCalendarAPIClient {
+    private static let includedEventTypesForUpcomingEvents = [
+        "default",
+        "focusTime",
+        "fromGmail",
+    ]
+
     struct CalendarListResponse: Decodable {
         let items: [CalendarListItemPayload]
 
@@ -319,6 +329,11 @@ extension GoogleCalendarAPIClient {
         let start: EventDateTime
         let end: EventDateTime
         let conferenceData: ConferenceData?
+        let eventType: String?
+
+        var isIgnoredForUpcomingEvents: Bool {
+            start.date != nil || eventType == "outOfOffice"
+        }
     }
 }
 
