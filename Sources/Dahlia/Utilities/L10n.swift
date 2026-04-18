@@ -152,6 +152,26 @@ enum L10n {
     static var stopAgent: String { String(localized: "Stop Agent", bundle: bundle) }
     static var agentLiveMode: String { String(localized: "Live mode", bundle: bundle) }
     static var agentProcessing: String { String(localized: "Thinking…", bundle: bundle) }
+    static var askLauncherSubtitle: String { String(
+        localized: "Ask anything about your meetings, notes, and transcripts.",
+        bundle: bundle
+    ) }
+    static var askPromptPlaceholder: String { String(
+        localized: "Ask anything about meetings, people, tasks, or transcripts…",
+        bundle: bundle
+    ) }
+    static var askSuggestionMeetingPrep: String { String(
+        localized: "Prep me for this week's project meeting",
+        bundle: bundle
+    ) }
+    static var askSuggestionRecentDiscussion: String { String(
+        localized: "What did we discuss with this customer recently?",
+        bundle: bundle
+    ) }
+    static var askSuggestionActionItems: String { String(
+        localized: "Show my open action items",
+        bundle: bundle
+    ) }
     static var agentDisabledDescription: String { String(
         localized: "Enable Agent in Settings to use Ask.",
         bundle: bundle

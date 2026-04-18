@@ -72,66 +72,127 @@ private struct AgentLauncherView: View {
         effectiveWorkingDirectory == nil
     }
 
-    var body: some View {
-        ZStack(alignment: .bottom) {
-            VStack(spacing: 0) {
-                Spacer()
-
-                Image(systemName: "sparkles")
-                    .font(.system(size: 36))
-                    .foregroundStyle(.purple)
-                    .padding(.bottom, 8)
-
-                Text(L10n.agent)
-                    .font(.headline)
-                    .padding(.bottom, 4)
-
-                Text(hasContent ? L10n.agentProjectModeDescription : L10n.agentTranscriptModeDescription)
-                    .font(.caption)
-                    .foregroundStyle(.secondary)
-                    .multilineTextAlignment(.center)
-                    .padding(.horizontal, 20)
-
-                Spacer()
-            }
-            .padding(.bottom, AgentFloatingInputMetrics.contentBottomInset)
-
-            agentLauncherInputBar
-                .padding(.bottom, AgentFloatingInputMetrics.bottomPadding)
-        }
-        .frame(maxWidth: .infinity, maxHeight: .infinity)
+    private var contextName: String? {
+        effectiveProjectName ?? sidebarViewModel.currentVault?.name
     }
 
-    private var agentLauncherInputBar: some View {
-        HStack(spacing: 8) {
-            TextField("メッセージを入力...", text: $inputText)
-                .textFieldStyle(.plain)
-                .font(.body)
-                .padding(.leading, 4)
-                .focused($isTextFieldFocused)
-                .onSubmit {
-                    guard hasContent else { return }
-                    launchProjectMode()
-                }
+    private var launcherSuggestions: [String] {
+        [
+            L10n.askSuggestionMeetingPrep,
+            L10n.askSuggestionRecentDiscussion,
+            L10n.askSuggestionActionItems,
+        ]
+    }
 
-            Button {
-                if hasContent {
-                    launchProjectMode()
-                } else {
-                    launchTranscriptMode()
+    var body: some View {
+        GeometryReader { proxy in
+            ScrollView(.vertical, showsIndicators: false) {
+                VStack(spacing: AskLauncherMetrics.sectionSpacing) {
+                    Spacer(minLength: AskLauncherMetrics.topSpacing)
+
+                    VStack(spacing: AskLauncherMetrics.headerSpacing) {
+                        if let contextName, !contextName.isEmpty {
+                            Label(contextName, systemImage: "folder")
+                                .font(.subheadline)
+                                .foregroundStyle(.secondary)
+                                .padding(.horizontal, 14)
+                                .padding(.vertical, 8)
+                                .background(.background.secondary, in: Capsule())
+                        }
+
+                        Text(L10n.ask)
+                            .font(.system(size: AskLauncherMetrics.titleSize, weight: .bold, design: .rounded))
+                            .foregroundStyle(.primary)
+
+                        Text(L10n.askLauncherSubtitle)
+                            .font(.title3)
+                            .foregroundStyle(.secondary)
+                            .multilineTextAlignment(.center)
+                    }
+
+                    VStack(alignment: .leading, spacing: AskLauncherMetrics.cardSpacing) {
+                        TextField(L10n.askPromptPlaceholder, text: $inputText, axis: .vertical)
+                            .textFieldStyle(.plain)
+                            .font(.system(size: AskLauncherMetrics.promptSize, weight: .regular, design: .rounded))
+                            .lineLimit(1 ... 5)
+                            .focused($isTextFieldFocused)
+                            .disabled(isDisabled)
+                            .onSubmit {
+                                guard hasContent else { return }
+                                launchProjectMode()
+                            }
+
+                        HStack(alignment: .center, spacing: 12) {
+                            Button(action: launchTranscriptMode) {
+                                Label(L10n.agentTranscriptMode, systemImage: "waveform.badge.magnifyingglass")
+                                    .font(.body)
+                            }
+                            .buttonStyle(.plain)
+                            .foregroundStyle(isDisabled ? .tertiary : .secondary)
+                            .disabled(isDisabled)
+                            .help(L10n.agentTranscriptModeDescription)
+
+                            Spacer(minLength: 0)
+
+                            Button(action: launchProjectMode) {
+                                Image(systemName: "arrow.up")
+                                    .font(.system(size: 20, weight: .semibold))
+                                    .foregroundStyle(hasContent ? .primary : .tertiary)
+                                    .frame(width: 48, height: 48)
+                                    .background(
+                                        Circle()
+                                            .fill(hasContent ? Color.secondary.opacity(0.14) : Color.secondary.opacity(0.08))
+                                    )
+                            }
+                            .buttonStyle(.plain)
+                            .disabled(!hasContent || isDisabled)
+                            .help(L10n.agentProjectMode)
+                        }
+                    }
+                    .padding(AskLauncherMetrics.cardPadding)
+                    .background(askLauncherCardBackground)
+
+                    VStack(alignment: .leading, spacing: AskLauncherMetrics.suggestionSpacing) {
+                        ForEach(launcherSuggestions, id: \.self) { suggestion in
+                            Button {
+                                guard !isDisabled else { return }
+                                inputText = suggestion
+                                launchProjectMode()
+                            } label: {
+                                HStack(spacing: 14) {
+                                    Image(systemName: "arrow.turn.down.right")
+                                        .font(.body)
+                                        .foregroundStyle(.tertiary)
+                                        .frame(width: 18)
+
+                                    Text(suggestion)
+                                        .font(.title3)
+                                        .foregroundStyle(isDisabled ? .tertiary : .secondary)
+                                        .multilineTextAlignment(.leading)
+
+                                    Spacer(minLength: 0)
+                                }
+                                .contentShape(Rectangle())
+                            }
+                            .buttonStyle(.plain)
+                            .disabled(isDisabled)
+                        }
+                    }
+                    .frame(maxWidth: .infinity, alignment: .leading)
+
+                    Spacer(minLength: AskLauncherMetrics.bottomSpacing)
                 }
-            } label: {
-                Image(systemName: hasContent ? "arrow.up.circle.fill" : "waveform.badge.microphone")
-                    .font(.system(size: 22))
-                    .foregroundStyle(hasContent ? Color.accentColor : .purple)
+                .frame(
+                    maxWidth: AskLauncherMetrics.maxContentWidth,
+                    minHeight: max(proxy.size.height, AskLauncherMetrics.minHeight),
+                    alignment: .top
+                )
+                .padding(.horizontal, AskLauncherMetrics.outerPadding)
+                .frame(maxWidth: .infinity)
             }
-            .buttonStyle(.plain)
-            .help(hasContent ? L10n.agentProjectMode : L10n.agentTranscriptMode)
+            .background(askLauncherBackground)
         }
-        .padding(.horizontal, 14)
-        .padding(.vertical, 10)
-        .background(capsuleInputBarBackground)
-        .disabled(isDisabled)
+        .frame(maxWidth: .infinity, maxHeight: .infinity)
         .onAppear {
             DispatchQueue.main.async {
                 isTextFieldFocused = true
@@ -654,8 +715,60 @@ private var capsuleInputBarBackground: some View {
         .padding(.vertical, 8)
 }
 
+private var askLauncherBackground: some View {
+    ZStack {
+        Color.clear
+
+        LinearGradient(
+            colors: [
+                Color(nsColor: .windowBackgroundColor),
+                Color(nsColor: .windowBackgroundColor),
+                Color(nsColor: .underPageBackgroundColor),
+            ],
+            startPoint: .top,
+            endPoint: .bottom
+        )
+
+        RadialGradient(
+            colors: [
+                .white.opacity(0.55),
+                .clear,
+            ],
+            center: .top,
+            startRadius: 80,
+            endRadius: 420
+        )
+        .blendMode(.plusLighter)
+    }
+}
+
+private var askLauncherCardBackground: some View {
+    RoundedRectangle(cornerRadius: 30)
+        .fill(.ultraThinMaterial)
+        .overlay {
+            RoundedRectangle(cornerRadius: 30)
+                .strokeBorder(.separator.opacity(0.28), lineWidth: 1)
+        }
+        .shadow(color: .black.opacity(0.08), radius: 28, y: 16)
+}
+
 private enum AgentFloatingInputMetrics {
     static let bottomPadding: CGFloat = 24
     static let contentBottomInset: CGFloat = 102
     static let scrollBottomInset: CGFloat = 110
+}
+
+private enum AskLauncherMetrics {
+    static let maxContentWidth: CGFloat = 1_140
+    static let minHeight: CGFloat = 760
+    static let outerPadding: CGFloat = 48
+    static let topSpacing: CGFloat = 72
+    static let bottomSpacing: CGFloat = 56
+    static let sectionSpacing: CGFloat = 40
+    static let headerSpacing: CGFloat = 16
+    static let titleSize: CGFloat = 60
+    static let promptSize: CGFloat = 28
+    static let cardSpacing: CGFloat = 28
+    static let cardPadding: CGFloat = 30
+    static let suggestionSpacing: CGFloat = 18
 }

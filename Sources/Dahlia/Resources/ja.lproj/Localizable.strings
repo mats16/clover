@@ -104,6 +104,11 @@
 "Stop Agent" = "停止";
 "Live mode" = "Live mode";
 "Thinking…" = "考え中…";
+"Ask anything about your meetings, notes, and transcripts." = "ミーティング、ノート、文字起こしについて何でも聞けます。";
+"Ask anything about meetings, people, tasks, or transcripts…" = "ミーティング、人、タスク、文字起こしについて質問してください…";
+"Prep me for this week's project meeting" = "今週のプロジェクト会議に向けて準備して";
+"What did we discuss with this customer recently?" = "この顧客と最近何を話した？";
+"Show my open action items" = "自分の未完了アクションアイテムを見せて";
 "Enable Agent in Settings to use Ask." = "Ask を使うには設定で Agent を有効にしてください。";
 
 /* Settings (Agent) */

@@ -104,6 +104,11 @@
 "Stop Agent" = "Stop";
 "Live mode" = "Live mode";
 "Thinking…" = "Thinking…";
+"Ask anything about your meetings, notes, and transcripts." = "Ask anything about your meetings, notes, and transcripts.";
+"Ask anything about meetings, people, tasks, or transcripts…" = "Ask anything about meetings, people, tasks, or transcripts…";
+"Prep me for this week's project meeting" = "Prep me for this week's project meeting";
+"What did we discuss with this customer recently?" = "What did we discuss with this customer recently?";
+"Show my open action items" = "Show my open action items";
 "Enable Agent in Settings to use Ask." = "Enable Agent in Settings to use Ask.";
 
 /* Settings (Agent) */
