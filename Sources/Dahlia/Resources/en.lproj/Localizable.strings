@@ -102,6 +102,7 @@
 "Continuously feed transcript to Claude Code." = "Continuously feed transcript to Claude Code.";
 "Ask Agent" = "Ask Agent";
 "Ask anything about your project or transcript…" = "Ask anything about your project or transcript…";
+"New chat" = "New chat";
 "Start Agent" = "Start";
 "Stop Agent" = "Stop";
 "Live mode" = "Live mode";

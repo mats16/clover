@@ -153,6 +153,7 @@ enum L10n {
         localized: "Ask anything about your project or transcript…",
         bundle: bundle
     ) }
+    static var newChat: String { String(localized: "New chat", bundle: bundle) }
     static var startAgent: String { String(localized: "Start Agent", bundle: bundle) }
     static var stopAgent: String { String(localized: "Stop Agent", bundle: bundle) }
     static var agentLiveMode: String { String(localized: "Live mode", bundle: bundle) }

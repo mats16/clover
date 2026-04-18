@@ -16,9 +16,7 @@ struct AgentSidebarView: View {
                     service: service,
                     projectName: headerDirectoryName(service: service),
                     showsLiveModeBadge: !isAskPage
-                ) {
-                    viewModel.stopAgent()
-                }
+                )
             } else {
                 AgentLauncherView(viewModel: viewModel, sidebarViewModel: sidebarViewModel, isAskPage: isAskPage)
             }
@@ -250,7 +248,6 @@ private struct AgentChatView: View {
     @ObservedObject var service: AgentService
     let projectName: String
     let showsLiveModeBadge: Bool
-    let onStop: () -> Void
     @State private var inputText = ""
 
     var body: some View {
@@ -317,8 +314,7 @@ private struct AgentChatView: View {
                 AgentSessionBar(
                     projectName: projectName,
                     isLiveMode: service.mode.isTranscript,
-                    showsLiveModeBadge: showsLiveModeBadge,
-                    onStop: onStop
+                    showsLiveModeBadge: showsLiveModeBadge
                 )
 
                 ChatInputBar(
@@ -341,7 +337,6 @@ private struct AgentSessionBar: View {
     let projectName: String
     let isLiveMode: Bool
     let showsLiveModeBadge: Bool
-    let onStop: () -> Void
 
     var body: some View {
         HStack(spacing: 8) {
@@ -359,20 +354,10 @@ private struct AgentSessionBar: View {
                     .padding(.vertical, 4)
                     .background(.purple.opacity(0.12), in: Capsule())
             }
-
-            Spacer()
-
-            Button(action: onStop) {
-                Label(L10n.stopAgent, systemImage: "stop.fill")
-                    .labelStyle(.iconOnly)
-                    .font(.caption)
-                    .foregroundStyle(.red)
-            }
-            .buttonStyle(.plain)
-            .help(L10n.stopAgent)
         }
         .padding(.horizontal, 16)
         .padding(.bottom, 4)
+        .frame(maxWidth: .infinity, alignment: .leading)
     }
 }
 

@@ -100,6 +100,12 @@ struct ContentView: View {
 
         ToolbarSpacer(.flexible, placement: .automatic)
 
+        if shouldShowNewChatButton {
+            ToolbarItem(placement: .automatic) {
+                newChatToolbarButton
+            }
+        }
+
         if shouldShowAgentSidebarToggle {
             ToolbarItem(placement: .automatic) {
                 agentSidebarToggle
@@ -143,6 +149,16 @@ struct ContentView: View {
         }
         .help(L10n.agent)
         .accessibilityLabel(L10n.agent)
+    }
+
+    private var newChatToolbarButton: some View {
+        Button(action: viewModel.stopAgent) {
+            Label(L10n.newChat, systemImage: "plus")
+                .foregroundStyle(.secondary)
+                .labelStyle(.iconOnly)
+        }
+        .help(L10n.newChat)
+        .accessibilityLabel(L10n.newChat)
     }
 
     private var historyNavigationControls: some View {
@@ -193,6 +209,10 @@ struct ContentView: View {
 
     private var shouldShowAgentSidebarToggle: Bool {
         appSettings.agentEnabled && sidebarViewModel.selectedDestination != .ask
+    }
+
+    private var shouldShowNewChatButton: Bool {
+        appSettings.agentEnabled && viewModel.agentService != nil
     }
 
     private var currentNavigationState: ContentNavigationState {
