@@ -7,33 +7,31 @@ final class SummaryProgressState {
         case pending
         case running
         case completed
+        case skipped
         case failed(String)
 
         var isTerminal: Bool {
             switch self {
-            case .completed, .failed: true
+            case .completed, .skipped, .failed: true
             default: false
             }
         }
     }
 
     var isVisible = false
-    var screenshotExport: StepStatus?
-    var transcriptExport: StepStatus = .pending
+    var vaultExport: StepStatus = .pending
     var summaryGeneration: StepStatus = .pending
     var driveExport: StepStatus?
 
     /// 全ステップが完了またはスキップ済みか。
     var isAllDone: Bool {
-        (screenshotExport?.isTerminal ?? true)
-            && transcriptExport.isTerminal
+        vaultExport.isTerminal
             && summaryGeneration.isTerminal
             && (driveExport?.isTerminal ?? true)
     }
 
     func reset() {
-        screenshotExport = nil
-        transcriptExport = .pending
+        vaultExport = .pending
         summaryGeneration = .pending
         driveExport = nil
     }

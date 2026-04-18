@@ -1023,31 +1023,33 @@ final class CaptionViewModel: ObservableObject {
         summaryError = nil
         summaryWarning = nil
         lastSummaryURL = nil
-        summaryProgress.show()
 
         do {
             let dbQueue = currentDbQueue
+            let projectId = currentProjectId
+            let repo = dbQueue.map { MeetingRepository(dbQueue: $0) }
             var screenshots: [MeetingScreenshotRecord] = []
-            if let queue = dbQueue {
-                let repo = MeetingRepository(dbQueue: queue)
+            var googleDriveFolderId: String?
+            if let repo {
                 screenshots = (try? repo.fetchScreenshots(forMeetingId: meetingId)) ?? []
+                if let projectId,
+                   let project = try repo.fetchProject(id: projectId),
+                   let folderId = project.googleDriveFolderId?.trimmingCharacters(in: .whitespacesAndNewlines),
+                   !folderId.isEmpty {
+                    googleDriveFolderId = folderId
+                }
             }
 
-            let screenshotsForExport = screenshots
-
-            // Screenshots の書き出し
-            summaryProgress.screenshotExport = screenshots.isEmpty ? nil : .running
-
-            // Transcript の書き出し
-            summaryProgress.transcriptExport = .running
+            summaryProgress.show()
+            if googleDriveFolderId != nil {
+                summaryProgress.driveExport = .pending
+            }
 
             // LLM 要約
             summaryProgress.summaryGeneration = .running
 
-            // LLM 要約とファイル書き出しを並行実行
-            async let summaryResult = SummaryService.generateSummary(
+            let generatedSummary = try await SummaryService.generateSummary(
                 projectURL: projectURL,
-                vaultURL: vaultURL,
                 meetingId: meetingId,
                 createdAt: createdAt,
                 transcriptText: transcriptText,
@@ -1055,48 +1057,7 @@ final class CaptionViewModel: ObservableObject {
                 screenshots: screenshots
             )
 
-            async let fileExport: Void = exportTranscriptAndScreenshotsWithProgress(
-                vaultURL: vaultURL,
-                meetingId: meetingId,
-                projectName: projectName,
-                createdAt: createdAt,
-                segments: segments,
-                screenshots: screenshotsForExport
-            )
-
-            let generatedSummary = try await summaryResult
-            summaryProgress.summaryGeneration = .completed
-
-            _ = await fileExport
-
-            if let dbQueue, let currentProjectId {
-                let repo = MeetingRepository(dbQueue: dbQueue)
-                if let project = try repo.fetchProject(id: currentProjectId),
-                   let folderId = project.googleDriveFolderId,
-                   !folderId.isEmpty {
-                    summaryProgress.driveExport = .running
-                    do {
-                        try await GoogleDriveSummaryExportService.exportSummary(
-                            folderId: folderId,
-                            meetingId: meetingId,
-                            projectId: currentProjectId,
-                            fileName: generatedSummary.fileName,
-                            markdown: generatedSummary.markdown
-                        )
-                        summaryProgress.driveExport = .completed
-                    } catch {
-                        let warning = GoogleAuthErrorFormatter.message(
-                            for: error,
-                            defaultMessage: L10n.googleDriveExportFailed
-                        )
-                        summaryWarning = warning
-                        summaryProgress.driveExport = .failed(warning)
-                    }
-                }
-            }
-
-            if let dbQueue {
-                let repo = MeetingRepository(dbQueue: dbQueue)
+            if let repo {
                 try repo.applyGeneratedSummary(
                     toMeetingId: meetingId,
                     title: generatedSummary.title,
@@ -1105,15 +1066,65 @@ final class CaptionViewModel: ObservableObject {
                     actionItems: generatedSummary.actionItems
                 )
             }
+            summaryProgress.summaryGeneration = .completed
             if currentMeetingId == meetingId {
                 currentMeetingSummary = generatedSummary.summary
-                lastSummaryURL = generatedSummary.fileURL
-                if let dbQueue {
-                    let repo = MeetingRepository(dbQueue: dbQueue)
-                    currentMeetingActionItems = (try? repo.fetchActionItems(forMeetingId: meetingId)) ?? []
-                } else {
-                    currentMeetingActionItems = []
+                currentMeetingActionItems = (try? repo?.fetchActionItems(forMeetingId: meetingId)) ?? []
+            }
+
+            summaryProgress.vaultExport = .running
+            if googleDriveFolderId != nil {
+                summaryProgress.driveExport = .running
+            }
+
+            async let vaultExport: URL = VaultSummaryExportService.exportSummaryBundle(
+                projectURL: projectURL,
+                vaultURL: vaultURL,
+                meetingId: meetingId,
+                createdAt: createdAt,
+                projectName: projectName,
+                segments: segments,
+                screenshots: screenshots,
+                summaryFileName: generatedSummary.fileName,
+                summaryMarkdown: generatedSummary.markdown
+            )
+            let driveExportTask = Task {
+                guard let googleDriveFolderId else { return }
+                try await GoogleDriveSummaryExportService.exportSummary(
+                    folderId: googleDriveFolderId,
+                    meetingId: meetingId,
+                    projectId: projectId,
+                    fileName: generatedSummary.fileName,
+                    markdown: generatedSummary.markdown
+                )
+            }
+
+            do {
+                let fileURL = try await vaultExport
+                summaryProgress.vaultExport = .completed
+                if currentMeetingId == meetingId {
+                    lastSummaryURL = fileURL
                 }
+            } catch {
+                summaryProgress.vaultExport = .failed(error.localizedDescription)
+                if currentMeetingId == meetingId {
+                    summaryError = error.localizedDescription
+                }
+                ErrorReportingService.capture(error, context: ["source": "vaultSummaryExport"])
+            }
+
+            do {
+                try await driveExportTask.value
+                if googleDriveFolderId != nil {
+                    summaryProgress.driveExport = .completed
+                }
+            } catch {
+                let warning = GoogleAuthErrorFormatter.message(
+                    for: error,
+                    defaultMessage: L10n.googleDriveExportFailed
+                )
+                summaryWarning = warning
+                summaryProgress.driveExport = .failed(warning)
             }
         } catch {
             if currentMeetingId == meetingId {
@@ -1121,6 +1132,10 @@ final class CaptionViewModel: ObservableObject {
                 requestShowSummaryTab = false
             }
             summaryProgress.summaryGeneration = .failed(error.localizedDescription)
+            summaryProgress.vaultExport = .skipped
+            if summaryProgress.driveExport != nil {
+                summaryProgress.driveExport = .skipped
+            }
             ErrorReportingService.capture(error, context: ["source": "summaryGeneration"])
         }
 
@@ -1189,42 +1204,6 @@ final class CaptionViewModel: ObservableObject {
 
         _ = await transcriptPath
         _ = await screenshotExport
-    }
-
-    /// transcript と screenshot をファイルに書き出し、進捗トーストを更新する。
-    private func exportTranscriptAndScreenshotsWithProgress(
-        vaultURL: URL,
-        meetingId: UUID,
-        projectName: String,
-        createdAt: Date,
-        segments: [TranscriptSegment],
-        screenshots: [MeetingScreenshotRecord]
-    ) async {
-        async let transcriptPath = Task.detached {
-            try? TranscriptExportService.exportTranscript(
-                vaultURL: vaultURL,
-                meetingId: meetingId,
-                projectName: projectName,
-                createdAt: createdAt,
-                segments: segments
-            )
-        }.value
-
-        async let screenshotExport: Void = Task.detached {
-            guard !screenshots.isEmpty else { return }
-            _ = try? ScreenshotExportService.exportScreenshots(
-                vaultURL: vaultURL,
-                screenshots: screenshots
-            )
-        }.value
-
-        _ = await transcriptPath
-        summaryProgress.transcriptExport = .completed
-
-        _ = await screenshotExport
-        if !screenshots.isEmpty {
-            summaryProgress.screenshotExport = .completed
-        }
     }
 
     func clearText() {

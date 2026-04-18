@@ -10,11 +10,8 @@ struct SummaryProgressToastView: View {
                 .font(.system(size: 12, weight: .semibold))
                 .foregroundStyle(.primary)
 
-            if let screenshotStatus = state.screenshotExport {
-                StepRow(label: "Screenshots の書き出し", status: screenshotStatus)
-            }
-            StepRow(label: "Transcript の書き出し", status: state.transcriptExport)
             StepRow(label: "要約の生成", status: state.summaryGeneration)
+            StepRow(label: "Vault へ書き出し", status: state.vaultExport)
             if let driveStatus = state.driveExport {
                 StepRow(label: "Google Drive へ書き出し", status: driveStatus)
             }
@@ -56,6 +53,10 @@ private struct StepRow: View {
             Image(systemName: "checkmark.circle.fill")
                 .font(.system(size: 12))
                 .foregroundStyle(.green)
+        case .skipped:
+            Image(systemName: "minus.circle")
+                .font(.system(size: 12))
+                .foregroundStyle(.tertiary)
         case .failed:
             Image(systemName: "xmark.circle.fill")
                 .font(.system(size: 12))
@@ -67,7 +68,7 @@ private struct StepRow: View {
         switch status {
         case .pending: .secondary
         case .running: .primary
-        case .completed: .secondary
+        case .completed, .skipped: .secondary
         case .failed: .red
         }
     }

@@ -1,9 +1,8 @@
 import Foundation
 
-/// 文字起こしテキストを LLM で要約し、Obsidian 互換の Markdown ファイルとして保存するサービス。
+/// 文字起こしテキストを LLM で要約し、Obsidian 互換の Markdown を生成するサービス。
 enum SummaryService {
     struct GeneratedSummary {
-        let fileURL: URL
         let fileName: String
         let markdown: String
         let title: String
@@ -24,13 +23,10 @@ enum SummaryService {
         return f
     }()
 
-    /// 要約を生成して Markdown ファイルとして書き出す。
-    /// プロジェクトがある場合はそのフォルダ直下、ない場合は vault 直下へ保存する。
-    /// - Returns: 生成された `.md` ファイルの URL。
+    /// 要約を生成し、Markdown と関連メタデータを返す。
     @MainActor
     static func generateSummary(
         projectURL: URL?,
-        vaultURL: URL,
         meetingId: UUID,
         createdAt: Date,
         transcriptText: String,
@@ -131,23 +127,14 @@ enum SummaryService {
         let frontmatter = "---\n\(frontmatterFields)\n---"
 
         let markdown = frontmatter + "\n\n" + result.summary + "\n"
-
-        // 同じ meeting_id の要約ファイルが既に存在すればそのパスに上書きする
-        let fileURL: URL
-        if let existing = findSummaryFile(projectURL: projectURL, vaultURL: vaultURL, meetingId: meetingId) {
-            fileURL = existing
-        } else {
-            let datePrefix = dateFormatter.string(from: createdAt)
-            let fileName = summaryFileName(datePrefix: datePrefix, title: result.title, meetingId: meetingId)
-            let directoryURL = projectURL ?? vaultURL
-            try FileManager.default.createDirectory(at: directoryURL, withIntermediateDirectories: true)
-            fileURL = directoryURL.appendingPathComponent("\(fileName).md")
-        }
-        try Data(markdown.utf8).write(to: fileURL, options: .atomic)
+        let fileName = summaryFileName(
+            datePrefix: dateFormatter.string(from: createdAt),
+            title: result.title,
+            meetingId: meetingId
+        ) + ".md"
 
         return GeneratedSummary(
-            fileURL: fileURL,
-            fileName: fileURL.lastPathComponent,
+            fileName: fileName,
             markdown: markdown,
             title: result.title,
             summary: result.summary,
