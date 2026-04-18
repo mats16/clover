@@ -100,6 +100,8 @@
 "Transcript Mode" = "Transcript Mode";
 "Run Claude Code in the project directory." = "Run Claude Code in the project directory.";
 "Continuously feed transcript to Claude Code." = "Continuously feed transcript to Claude Code.";
+"Ask Agent" = "Ask Agent";
+"Ask anything about your project or transcript…" = "Ask anything about your project or transcript…";
 "Start Agent" = "Start";
 "Stop Agent" = "Stop";
 "Live mode" = "Live mode";

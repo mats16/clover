@@ -148,6 +148,11 @@ enum L10n {
         localized: "Continuously feed transcript to Claude Code.",
         bundle: bundle
     ) }
+    static var askAgent: String { String(localized: "Ask Agent", bundle: bundle) }
+    static var agentAskPlaceholder: String { String(
+        localized: "Ask anything about your project or transcript…",
+        bundle: bundle
+    ) }
     static var startAgent: String { String(localized: "Start Agent", bundle: bundle) }
     static var stopAgent: String { String(localized: "Stop Agent", bundle: bundle) }
     static var agentLiveMode: String { String(localized: "Live mode", bundle: bundle) }

@@ -100,6 +100,8 @@
 "Transcript Mode" = "文字起こしモード";
 "Run Claude Code in the project directory." = "プロジェクトディレクトリで Claude Code を実行します。";
 "Continuously feed transcript to Claude Code." = "文字起こしを継続的に Claude Code に入力します。";
+"Ask Agent" = "Ask Agent";
+"Ask anything about your project or transcript…" = "プロジェクトや文字起こしについて質問できます…";
 "Start Agent" = "開始";
 "Stop Agent" = "停止";
 "Live mode" = "Live mode";

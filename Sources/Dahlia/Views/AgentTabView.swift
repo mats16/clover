@@ -5,17 +5,22 @@ struct AgentSidebarView: View {
     @ObservedObject var viewModel: CaptionViewModel
     var sidebarViewModel: SidebarViewModel
 
+    private var isAskPage: Bool {
+        sidebarViewModel.selectedDestination == .ask
+    }
+
     var body: some View {
         VStack(spacing: 0) {
             if let service = viewModel.agentService {
                 AgentChatView(
                     service: service,
-                    projectName: headerDirectoryName(service: service)
+                    projectName: headerDirectoryName(service: service),
+                    showsLiveModeBadge: !isAskPage
                 ) {
                     viewModel.stopAgent()
                 }
             } else {
-                AgentLauncherView(viewModel: viewModel, sidebarViewModel: sidebarViewModel)
+                AgentLauncherView(viewModel: viewModel, sidebarViewModel: sidebarViewModel, isAskPage: isAskPage)
             }
         }
     }
@@ -45,6 +50,7 @@ struct AgentSidebarView: View {
 private struct AgentLauncherView: View {
     @ObservedObject var viewModel: CaptionViewModel
     var sidebarViewModel: SidebarViewModel
+    var isAskPage: Bool
     @State private var inputText = ""
     @FocusState private var isTextFieldFocused: Bool
 
@@ -73,6 +79,22 @@ private struct AgentLauncherView: View {
     }
 
     var body: some View {
+        Group {
+            if isAskPage {
+                askPageLauncherContent
+            } else {
+                sidebarLauncherContent
+            }
+        }
+        .frame(maxWidth: .infinity, maxHeight: .infinity)
+        .onAppear {
+            DispatchQueue.main.async {
+                isTextFieldFocused = true
+            }
+        }
+    }
+
+    private var sidebarLauncherContent: some View {
         ZStack(alignment: .bottom) {
             VStack(spacing: 0) {
                 Spacer()
@@ -96,13 +118,25 @@ private struct AgentLauncherView: View {
             }
             .padding(.bottom, AgentFloatingInputMetrics.contentBottomInset)
 
-            agentLauncherInputBar
+            compactLauncherInputBar
                 .padding(.bottom, AgentFloatingInputMetrics.bottomPadding)
         }
-        .frame(maxWidth: .infinity, maxHeight: .infinity)
     }
 
-    private var agentLauncherInputBar: some View {
+    private var askPageLauncherContent: some View {
+        VStack(spacing: 18) {
+            Text(L10n.askAgent)
+                .font(.system(size: 32, weight: .semibold))
+                .kerning(-0.8)
+
+            askPageInputCard
+        }
+        .frame(maxWidth: 620)
+        .padding(.horizontal, 28)
+        .offset(y: 12)
+    }
+
+    private var compactLauncherInputBar: some View {
         HStack(spacing: 8) {
             TextField("メッセージを入力...", text: $inputText)
                 .textFieldStyle(.plain)
@@ -121,22 +155,62 @@ private struct AgentLauncherView: View {
                     launchTranscriptMode()
                 }
             } label: {
-                Image(systemName: hasContent ? "arrow.up.circle.fill" : "waveform.badge.microphone")
+                Image(systemName: hasContent ? "arrow.up.circle.fill" : "waveform.circle.fill")
                     .font(.system(size: 22))
                     .foregroundStyle(hasContent ? Color.accentColor : .purple)
             }
             .buttonStyle(.plain)
-            .help(hasContent ? L10n.agentProjectMode : L10n.agentTranscriptMode)
+            .help(hasContent ? L10n.agentProjectMode : L10n.agentLiveMode)
         }
         .padding(.horizontal, 14)
         .padding(.vertical, 10)
         .background(capsuleInputBarBackground)
         .disabled(isDisabled)
-        .onAppear {
-            DispatchQueue.main.async {
-                isTextFieldFocused = true
+    }
+
+    private var askPageInputCard: some View {
+        ZStack(alignment: .bottomTrailing) {
+            TextField(
+                "",
+                text: $inputText,
+                prompt: Text(L10n.agentAskPlaceholder)
+                    .foregroundStyle(.secondary),
+                axis: .vertical
+            )
+            .textFieldStyle(.plain)
+            .font(.system(size: 15))
+            .lineLimit(4)
+            .focused($isTextFieldFocused)
+            .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
+            .onSubmit {
+                guard hasContent else { return }
+                launchProjectMode()
             }
+
+            Button(action: launchProjectMode) {
+                Image(systemName: "arrow.up")
+                    .font(.system(size: 15, weight: .semibold))
+                    .foregroundStyle(hasContent ? Color.primary : Color.secondary)
+                    .frame(width: 34, height: 34)
+                    .background(
+                        hasContent
+                            ? Color.primary.opacity(0.08)
+                            : Color.secondary.opacity(0.08),
+                        in: Circle()
+                    )
+            }
+            .buttonStyle(.plain)
+            .disabled(!hasContent || isDisabled)
+            .help(L10n.agentProjectMode)
+            .padding(.trailing, 18)
+            .padding(.bottom, 16)
         }
+        .frame(maxWidth: .infinity, minHeight: 108, maxHeight: 132, alignment: .topLeading)
+        .padding(.horizontal, 18)
+        .padding(.top, 18)
+        .padding(.bottom, 14)
+        .background(askPageInputBackground)
+        .accessibilityElement(children: .contain)
     }
 
     private func launchProjectMode() {
@@ -175,6 +249,7 @@ private struct AgentLauncherView: View {
 private struct AgentChatView: View {
     @ObservedObject var service: AgentService
     let projectName: String
+    let showsLiveModeBadge: Bool
     let onStop: () -> Void
     @State private var inputText = ""
 
@@ -242,6 +317,7 @@ private struct AgentChatView: View {
                 AgentSessionBar(
                     projectName: projectName,
                     isLiveMode: service.mode.isTranscript,
+                    showsLiveModeBadge: showsLiveModeBadge,
                     onStop: onStop
                 )
 
@@ -264,6 +340,7 @@ private struct AgentChatView: View {
 private struct AgentSessionBar: View {
     let projectName: String
     let isLiveMode: Bool
+    let showsLiveModeBadge: Bool
     let onStop: () -> Void
 
     var body: some View {
@@ -274,7 +351,7 @@ private struct AgentSessionBar: View {
                 .lineLimit(1)
                 .truncationMode(.middle)
 
-            if isLiveMode {
+            if isLiveMode, showsLiveModeBadge {
                 Text(L10n.agentLiveMode)
                     .font(.caption2.weight(.medium))
                     .foregroundStyle(.purple)
@@ -652,6 +729,16 @@ private var capsuleInputBarBackground: some View {
         .shadow(color: .black.opacity(0.08), radius: 12, y: 6)
         .padding(.horizontal, 12)
         .padding(.vertical, 8)
+}
+
+private var askPageInputBackground: some View {
+    RoundedRectangle(cornerRadius: 30, style: .continuous)
+        .fill(.ultraThinMaterial)
+        .overlay {
+            RoundedRectangle(cornerRadius: 30, style: .continuous)
+                .strokeBorder(.separator.opacity(0.35), lineWidth: 1)
+        }
+        .shadow(color: .black.opacity(0.05), radius: 18, y: 8)
 }
 
 private enum AgentFloatingInputMetrics {
