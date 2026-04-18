@@ -202,11 +202,6 @@ private struct SessionSettingsMenu: View {
         Menu {
             // ── Summary ──
             Section(L10n.summary) {
-                Button("Retry summary", systemImage: "pencil.and.scribble") {
-                    viewModel.triggerManualSummary()
-                }
-                .disabled(viewModel.isSummaryGenerating || !viewModel.canGenerateSummary)
-
                 Menu {
                     Picker(selection: $appSettings.selectedTemplateName) {
                         Text("Auto").tag(AppSettings.autoTemplateName)
