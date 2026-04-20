@@ -6,6 +6,8 @@ import Speech
 /// AudioBufferBridge から受け取った AsyncStream<AnalyzerInput> を SpeechAnalyzer に渡し、
 /// SpeechTranscriber の結果を TranscriptStore に反映する。
 actor SpeechTranscriberService {
+    private nonisolated static let ignoredConfirmedTexts: Set<String> = [".", "あ"]
+
     private var analyzer: SpeechAnalyzer?
     private var transcriber: SpeechTranscriber?
     private var resultTask: Task<Void, Never>?
@@ -17,6 +19,13 @@ actor SpeechTranscriberService {
     init(locale: Locale = Locale(identifier: "ja-JP"), speakerLabel: String? = nil) {
         self.locale = locale
         self.speakerLabel = speakerLabel
+    }
+
+    nonisolated static func normalizedTranscriptText(_ rawText: String) -> String? {
+        let text = rawText.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard !text.isEmpty else { return nil }
+        guard !ignoredConfirmedTexts.contains(text) else { return nil }
+        return text
     }
 
     /// 指定ロケールのモデルがインストール済みか確認し、未インストールならダウンロードする。
@@ -81,9 +90,15 @@ actor SpeechTranscriberService {
                 for try await result in transcriber.results {
                     guard self != nil else { break }
 
-                    let text = String(result.text.characters)
-                        .trimmingCharacters(in: .whitespacesAndNewlines)
-                    guard !text.isEmpty else { continue }
+                    let label = self?.speakerLabel
+                    guard let text = Self.normalizedTranscriptText(String(result.text.characters)) else {
+                        if result.isFinal {
+                            Task { @MainActor in
+                                store.replaceUnconfirmedSegments(with: [], forSource: label)
+                            }
+                        }
+                        continue
+                    }
 
                     let startSeconds = result.range.start.seconds
                     let endSeconds = result.range.end.seconds
@@ -100,15 +115,15 @@ actor SpeechTranscriberService {
                         endTime: endDate,
                         text: text,
                         isConfirmed: result.isFinal,
-                        speakerLabel: self?.speakerLabel
+                        speakerLabel: label
                     )
 
                     if result.isFinal {
                         Task { @MainActor in
+                            store.replaceUnconfirmedSegments(with: [], forSource: label)
                             store.addSegment(segment)
                         }
                     } else {
-                        let label = self?.speakerLabel
                         Task { @MainActor in
                             store.replaceUnconfirmedSegments(with: [segment], forSource: label)
                         }
