@@ -10,6 +10,45 @@ struct CaptionViewModelTests {
     private let testVaultURL = URL(fileURLWithPath: NSTemporaryDirectory(), isDirectory: true)
 
     @Test
+    func systemDefaultMicrophoneSelectionResolvesCurrentDefaultDevice() {
+        var defaultDeviceID = AudioDeviceID(101)
+        let devices = [
+            MicrophoneDevice(id: 101, name: "Poly Sync 20"),
+            MicrophoneDevice(id: 202, name: "MacBook Pro Mic"),
+        ]
+        let viewModel = CaptionViewModel(
+            availableInputDevicesProvider: { devices },
+            defaultInputDeviceIDProvider: { defaultDeviceID }
+        )
+
+        #expect(viewModel.microphoneSelection == .systemDefault)
+        #expect(viewModel.selectedMicrophoneID == 101)
+
+        defaultDeviceID = 202
+
+        #expect(viewModel.selectedMicrophoneID == 202)
+    }
+
+    @Test
+    func missingSelectedMicrophoneFallsBackToSystemDefaultSelection() {
+        var availableDevices = [
+            MicrophoneDevice(id: 101, name: "Poly Sync 20"),
+            MicrophoneDevice(id: 202, name: "MacBook Pro Mic"),
+        ]
+        let viewModel = CaptionViewModel(
+            availableInputDevicesProvider: { availableDevices },
+            defaultInputDeviceIDProvider: { 202 }
+        )
+
+        viewModel.microphoneSelection = .device(101)
+        availableDevices = [MicrophoneDevice(id: 202, name: "MacBook Pro Mic")]
+        viewModel.refreshAvailableMicrophones()
+
+        #expect(viewModel.microphoneSelection == .systemDefault)
+        #expect(viewModel.selectedMicrophoneID == 202)
+    }
+
+    @Test
     func selectingActiveRecordingMeetingKeepsLiveTranscriptStore() throws {
         let viewModel = CaptionViewModel()
         let dbQueue = try DatabaseQueue(path: ":memory:")

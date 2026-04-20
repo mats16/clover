@@ -187,6 +187,8 @@ enum L10n {
     static var systemAudio: String { String(localized: "System Audio", bundle: bundle) }
     static var both: String { String(localized: "Both", bundle: bundle) }
     static var none: String { String(localized: "None", bundle: bundle) }
+    static var sameAsSystem: String { String(localized: "Same as System", bundle: bundle) }
+    static func sameAsSystem(_ deviceName: String) -> String { String(localized: "Same as System (\(deviceName))", bundle: bundle) }
     static var noComputerAudio: String { String(localized: "No computer audio", bundle: bundle) }
     static var recordComputerAudio: String { String(localized: "Record computer audio", bundle: bundle) }
 

@@ -1,7 +1,7 @@
 import SwiftUI
 
 /// ミーティング詳細ヘッダーの下に配置するメタデータバー。
-/// タグチップ群 + プロジェクトピッカーを横並びで表示する。
+/// タグチップ群を横並びで表示する。
 struct MeetingMetadataBar: View {
     @ObservedObject var viewModel: CaptionViewModel
     var sidebarViewModel: SidebarViewModel
@@ -14,7 +14,6 @@ struct MeetingMetadataBar: View {
 
     var body: some View {
         HStack(spacing: 8) {
-            MeetingProjectPicker(viewModel: viewModel, sidebarViewModel: sidebarViewModel)
             MeetingTagsView(viewModel: viewModel, tags: tags, sidebarViewModel: sidebarViewModel)
             Spacer(minLength: 0)
         }
@@ -218,9 +217,15 @@ private struct TagChip: View {
 
 // MARK: - Project Picker
 
-private struct MeetingProjectPicker: View {
+struct MeetingProjectPicker: View {
+    enum Style {
+        case regular
+        case compact
+    }
+
     @ObservedObject var viewModel: CaptionViewModel
     var sidebarViewModel: SidebarViewModel
+    var style: Style = .regular
 
     @State private var showProjectPopover = false
     @State private var projectInput = ""
@@ -256,7 +261,7 @@ private struct MeetingProjectPicker: View {
     }
 
     var body: some View {
-        HStack(spacing: 4) {
+        HStack(spacing: style == .compact ? 3 : 4) {
             ZStack {
                 Image(systemName: "folder")
                     .font(.caption2)
@@ -280,8 +285,11 @@ private struct MeetingProjectPicker: View {
 
             Button(action: presentProjectPopover) {
                 HStack(spacing: 4) {
-                    Text(currentProjectName ?? L10n.noProject)
-                        .font(.caption.weight(.medium))
+                    if style == .regular {
+                        Text(currentProjectName ?? L10n.noProject)
+                            .font(.caption.weight(.medium))
+                            .lineLimit(1)
+                    }
                     Image(systemName: "chevron.down")
                         .font(.system(size: 8, weight: .medium))
                 }
@@ -289,18 +297,20 @@ private struct MeetingProjectPicker: View {
             .buttonStyle(.plain)
         }
         .foregroundStyle(.secondary)
-        .padding(.horizontal, 8)
+        .padding(.horizontal, style == .compact ? 6 : 8)
         .padding(.vertical, 3)
         .background(
             Capsule()
                 .fill(Color.primary.opacity(0.05))
         )
+        .fixedSize(horizontal: true, vertical: false)
         .onHover { hovering in
             isHovered = hovering
         }
         .popover(isPresented: $showProjectPopover, arrowEdge: .bottom) {
             projectPopoverContent
         }
+        .help(currentProjectName ?? L10n.noProject)
     }
 
     private func presentProjectPopover() {
