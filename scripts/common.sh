@@ -31,5 +31,5 @@ codesign_path() {
     local path="$1"
     shift
 
-    codesign --force --sign "$SIGN_IDENTITY" "$@" "$path"
+    codesign --force --timestamp --options runtime --sign "$SIGN_IDENTITY" "$@" "$path"
 }

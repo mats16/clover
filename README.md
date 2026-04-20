@@ -32,11 +32,25 @@ swift build && swift run
 # Build release .app bundle
 ./scripts/build-app.sh && open Dahlia.app
 
+# Build, notarize, staple, and repack release archive
+./scripts/notarize.sh
+
 # Lint
 ./scripts/lint.sh
 ```
 
 > **Note:** `swift run` produces an unsigned binary and cannot use Data Protection Keychain. Use `run-dev.sh` for full functionality.
+
+Before the first notarization run, create a notarytool keychain profile:
+
+```bash
+xcrun notarytool store-credentials "dahlia-notary" \
+  --apple-id "YOUR_APPLE_ID" \
+  --team-id "YOUR_TEAM_ID" \
+  --password "APP_SPECIFIC_PASSWORD"
+```
+
+`./scripts/notarize.sh` uses `NOTARY_PROFILE` (default: `dahlia-notary`) and produces a stapled `Dahlia.zip` ready for distribution.
 
 ## Architecture
 

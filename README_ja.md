@@ -32,11 +32,25 @@ swift build && swift run
 # リリース用 .app バンドルのビルド
 ./scripts/build-app.sh && open Dahlia.app
 
+# リリースビルド + notarization + staple + 配布用 zip 再作成
+./scripts/notarize.sh
+
 # Lint
 ./scripts/lint.sh
 ```
 
 > **注意:** `swift run` は署名なしバイナリのため Data Protection Keychain を使用できません。フル機能を利用するには `run-dev.sh` を使用してください。
+
+notarization の初回実行前に、`notarytool` のキーチェーンプロファイルを作成してください。
+
+```bash
+xcrun notarytool store-credentials "dahlia-notary" \
+  --apple-id "YOUR_APPLE_ID" \
+  --team-id "YOUR_TEAM_ID" \
+  --password "APP_SPECIFIC_PASSWORD"
+```
+
+`./scripts/notarize.sh` は `NOTARY_PROFILE` 環境変数（既定値: `dahlia-notary`）を使い、staple 済みの `Dahlia.zip` を作成します。
 
 ## アーキテクチャ
 

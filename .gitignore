@@ -1,6 +1,7 @@
 .build/
 .swiftpm/
 *.app
+Dahlia.zip
 DerivedData/
 .DS_Store
 .env.local
