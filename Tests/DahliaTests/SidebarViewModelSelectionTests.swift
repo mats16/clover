@@ -117,7 +117,7 @@ struct SidebarViewModelSelectionTests {
                 id: .v7(),
                 vaultId: UUID.v7(),
                 name: "customer_meeting",
-                content: AppSettings.defaultOutputFormat,
+                content: AppSettings.defaultSummaryPrompt,
                 createdAt: Date(),
                 updatedAt: Date()
             )
@@ -241,7 +241,7 @@ final class SidebarViewModelSelectionTests: XCTestCase {
                 id: .v7(),
                 vaultId: UUID.v7(),
                 name: "customer_meeting",
-                content: AppSettings.defaultOutputFormat,
+                content: AppSettings.defaultSummaryPrompt,
                 createdAt: Date(),
                 updatedAt: Date()
             )

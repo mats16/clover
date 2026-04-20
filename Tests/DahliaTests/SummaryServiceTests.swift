@@ -132,14 +132,15 @@ struct SummaryServiceTests {
         let instruction = try repository.createInstruction(
             vaultId: vault.id,
             name: "customer_meeting",
-            content: "# Output Format\n- Follow up"
+            content: AppSettings.defaultSummaryPrompt + "\n\n# Extra\n- Follow up"
         )
         AppSettings.shared.currentVault = vault
         AppSettings.shared.selectedInstructionID = instruction.id
 
         let prompt = SummaryService.resolvedSummaryPrompt(settings: AppSettings.shared, repository: repository)
 
-        #expect(prompt == AppSettings.summaryPromptPreamble + "\n\n" + instruction.content)
+        #expect(prompt == instruction.content.trimmingCharacters(in: .whitespacesAndNewlines))
     }
+
 }
 #endif

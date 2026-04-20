@@ -169,11 +169,13 @@ struct InstructionsWorkspaceView: View {
     }
 
     private func instructionRow(_ instruction: InstructionRecord) -> some View {
-        HStack(alignment: .top, spacing: 10) {
+        let isSelected = sidebarViewModel.selectedInstruction?.id == instruction.id
+
+        return HStack(alignment: .top, spacing: 10) {
             VStack(alignment: .leading, spacing: 4) {
                 HStack(spacing: 6) {
-                    Text(instruction.name.replacingOccurrences(of: "_", with: " "))
-                        .font(.body.weight(sidebarViewModel.selectedInstruction?.id == instruction.id ? .semibold : .regular))
+                    Text(instruction.displayName)
+                        .font(.body.weight(isSelected ? .semibold : .regular))
                         .foregroundStyle(.primary)
                         .lineLimit(1)
 
@@ -198,7 +200,7 @@ struct InstructionsWorkspaceView: View {
         .frame(maxWidth: .infinity, alignment: .leading)
         .background(
             RoundedRectangle(cornerRadius: 12)
-                .fill(sidebarViewModel.selectedInstruction?.id == instruction.id ? Color.primary.opacity(0.08) : Color.clear)
+                .fill(isSelected ? Color.primary.opacity(0.08) : Color.clear)
         )
     }
 

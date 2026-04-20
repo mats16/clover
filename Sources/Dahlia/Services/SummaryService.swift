@@ -229,26 +229,24 @@ enum SummaryService {
 
     /// 選択中 instruction の内容を DB から解決する。
     /// Auto モード時はデフォルトプロンプト全体を返す。
-    /// instruction 選択時は preamble + instruction 内容（Output Format セクション）を結合して返す。
+    /// instruction 選択時は instruction 本文をそのまま使う。
     @MainActor
     static func resolvedSummaryPrompt(settings: AppSettings, repository: MeetingRepository? = nil) -> String {
-        let preamble = AppSettings.summaryPromptPreamble
-
         // Auto モード
         guard let selectedInstructionID = settings.selectedInstructionID,
               let vaultId = settings.currentVault?.id else {
-            return preamble + "\n\n" + AppSettings.defaultOutputFormat
+            return AppSettings.defaultSummaryPrompt
         }
 
-        // カスタム instruction: DB から Output Format セクションを読み込む
-        if let instruction = (try? repository?.fetchInstruction(id: selectedInstructionID)) ?? nil,
+        // カスタム instruction: DB から全文プロンプトを読み込む
+        if let instruction = try? repository?.fetchInstruction(id: selectedInstructionID),
            instruction.vaultId == vaultId,
            !instruction.content.isEmpty {
-            return preamble + "\n\n" + instruction.content
+            return instruction.content.trimmingCharacters(in: .whitespacesAndNewlines)
         }
 
         // フォールバック: デフォルト
-        return preamble + "\n\n" + AppSettings.defaultOutputFormat
+        return AppSettings.defaultSummaryPrompt
     }
 
     /// プロジェクトフォルダ直下の CONTEXT.md を読み込む。存在しないか空なら nil。

@@ -208,7 +208,7 @@ private struct SessionSettingsMenu: View {
                         Divider()
 
                         ForEach(sidebarViewModel.allInstructions) { instruction in
-                            Text(instruction.name.replacingOccurrences(of: "_", with: " ")).tag(instruction.id.uuidString)
+                            Text(instruction.displayName).tag(instruction.id.uuidString)
                         }
                     } label: {
                         EmptyView()

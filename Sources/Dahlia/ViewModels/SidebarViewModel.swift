@@ -568,7 +568,7 @@ final class SidebarViewModel {
             let instruction = try meetingRepository.createInstruction(
                 vaultId: vault.id,
                 name: nextInstructionName(),
-                content: AppSettings.defaultOutputFormat
+                content: AppSettings.defaultSummaryPrompt
             )
             selectedInstruction = instruction
             return instruction

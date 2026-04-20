@@ -209,7 +209,7 @@ final class AppSettings: ObservableObject {
     // MARK: - Summary Prompt 定数
 
     /// ベースプロンプト（`# Output Format` より前の共通部分）。
-    nonisolated static let summaryPromptPreamble = """
+    private nonisolated static let summaryPromptPreamble = """
     # Role and Objective
     <task>
     You are a meeting analyst. Extract a structured summary from the provided <transcript>.
@@ -245,7 +245,7 @@ final class AppSettings: ObservableObject {
     """
 
     /// Auto モード時のデフォルト Output Format セクション。
-    nonisolated static let defaultOutputFormat = """
+    private nonisolated static let defaultOutputFormat = """
     # Output Format
 
     <summary_template>

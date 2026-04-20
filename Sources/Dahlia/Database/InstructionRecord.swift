@@ -11,4 +11,6 @@ struct InstructionRecord: Codable, FetchableRecord, PersistableRecord, Identifia
     var content: String
     var createdAt: Date
     var updatedAt: Date
+
+    var displayName: String { name.replacingOccurrences(of: "_", with: " ") }
 }

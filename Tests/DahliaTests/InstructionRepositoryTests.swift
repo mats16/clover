@@ -29,7 +29,7 @@ struct InstructionRepositoryTests {
         let created = try repository.createInstruction(
             vaultId: firstVault.id,
             name: "customer_meeting",
-            content: AppSettings.defaultOutputFormat
+            content: AppSettings.defaultSummaryPrompt
         )
         _ = try repository.createInstruction(
             vaultId: secondVault.id,
@@ -38,7 +38,7 @@ struct InstructionRepositoryTests {
         )
 
         #expect(try repository.fetchInstructions(vaultId: firstVault.id).map(\.id) == [created.id])
-        #expect(created.content == AppSettings.defaultOutputFormat)
+        #expect(created.content == AppSettings.defaultSummaryPrompt)
 
         try repository.updateInstruction(
             id: created.id,
@@ -83,7 +83,7 @@ final class InstructionRepositoryTests: XCTestCase {
         let created = try repository.createInstruction(
             vaultId: firstVault.id,
             name: "customer_meeting",
-            content: AppSettings.defaultOutputFormat
+            content: AppSettings.defaultSummaryPrompt
         )
         _ = try repository.createInstruction(
             vaultId: secondVault.id,
@@ -92,7 +92,7 @@ final class InstructionRepositoryTests: XCTestCase {
         )
 
         XCTAssertEqual(try repository.fetchInstructions(vaultId: firstVault.id).map(\.id), [created.id])
-        XCTAssertEqual(created.content, AppSettings.defaultOutputFormat)
+        XCTAssertEqual(created.content, AppSettings.defaultSummaryPrompt)
 
         try repository.updateInstruction(
             id: created.id,

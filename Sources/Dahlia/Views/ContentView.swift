@@ -65,15 +65,10 @@ struct ContentView: View {
                 sidebarViewModel.clearProjectSelection()
                 sidebarViewModel.deselectProject()
             }
-            if oldValue != .actionItems, newValue == .actionItems {
+            if newValue == .actionItems || newValue == .instructions,
+               oldValue != newValue {
                 sidebarViewModel.clearProjectSelection()
                 sidebarViewModel.deselectProject()
-                sidebarViewModel.clearMeetingSelection()
-            }
-            if oldValue != .instructions, newValue == .instructions {
-                sidebarViewModel.clearProjectSelection()
-                sidebarViewModel.deselectProject()
-                sidebarViewModel.clearMeetingSelection()
             }
         }
         .onChange(of: viewModel.currentMeetingId) { oldId, newId in
