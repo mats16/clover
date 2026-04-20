@@ -69,12 +69,19 @@ final class AgentService: ObservableObject {
     private var cancellable: AnyCancellable?
     private var readTask: Task<Void, Never>?
 
+    /// content_block_delta のスロットリング用バッファ。
+    private var pendingDeltaText = ""
+    private var deltaFlushTask: Task<Void, Never>?
+
+    /// toolUseId → messages 配列インデックスの O(1) ルックアップ。
+    private var toolUseIndexByToolId: [String: Int] = [:]
+
     private let logger = Logger(subsystem: "com.dahlia", category: "AgentService")
 
     /// 結果を UI に表示しないツール。
     static let toolsOmitResult: Set = ["Glob", "Grep", "Read", "Write", "Edit", "TodoWrite"]
     /// 入力サマリーを省略するツール。
-    static let toolsOmitInputSummary: Set = ["TodoWrite"]
+    nonisolated static let toolsOmitInputSummary: Set = ["TodoWrite"]
     nonisolated static let defaultLaunchCommand = "claude"
 
     // MARK: - Lifecycle
@@ -165,6 +172,8 @@ final class AgentService: ObservableObject {
         isProcessing = false
         cancellable = nil
         readTask?.cancel()
+        flushPendingDelta()
+        toolUseIndexByToolId.removeAll()
 
         try? stdinPipe?.fileHandleForWriting.close()
 
@@ -245,6 +254,84 @@ final class AgentService: ObservableObject {
         writeToStdin(content: "<transcript>\(text)</transcript>")
     }
 
+    // MARK: - Parsed Event (nonisolated)
+
+    /// stdout 行をメインスレッド外でパースした結果。
+    /// `@unchecked Sendable`: toolInput の `[String: Any]` は JSONSerialization 由来の不変値型のみ含む。
+    enum ParsedEvent: @unchecked Sendable {
+        case assistantText(String)
+        case assistantToolUses(text: String, toolUses: [(name: String, id: String, input: [String: Any], summary: String)])
+        case contentBlockDelta(String)
+        case toolResults([(toolUseId: String, content: String, isError: Bool)])
+        case systemInit
+        case result
+        case error(String)
+    }
+
+    /// stdout の JSON 行をパースし、型付きイベントを返す。メインスレッド外で呼び出す。
+    nonisolated static func parseOutputLine(_ line: String) -> ParsedEvent? {
+        guard let data = line.data(using: .utf8),
+              let json = try? JSONSerialization.jsonObject(with: data) as? [String: Any],
+              let type = json["type"] as? String else {
+            return nil
+        }
+
+        switch type {
+        case "assistant":
+            guard let message = json["message"] as? [String: Any],
+                  let content = message["content"] as? [[String: Any]] else { return nil }
+            let text = content.compactMap { block -> String? in
+                guard block["type"] as? String == "text" else { return nil }
+                return block["text"] as? String
+            }.joined()
+            var toolUses: [(name: String, id: String, input: [String: Any], summary: String)] = []
+            for block in content where block["type"] as? String == "tool_use" {
+                guard let toolName = block["name"] as? String,
+                      let toolUseId = block["id"] as? String else { continue }
+                let toolInput = block["input"] as? [String: Any] ?? [:]
+                let summary = toolInputSummary(toolName: toolName, input: toolInput)
+                toolUses.append((name: toolName, id: toolUseId, input: toolInput, summary: summary))
+            }
+            if !text.isEmpty, toolUses.isEmpty {
+                return .assistantText(text)
+            }
+            if !toolUses.isEmpty {
+                return .assistantToolUses(text: text, toolUses: toolUses)
+            }
+            return text.isEmpty ? nil : .assistantText(text)
+        case "content_block_delta":
+            guard let delta = json["delta"] as? [String: Any],
+                  let text = delta["text"] as? String,
+                  !text.isEmpty else { return nil }
+            return .contentBlockDelta(text)
+        case "user":
+            guard let message = json["message"] as? [String: Any],
+                  let content = message["content"] as? [[String: Any]] else { return nil }
+            var results: [(toolUseId: String, content: String, isError: Bool)] = []
+            for block in content where block["type"] as? String == "tool_result" {
+                guard let toolUseId = block["tool_use_id"] as? String else { continue }
+                let resultContent = (block["content"] as? String) ?? ""
+                let isError = block["is_error"] as? Bool ?? false
+                results.append((toolUseId: toolUseId, content: resultContent, isError: isError))
+            }
+            return results.isEmpty ? nil : .toolResults(results)
+        case "system":
+            if let subtype = json["subtype"] as? String, subtype == "init" {
+                return .systemInit
+            }
+            return nil
+        case "result":
+            return .result
+        case "error":
+            let errorMsg = (json["error"] as? [String: Any])?["message"] as? String
+                ?? json["error"] as? String
+                ?? "Unknown error"
+            return .error(errorMsg)
+        default:
+            return nil
+        }
+    }
+
     // MARK: - Stdout Reading
 
     private func startReadingStdout(_ pipe: Pipe) {
@@ -265,16 +352,22 @@ final class AgentService: ObservableObject {
                     guard let line = String(data: lineData, encoding: .utf8),
                           !line.trimmingCharacters(in: .whitespaces).isEmpty else { continue }
 
-                    await self?.handleOutputLine(line)
+                    if let event = AgentService.parseOutputLine(line) {
+                        await self?.applyEvent(event)
+                    }
                 }
             }
 
             if !buffer.isEmpty, let line = String(data: buffer, encoding: .utf8),
                !line.trimmingCharacters(in: .whitespaces).isEmpty {
-                await self?.handleOutputLine(line)
+                if let event = AgentService.parseOutputLine(line) {
+                    await self?.applyEvent(event)
+                }
             }
         }
     }
+
+    // MARK: - Apply Event (@MainActor)
 
     /// `assistant` 確定イベントが、直前に `content_block_delta` で組み立てた本文と重複することがあるため、同一なら追加しない。
     private func isDuplicateAssistantBubble(comparedTo text: String) -> Bool {
@@ -283,83 +376,75 @@ final class AgentService: ObservableObject {
             == text.trimmingCharacters(in: .whitespacesAndNewlines)
     }
 
-    private func handleOutputLine(_ line: String) {
-        guard let data = line.data(using: .utf8),
-              let json = try? JSONSerialization.jsonObject(with: data) as? [String: Any],
-              let type = json["type"] as? String else {
-            logger.debug("Failed to parse stream-json line")
-            return
-        }
-
-        switch type {
-        case "assistant":
-            if let message = json["message"] as? [String: Any],
-               let content = message["content"] as? [[String: Any]] {
-                let text = content.compactMap { block -> String? in
-                    guard block["type"] as? String == "text" else { return nil }
-                    return block["text"] as? String
-                }.joined()
-                if !text.isEmpty, !isDuplicateAssistantBubble(comparedTo: text) {
-                    messages.append(AgentMessage(role: .assistant, content: text))
-                }
-                // tool_use ブロックを抽出
-                for block in content where block["type"] as? String == "tool_use" {
-                    guard let toolName = block["name"] as? String,
-                          let toolUseId = block["id"] as? String else { continue }
-                    // 重複チェック
-                    if messages.contains(where: { $0.toolCallInfo?.toolUseId == toolUseId }) { continue }
-                    let toolInput = block["input"] as? [String: Any] ?? [:]
-                    let summary = Self.toolInputSummary(toolName: toolName, input: toolInput)
-                    let info = ToolCallInfo(toolName: toolName, toolUseId: toolUseId, toolInput: toolInput)
-                    messages.append(AgentMessage(role: .toolUse, content: summary, toolCallInfo: info))
-                }
+    /// パース済みイベントを @MainActor 上で状態に適用する。
+    private func applyEvent(_ event: ParsedEvent) {
+        switch event {
+        case let .assistantText(text):
+            flushPendingDelta()
+            if !text.isEmpty, !isDuplicateAssistantBubble(comparedTo: text) {
+                messages.append(AgentMessage(role: .assistant, content: text))
             }
-        case "content_block_delta":
-            if let delta = json["delta"] as? [String: Any],
-               let text = delta["text"] as? String,
-               !text.isEmpty {
-                if let lastIndex = messages.indices.last, messages[lastIndex].role == .assistant {
-                    messages[lastIndex].content += text
-                } else {
-                    messages.append(AgentMessage(role: .assistant, content: text))
+        case let .assistantToolUses(text, toolUses):
+            flushPendingDelta()
+            if !text.isEmpty, !isDuplicateAssistantBubble(comparedTo: text) {
+                messages.append(AgentMessage(role: .assistant, content: text))
+            }
+            for toolUse in toolUses {
+                if toolUseIndexByToolId[toolUse.id] != nil { continue }
+                let info = ToolCallInfo(toolName: toolUse.name, toolUseId: toolUse.id, toolInput: toolUse.input)
+                messages.append(AgentMessage(role: .toolUse, content: toolUse.summary, toolCallInfo: info))
+                toolUseIndexByToolId[toolUse.id] = messages.count - 1
+            }
+        case let .contentBlockDelta(text):
+            // 最初のデルタで assistant メッセージがなければ即座に追加
+            if messages.last?.role != .assistant, pendingDeltaText.isEmpty {
+                messages.append(AgentMessage(role: .assistant, content: text))
+                return
+            }
+            pendingDeltaText += text
+            if deltaFlushTask == nil {
+                deltaFlushTask = Task { @MainActor [weak self] in
+                    try? await Task.sleep(for: .milliseconds(50))
+                    self?.flushPendingDelta()
                 }
             }
-        case "user":
-            // tool_result ブロックをマッチする tool_use メッセージにマージ
-            if let message = json["message"] as? [String: Any],
-               let content = message["content"] as? [[String: Any]] {
-                for block in content where block["type"] as? String == "tool_result" {
-                    guard let toolUseId = block["tool_use_id"] as? String else { continue }
-                    let resultContent = (block["content"] as? String) ?? ""
-                    let isError = block["is_error"] as? Bool ?? false
-                    let resultInfo = ToolResultInfo(content: resultContent, isError: isError)
-                    if let idx = messages.lastIndex(where: {
-                        $0.role == .toolUse && $0.toolCallInfo?.toolUseId == toolUseId
-                    }) {
-                        messages[idx].toolCallInfo?.toolResult = resultInfo
-                    }
+        case let .toolResults(results):
+            for result in results {
+                if let idx = toolUseIndexByToolId[result.toolUseId] {
+                    messages[idx].toolCallInfo?.toolResult = ToolResultInfo(
+                        content: result.content,
+                        isError: result.isError
+                    )
                 }
             }
-        case "system":
-            if let subtype = json["subtype"] as? String, subtype == "init" {
-                isProcessing = true
-            }
-        case "result":
+        case .systemInit:
+            isProcessing = true
+        case .result:
+            flushPendingDelta()
             isProcessing = false
-        case "error":
-            let errorMsg = (json["error"] as? [String: Any])?["message"] as? String
-                ?? json["error"] as? String
-                ?? "Unknown error"
+        case let .error(errorMsg):
+            flushPendingDelta()
             messages.append(AgentMessage(role: .error, content: errorMsg))
-        default:
-            break
         }
+    }
+
+    /// バッファされたデルタテキストを messages に反映する。
+    private func flushPendingDelta() {
+        deltaFlushTask?.cancel()
+        deltaFlushTask = nil
+        guard !pendingDeltaText.isEmpty else { return }
+        if let lastIndex = messages.indices.last, messages[lastIndex].role == .assistant {
+            messages[lastIndex].content += pendingDeltaText
+        } else {
+            messages.append(AgentMessage(role: .assistant, content: pendingDeltaText))
+        }
+        pendingDeltaText = ""
     }
 
     // MARK: - Tool Input Summary
 
     /// ツール名と入力パラメータから人間可読なサマリー文字列を返す。
-    static func toolInputSummary(toolName: String, input: [String: Any]) -> String {
+    nonisolated static func toolInputSummary(toolName: String, input: [String: Any]) -> String {
         switch toolName {
         case "Bash":
             return (input["command"] as? String) ?? toolName

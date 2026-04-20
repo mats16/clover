@@ -5,6 +5,7 @@ import SwiftUI
 struct MarkdownContentView: View {
     let markdown: String
     @State private var blocks: [Block] = []
+    @State private var parseTask: Task<Void, Never>?
 
     var body: some View {
         VStack(alignment: .leading, spacing: 4) {
@@ -13,8 +14,19 @@ struct MarkdownContentView: View {
             }
         }
         .textSelection(.enabled)
-        .task(id: markdown) {
+        .onAppear {
             blocks = Self.parseBlocks(markdown)
+        }
+        .onDisappear {
+            parseTask?.cancel()
+        }
+        .onChange(of: markdown) { _, newValue in
+            parseTask?.cancel()
+            parseTask = Task { @MainActor in
+                try? await Task.sleep(for: .milliseconds(100))
+                guard !Task.isCancelled else { return }
+                blocks = Self.parseBlocks(newValue)
+            }
         }
     }
 
