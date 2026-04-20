@@ -306,11 +306,8 @@ private struct SessionSettingsMenu: View {
 
                         Divider()
 
-                        ForEach(viewModel.availableWindows, id: \.windowID) { window in
-                            let appName = window.owningApplication?.applicationName ?? "不明"
-                            let title = window.title ?? ""
-                            let displayName = title.isEmpty ? appName : "\(appName) — \(title)"
-                            Text(displayName).tag(CGWindowID?.some(window.windowID))
+                        ForEach(viewModel.availableWindows) { window in
+                            Text(window.displayName).tag(CGWindowID?.some(window.id))
                         }
                     } label: {
                         EmptyView()

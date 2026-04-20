@@ -79,7 +79,7 @@ final class CaptionViewModel: ObservableObject {
 
     @Published var screenshots: [MeetingScreenshotRecord] = []
     /// キャプチャ対象として選択可能なウィンドウ一覧。
-    @Published var availableWindows: [SCWindow] = []
+    @Published var availableWindows: [ScreenshotWindowOption] = []
     /// 選択中のウィンドウ ID。nil の場合はデスクトップ全体をキャプチャ。
     @Published var selectedWindowID: CGWindowID?
 
@@ -1242,21 +1242,18 @@ final class CaptionViewModel: ObservableObject {
     func refreshAvailableWindows() {
         Task {
             do {
-                let content = try await SCShareableContent.excludingDesktopWindows(true, onScreenWindowsOnly: true)
+                let content = try await SCShareableContent.excludingDesktopWindows(true, onScreenWindowsOnly: false)
                 let myBundleID = Bundle.main.bundleIdentifier
-                self.availableWindows = content.windows
-                    .filter { window in
-                        window.isOnScreen
-                            && window.frame.width > 0
-                            && window.frame.height > 0
-                            && window.windowLayer == 0
-                            && !(window.title ?? "").isEmpty
-                            && window.owningApplication?.bundleIdentifier != myBundleID
-                    }
-                    .sorted { ($0.owningApplication?.applicationName ?? "") < ($1.owningApplication?.applicationName ?? "") }
+                let newWindows = ScreenshotWindowOption.build(
+                    from: content.windows.map(ScreenshotWindowOption.Snapshot.init(window:)),
+                    excludingBundleID: myBundleID
+                )
+                if newWindows != self.availableWindows {
+                    self.availableWindows = newWindows
+                }
                 // 選択中のウィンドウが一覧から消えていたらリセット
                 if let id = selectedWindowID,
-                   !self.availableWindows.contains(where: { $0.windowID == id }) {
+                   !self.availableWindows.contains(where: { $0.id == id }) {
                     selectedWindowID = nil
                 }
             } catch {
@@ -1273,7 +1270,7 @@ final class CaptionViewModel: ObservableObject {
 
         Task {
             do {
-                let content = try await SCShareableContent.excludingDesktopWindows(false, onScreenWindowsOnly: true)
+                let content = try await SCShareableContent.excludingDesktopWindows(false, onScreenWindowsOnly: false)
 
                 let filter: SCContentFilter
                 let config = SCScreenshotConfiguration()

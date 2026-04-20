@@ -122,7 +122,7 @@
 
 /* Settings (Agent) */
 "Launch Command" = "起動コマンド";
-"Command used to launch the agent from your PATH. Default: `claude`." = "PATH からエージェントを起動するコマンドです。デフォルトは `claude` です。";
+"Command used to launch the agent from your PATH. Default: `claude`." = "PATH からエージェントを起動するコマンドです。デフォルトは `/Users/{user_name}/.local/bin/claude` です。";
 
 /* Audio Source Mode */
 "Audio source" = "音声ソース";

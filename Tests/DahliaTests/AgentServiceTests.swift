@@ -9,7 +9,7 @@ struct AgentServiceTests {
     func resolveLaunchArgumentsFallsBackToClaudeWhenBlank() {
         let arguments = AgentService.resolveLaunchArguments(from: "   ")
 
-        #expect(arguments == ["claude"])
+        #expect(arguments == [AgentService.defaultLaunchCommand])
     }
 
     @Test
@@ -126,7 +126,7 @@ import XCTest
 
 final class AgentServiceTests: XCTestCase {
     func testResolveLaunchArgumentsFallsBackToClaudeWhenBlank() {
-        XCTAssertEqual(AgentService.resolveLaunchArguments(from: "   "), ["claude"])
+        XCTAssertEqual(AgentService.resolveLaunchArguments(from: "   "), [AgentService.defaultLaunchCommand])
     }
 
     func testResolveLaunchArgumentsSplitsCommandAndArguments() {

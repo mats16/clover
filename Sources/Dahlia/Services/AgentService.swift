@@ -82,7 +82,7 @@ final class AgentService: ObservableObject {
     static let toolsOmitResult: Set = ["Glob", "Grep", "Read", "Write", "Edit", "TodoWrite"]
     /// 入力サマリーを省略するツール。
     nonisolated static let toolsOmitInputSummary: Set = ["TodoWrite"]
-    nonisolated static let defaultLaunchCommand = "claude"
+    nonisolated static let defaultLaunchCommand = AppSettings.defaultAgentLaunchCommand
 
     // MARK: - Lifecycle
 
