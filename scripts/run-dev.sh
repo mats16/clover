@@ -37,6 +37,7 @@ mkdir -p "${CONTENTS}/Resources"
 cp "${BUILD_DIR}/${APP_NAME}" "${MACOS}/${APP_NAME}"
 cp "Resources/Info.plist" "${CONTENTS}/Info.plist"
 configure_google_calendar_plist "${CONTENTS}/Info.plist"
+configure_sentry_plist "${CONTENTS}/Info.plist"
 
 mkdir -p "$ICONSET_DIR"
 sips -z 16 16     "$ICON_SRC" --out "$ICONSET_DIR/icon_16x16.png"      > /dev/null

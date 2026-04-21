@@ -41,9 +41,12 @@ swift build && swift run
 
 > **Note:** `swift run` produces an unsigned binary and cannot use Data Protection Keychain. Use `run-dev.sh` for full functionality.
 
-If you use Sentry for debug/release app builds, `run-dev.sh` and `build-app.sh` will also try to upload `Dahlia.dSYM` when `SENTRY_AUTH_TOKEN` is set. Install `sentry-cli` first, for example:
+If you set `SENTRY_DSN` before running `build-app.sh` or `notarize.sh`, the generated release app embeds the DSN into `Info.plist` and enables Sentry when launched from Finder. Debug runs remain disabled, so `swift run` and `run-dev.sh` do not send Sentry events by default.
+
+If you use Sentry for app builds, `run-dev.sh` and `build-app.sh` will also try to upload `Dahlia.dSYM` when `SENTRY_AUTH_TOKEN` is set. Install `sentry-cli` first, for example:
 
 ```bash
+export SENTRY_DSN="https://<key>@o0.ingest.sentry.io/<project>"
 brew install getsentry/tools/sentry-cli
 ```
 
