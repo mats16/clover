@@ -140,6 +140,10 @@
 "Default" = "Default";
 "Accept Edits" = "Accept Edits";
 "Bypass Permissions" = "Bypass Permissions";
+"Allowed Tools" = "Allowed Tools";
+"Space-separated tool allowlist passed to the agent CLI. Leave blank to use the default set." = "Space-separated tool allowlist passed to the agent CLI. Leave blank to use the default set.";
+"Add a tool and press Space" = "Add a tool and press Space";
+"Remove %@" = "Remove %@";
 
 /* Audio Source Mode */
 "Audio source" = "Audio source";

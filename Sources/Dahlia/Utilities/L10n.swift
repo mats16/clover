@@ -198,6 +198,16 @@ enum L10n {
     static var agentPermissionModeDefault: String { String(localized: "Default", bundle: bundle) }
     static var agentPermissionModeAcceptEdits: String { String(localized: "Accept Edits", bundle: bundle) }
     static var agentPermissionModeBypassPermissions: String { String(localized: "Bypass Permissions", bundle: bundle) }
+    static var agentAllowedTools: String { String(localized: "Allowed Tools", bundle: bundle) }
+    static var agentAllowedToolsDescription: String { String(
+        localized: "Space-separated tool allowlist passed to the agent CLI. Leave blank to use the default set.",
+        bundle: bundle
+    ) }
+    static var agentAllowedToolsPlaceholder: String { String(
+        localized: "Add a tool and press Space",
+        bundle: bundle
+    ) }
+    static func agentAllowedToolsRemoveToken(_ token: String) -> String { String(localized: "Remove \(token)", bundle: bundle) }
 
     // MARK: - Audio Source Mode
 

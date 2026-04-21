@@ -35,6 +35,15 @@ struct AgentSettingsView: View {
                             .pickerStyle(.menu)
                             .frame(width: 220, alignment: .trailing)
                         }
+
+                        Divider()
+
+                        SettingsControlRow(
+                            title: L10n.agentAllowedTools,
+                            description: L10n.agentAllowedToolsDescription
+                        ) {
+                            AllowedToolsTokenField(text: $settings.agentAllowedTools)
+                        }
                     }
                 }
             }

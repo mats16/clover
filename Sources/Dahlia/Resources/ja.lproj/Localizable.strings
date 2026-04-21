@@ -140,6 +140,10 @@
 "Default" = "通常";
 "Accept Edits" = "編集を自動許可";
 "Bypass Permissions" = "権限確認をスキップ";
+"Allowed Tools" = "許可ツール";
+"Space-separated tool allowlist passed to the agent CLI. Leave blank to use the default set." = "Agent CLI に渡す、スペース区切りの許可ツール一覧です。空欄の場合はデフォルト値を使います。";
+"Add a tool and press Space" = "ツール名を入力して Space で追加";
+"Remove %@" = "%@ を削除";
 
 /* Audio Source Mode */
 "Audio source" = "音声ソース";

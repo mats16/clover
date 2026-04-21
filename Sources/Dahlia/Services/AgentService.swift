@@ -101,7 +101,7 @@ final class AgentService: ObservableObject {
     /// 入力サマリーを省略するツール。
     nonisolated static let toolsOmitInputSummary: Set = ["TodoWrite"]
     nonisolated static let defaultLaunchCommand = AppSettings.defaultAgentLaunchCommand
-    nonisolated static let defaultAllowedTools = "Read(/*) Glob(/*) Grep(/*) TodoWrite"
+    nonisolated static let defaultAllowedTools = "Read(/*) Glob(/*) Grep(/*) TodoWrite WebSearch WebFetch"
 
     // MARK: - Lifecycle
 
@@ -143,7 +143,8 @@ final class AgentService: ObservableObject {
         proc.executableURL = launchConfiguration.executableURL
         proc.arguments = launchConfiguration.arguments + Self.sessionArguments(
             systemPrompt: systemPrompt,
-            permissionMode: AppSettings.shared.agentPermissionMode
+            permissionMode: AppSettings.shared.agentPermissionMode,
+            allowedTools: AppSettings.shared.agentAllowedTools
         )
         proc.environment = launchConfiguration.environment
         proc.currentDirectoryURL = workingDirectory
@@ -529,15 +530,20 @@ final class AgentService: ObservableObject {
 
     nonisolated static func sessionArguments(
         systemPrompt: String,
-        permissionMode: AgentPermissionMode
+        permissionMode: AgentPermissionMode,
+        allowedTools: String
     ) -> [String] {
-        [
+        let resolvedAllowedTools = allowedTools.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty
+            ? defaultAllowedTools
+            : allowedTools
+
+        return [
             "-p",
             "--input-format", "stream-json",
             "--output-format", "stream-json",
             "--verbose",
             "--permission-mode", permissionMode.rawValue,
-            "--allowedTools", defaultAllowedTools,
+            "--allowedTools", resolvedAllowedTools,
             "--no-session-persistence",
             "--model", "sonnet",
             "--system-prompt", systemPrompt,
