@@ -113,9 +113,7 @@ enum MarkdownEditor: String, CaseIterable, Identifiable {
 @MainActor
 final class AppSettings: ObservableObject {
     static let shared = AppSettings()
-    nonisolated static let defaultAgentLaunchCommand = FileManager.default.homeDirectoryForCurrentUser
-        .appendingPathComponent(".local/bin/claude")
-        .path
+    nonisolated static let defaultAgentLaunchCommand = "claude"
 
     // MARK: - 表示言語
 

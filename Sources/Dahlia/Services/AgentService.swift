@@ -46,6 +46,24 @@ struct AgentMessage: Identifiable {
     var toolCallInfo: ToolCallInfo?
 }
 
+struct AgentLaunchConfiguration {
+    let executableURL: URL
+    let arguments: [String]
+    let environment: [String: String]
+    let displayName: String
+}
+
+enum AgentLaunchError: LocalizedError {
+    case executableNotFound(String)
+
+    var errorDescription: String? {
+        switch self {
+        case let .executableNotFound(command):
+            "\(command) を起動できません。PATH 上の実行ファイルかフルパスを指定してください。shell alias / function は未対応です。"
+        }
+    }
+}
+
 /// Agent CLI をサブプロセスとして管理し、確定済み文字起こしセグメントをストリーミングで送信するサービス。
 @MainActor
 final class AgentService: ObservableObject {
@@ -107,11 +125,22 @@ final class AgentService: ObservableObject {
             """
         }
 
-        let launchArguments = Self.resolveLaunchArguments(from: AppSettings.shared.agentLaunchCommand)
-        let launchCommandDisplayName = launchArguments.joined(separator: " ")
+        let launchConfiguration: AgentLaunchConfiguration
+        do {
+            launchConfiguration = try Self.resolveLaunchConfiguration(
+                from: AppSettings.shared.agentLaunchCommand,
+                workingDirectory: workingDirectory
+            )
+        } catch {
+            logger.error("Failed to resolve agent process: \(error.localizedDescription)")
+            ErrorReportingService.capture(error, context: ["source": "agentProcessLaunchResolve"])
+            messages.append(AgentMessage(role: .error, content: error.localizedDescription))
+            return
+        }
+
         let proc = Process()
-        proc.executableURL = URL(fileURLWithPath: "/usr/bin/env")
-        proc.arguments = launchArguments + [
+        proc.executableURL = launchConfiguration.executableURL
+        proc.arguments = launchConfiguration.arguments + [
             "-p",
             "--input-format", "stream-json",
             "--output-format", "stream-json",
@@ -122,6 +151,7 @@ final class AgentService: ObservableObject {
             "--model", "sonnet",
             "--system-prompt", systemPrompt,
         ]
+        proc.environment = launchConfiguration.environment
         proc.currentDirectoryURL = workingDirectory
 
         let stdin = Pipe()
@@ -140,9 +170,9 @@ final class AgentService: ObservableObject {
         do {
             try proc.run()
         } catch {
-            logger.error("Failed to launch agent process (\(launchCommandDisplayName)): \(error.localizedDescription)")
+            logger.error("Failed to launch agent process (\(launchConfiguration.displayName)): \(error.localizedDescription)")
             ErrorReportingService.capture(error, context: ["source": "agentProcessLaunch"])
-            messages.append(AgentMessage(role: .error, content: "\(launchCommandDisplayName) の起動に失敗しました: \(error.localizedDescription)"))
+            messages.append(AgentMessage(role: .error, content: "\(launchConfiguration.displayName) の起動に失敗しました: \(error.localizedDescription)"))
             return
         }
 
@@ -471,10 +501,165 @@ final class AgentService: ObservableObject {
     }
 
     nonisolated static func resolveLaunchArguments(from configuredCommand: String) -> [String] {
-        let arguments = configuredCommand
-            .split(whereSeparator: \.isWhitespace)
-            .map(String.init)
+        let arguments = parseCommandLine(configuredCommand)
 
         return arguments.isEmpty ? [defaultLaunchCommand] : arguments
+    }
+
+    nonisolated static func resolveLaunchConfiguration(
+        from configuredCommand: String,
+        workingDirectory: URL,
+        environment: [String: String] = ProcessInfo.processInfo.environment,
+        fileManager: FileManager = .default,
+        homeDirectoryURL: URL = FileManager.default.homeDirectoryForCurrentUser
+    ) throws -> AgentLaunchConfiguration {
+        let arguments = resolveLaunchArguments(from: configuredCommand)
+        let executableURL = try resolveExecutableURL(
+            for: arguments[0],
+            workingDirectory: workingDirectory,
+            environment: environment,
+            fileManager: fileManager,
+            homeDirectoryURL: homeDirectoryURL
+        )
+
+        return AgentLaunchConfiguration(
+            executableURL: executableURL,
+            arguments: Array(arguments.dropFirst()),
+            environment: launchEnvironment(
+                baseEnvironment: environment,
+                homeDirectoryURL: homeDirectoryURL
+            ),
+            displayName: arguments.joined(separator: " ")
+        )
+    }
+
+    nonisolated static func parseCommandLine(_ command: String) -> [String] {
+        var arguments: [String] = []
+        var current = ""
+        var isEscaping = false
+        var isInsideSingleQuotes = false
+        var isInsideDoubleQuotes = false
+        var hasTokenContent = false
+
+        for character in command {
+            if isEscaping {
+                current.append(character)
+                hasTokenContent = true
+                isEscaping = false
+                continue
+            }
+
+            switch character {
+            case "\\":
+                if isInsideSingleQuotes {
+                    current.append(character)
+                    hasTokenContent = true
+                } else {
+                    isEscaping = true
+                }
+            case "'":
+                if isInsideDoubleQuotes {
+                    current.append(character)
+                    hasTokenContent = true
+                } else {
+                    isInsideSingleQuotes.toggle()
+                    hasTokenContent = true
+                }
+            case "\"":
+                if isInsideSingleQuotes {
+                    current.append(character)
+                    hasTokenContent = true
+                } else {
+                    isInsideDoubleQuotes.toggle()
+                    hasTokenContent = true
+                }
+            case _ where character.isWhitespace && !isInsideSingleQuotes && !isInsideDoubleQuotes:
+                if hasTokenContent {
+                    arguments.append(current)
+                    current = ""
+                    hasTokenContent = false
+                }
+            default:
+                current.append(character)
+                hasTokenContent = true
+            }
+        }
+
+        if isEscaping {
+            current.append("\\")
+            hasTokenContent = true
+        }
+
+        if hasTokenContent {
+            arguments.append(current)
+        }
+
+        return arguments
+    }
+
+    nonisolated static func resolveExecutableURL(
+        for command: String,
+        workingDirectory: URL,
+        environment: [String: String] = ProcessInfo.processInfo.environment,
+        fileManager: FileManager = .default,
+        homeDirectoryURL: URL = FileManager.default.homeDirectoryForCurrentUser
+    ) throws -> URL {
+        let expandedCommand = NSString(string: command).expandingTildeInPath
+
+        if command.contains("/") {
+            let explicitURL = URL(fileURLWithPath: expandedCommand, relativeTo: command.hasPrefix("/") ? nil : workingDirectory)
+                .standardizedFileURL
+            guard fileManager.isExecutableFile(atPath: explicitURL.path) else {
+                throw AgentLaunchError.executableNotFound(command)
+            }
+            return explicitURL
+        }
+
+        for directory in executableSearchDirectories(
+            environment: environment,
+            homeDirectoryURL: homeDirectoryURL
+        ) {
+            let candidateURL = directory.appendingPathComponent(command)
+            if fileManager.isExecutableFile(atPath: candidateURL.path) {
+                return candidateURL
+            }
+        }
+
+        throw AgentLaunchError.executableNotFound(command)
+    }
+
+    nonisolated static func launchEnvironment(
+        baseEnvironment: [String: String] = ProcessInfo.processInfo.environment,
+        homeDirectoryURL: URL = FileManager.default.homeDirectoryForCurrentUser
+    ) -> [String: String] {
+        var environment = baseEnvironment
+        environment["PATH"] = executableSearchDirectories(
+            environment: baseEnvironment,
+            homeDirectoryURL: homeDirectoryURL
+        )
+        .map(\.path)
+        .joined(separator: ":")
+        return environment
+    }
+
+    nonisolated static func executableSearchDirectories(
+        environment: [String: String] = ProcessInfo.processInfo.environment,
+        homeDirectoryURL: URL = FileManager.default.homeDirectoryForCurrentUser
+    ) -> [URL] {
+        let defaultDirectories = [
+            homeDirectoryURL.appendingPathComponent(".local/bin"),
+            URL(fileURLWithPath: "/opt/homebrew/bin"),
+            URL(fileURLWithPath: "/usr/local/bin"),
+        ]
+        let inheritedDirectories = (environment["PATH"] ?? "")
+            .split(separator: ":")
+            .map(String.init)
+            .filter { !$0.isEmpty }
+            .map { URL(fileURLWithPath: NSString(string: $0).expandingTildeInPath) }
+
+        var seenPaths: Set<String> = []
+        return (defaultDirectories + inheritedDirectories).filter { directory in
+            seenPaths.insert(directory.standardizedFileURL.path).inserted
+        }
     }
 }

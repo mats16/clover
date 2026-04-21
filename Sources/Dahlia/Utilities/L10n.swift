@@ -186,7 +186,7 @@ enum L10n {
 
     static var agentLaunchCommand: String { String(localized: "Launch Command", bundle: bundle) }
     static var agentLaunchCommandDescription: String { String(
-        localized: "Command used to launch the agent from your PATH. Default: `claude`.",
+        localized: "Command used to launch the agent. Default: `claude`. A full path is optional when the executable is available in PATH or common user bin directories.",
         bundle: bundle
     ) }
 

@@ -19,6 +19,52 @@ struct AgentServiceTests {
         #expect(arguments == ["isaac", "--profile", "local"])
     }
 
+    @Test
+    func resolveLaunchArgumentsSupportsSubcommands() {
+        let arguments = AgentService.resolveLaunchArguments(from: "vibe agent")
+
+        #expect(arguments == ["vibe", "agent"])
+    }
+
+    @Test
+    func resolveLaunchArgumentsPreservesQuotedTokens() {
+        let arguments = AgentService.resolveLaunchArguments(from: #"isaac --prompt "hello world" --path '/tmp/Agent Dir'"#)
+
+        #expect(arguments == ["isaac", "--prompt", "hello world", "--path", "/tmp/Agent Dir"])
+    }
+
+    @Test
+    func resolveLaunchConfigurationFindsExecutableInInjectedPath() throws {
+        let fixture = try LaunchFixture(commandName: "isaac")
+        let configuration = try AgentService.resolveLaunchConfiguration(
+            from: "isaac --profile local",
+            workingDirectory: fixture.directoryURL,
+            environment: ["PATH": fixture.directoryURL.path],
+            homeDirectoryURL: fixture.directoryURL
+        )
+
+        #expect(configuration.executableURL == fixture.executableURL)
+        #expect(configuration.arguments == ["--profile", "local"])
+        #expect(configuration.displayName == "isaac --profile local")
+        #expect(configuration.environment["PATH"]?.contains(fixture.directoryURL.path) == true)
+    }
+
+    @Test
+    func resolveLaunchConfigurationReturnsClearErrorWhenMissingExecutable() {
+        do {
+            _ = try AgentService.resolveLaunchConfiguration(
+                from: "missing-agent",
+                workingDirectory: FileManager.default.temporaryDirectory,
+                environment: ["PATH": ""],
+                homeDirectoryURL: FileManager.default.temporaryDirectory
+            )
+            Issue.record("Expected executable resolution to fail")
+        } catch {
+            #expect(error.localizedDescription.contains("missing-agent"))
+            #expect(error.localizedDescription.contains("PATH"))
+        }
+    }
+
     // MARK: - parseOutputLine
 
     @Test
@@ -125,17 +171,6 @@ struct AgentServiceTests {
 import XCTest
 
 final class AgentServiceTests: XCTestCase {
-    func testResolveLaunchArgumentsFallsBackToClaudeWhenBlank() {
-        XCTAssertEqual(AgentService.resolveLaunchArguments(from: "   "), [AgentService.defaultLaunchCommand])
-    }
-
-    func testResolveLaunchArgumentsSplitsCommandAndArguments() {
-        XCTAssertEqual(
-            AgentService.resolveLaunchArguments(from: "isaac --profile local"),
-            ["isaac", "--profile", "local"]
-        )
-    }
-
     func testParseOutputLineReturnsNilForInvalidJSON() {
         XCTAssertNil(AgentService.parseOutputLine("not json"))
         XCTAssertNil(AgentService.parseOutputLine("{}"))
@@ -159,3 +194,24 @@ final class AgentServiceTests: XCTestCase {
     }
 }
 #endif
+
+private final class LaunchFixture {
+    let directoryURL: URL
+    let executableURL: URL
+
+    init(commandName: String) throws {
+        directoryURL = FileManager.default.temporaryDirectory.appendingPathComponent(UUID().uuidString)
+        executableURL = directoryURL.appendingPathComponent(commandName)
+
+        try FileManager.default.createDirectory(at: directoryURL, withIntermediateDirectories: true)
+        try "#!/bin/sh\nexit 0\n".write(to: executableURL, atomically: true, encoding: .utf8)
+        try FileManager.default.setAttributes(
+            [.posixPermissions: 0o755],
+            ofItemAtPath: executableURL.path
+        )
+    }
+
+    deinit {
+        try? FileManager.default.removeItem(at: directoryURL)
+    }
+}
