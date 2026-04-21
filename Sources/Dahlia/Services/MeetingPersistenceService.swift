@@ -11,6 +11,7 @@ final class MeetingPersistenceService {
     let meetingId: UUID
     private var cancellable: AnyCancellable?
     private var persistedSegmentIds: Set<UUID> = []
+    private var persistedSegmentTranslations: [UUID: String?] = [:]
     private let recordingStartDate: Date
 
     /// 新規ミーティングを作成して録音を開始する。
@@ -78,20 +79,33 @@ final class MeetingPersistenceService {
     }
 
     private func persistNewConfirmedSegments(_ segments: [TranscriptSegment]) {
-        let newConfirmed = segments.filter {
-            $0.isConfirmed && !persistedSegmentIds.contains($0.id)
-        }
-        guard !newConfirmed.isEmpty else { return }
+        var recordsToInsert: [TranscriptSegmentRecord] = []
+        var translationUpdates: [(id: UUID, translatedText: String?)] = []
 
-        let records = newConfirmed.map { TranscriptSegmentRecord(from: $0, meetingId: meetingId) }
-        let newIds = Set(newConfirmed.map(\.id))
-        persistedSegmentIds.formUnion(newIds)
+        for segment in segments where segment.isConfirmed {
+            if !persistedSegmentIds.contains(segment.id) {
+                recordsToInsert.append(TranscriptSegmentRecord(from: segment, meetingId: meetingId))
+                persistedSegmentIds.insert(segment.id)
+                persistedSegmentTranslations[segment.id] = segment.translatedText
+            } else if persistedSegmentTranslations[segment.id] != segment.translatedText {
+                persistedSegmentTranslations[segment.id] = segment.translatedText
+                translationUpdates.append((id: segment.id, translatedText: segment.translatedText))
+            }
+        }
+
+        guard !recordsToInsert.isEmpty || !translationUpdates.isEmpty else { return }
 
         let queue = dbQueue
         Task.detached {
             try? queue.write { db in
-                for record in records {
+                for record in recordsToInsert {
                     try record.insert(db)
+                }
+                for update in translationUpdates {
+                    try db.execute(
+                        sql: "UPDATE transcript_segments SET translatedText = ? WHERE id = ?",
+                        arguments: [update.translatedText, update.id]
+                    )
                 }
             }
         }

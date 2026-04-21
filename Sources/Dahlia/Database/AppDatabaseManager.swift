@@ -49,6 +49,10 @@ final class AppDatabaseManager: Sendable {
             try addSummaryGoogleFileIdColumnIfNeeded(in: db)
         }
 
+        migrator.registerMigration("v6_transcriptSegmentTranslation") { db in
+            try addTranscriptSegmentTranslatedTextColumnIfNeeded(in: db)
+        }
+
         return migrator
     }()
 
@@ -133,6 +137,7 @@ final class AppDatabaseManager: Sendable {
             t.column("startTime", .datetime).notNull()
             t.column("endTime", .datetime)
             t.column("text", .text).notNull()
+            t.column("translatedText", .text)
             t.column("isConfirmed", .boolean).notNull().defaults(to: false)
             t.column("speakerLabel", .text)
         }
@@ -267,23 +272,34 @@ final class AppDatabaseManager: Sendable {
         try createInstructionsTable(in: db)
     }
 
+    @discardableResult
+    private static func addColumnIfNeeded(
+        in db: Database,
+        table tableName: String,
+        column columnName: String,
+        type columnType: Database.ColumnType
+    ) throws -> Bool {
+        guard try db.tableExists(tableName) else { return false }
+        let columns = try String.fetchAll(db, sql: "SELECT name FROM pragma_table_info('\(tableName)')")
+        guard !columns.contains(columnName) else { return false }
+        try db.alter(table: tableName) { t in
+            t.add(column: columnName, columnType)
+        }
+        return true
+    }
+
     private static func addSummaryGoogleFileIdColumnIfNeeded(in db: Database) throws {
         guard try db.tableExists("summaries") else { return }
 
-        let existingColumns = try String.fetchAll(
-            db,
-            sql: "SELECT name FROM pragma_table_info('summaries')"
-        )
-        let hasGoogleFileId = existingColumns.contains("googleFileId")
-        let hasLegacyGoogleDocumentId = existingColumns.contains("googleDocumentId")
+        let columns = try String.fetchAll(db, sql: "SELECT name FROM pragma_table_info('summaries')")
 
-        if !hasGoogleFileId {
+        if !columns.contains("googleFileId") {
             try db.alter(table: "summaries") { t in
                 t.add(column: "googleFileId", .text)
             }
         }
 
-        if hasLegacyGoogleDocumentId {
+        if columns.contains("googleDocumentId") {
             try db.execute(
                 sql: """
                 UPDATE summaries
@@ -292,5 +308,9 @@ final class AppDatabaseManager: Sendable {
                 """
             )
         }
+    }
+
+    private static func addTranscriptSegmentTranslatedTextColumnIfNeeded(in db: Database) throws {
+        try addColumnIfNeeded(in: db, table: "transcript_segments", column: "translatedText", type: .text)
     }
 }

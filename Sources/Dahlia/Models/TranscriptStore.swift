@@ -63,6 +63,12 @@ final class TranscriptStore: ObservableObject {
         segments = newSegments
     }
 
+    func updateTranslatedText(for segmentID: UUID, translatedText: String?) {
+        guard let index = segments.firstIndex(where: { $0.id == segmentID }) else { return }
+        guard segments[index].translatedText != translatedText else { return }
+        segments[index].translatedText = translatedText
+    }
+
     func clear() {
         segments.removeAll()
         recordingStartTime = nil

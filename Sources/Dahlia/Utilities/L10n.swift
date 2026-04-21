@@ -214,6 +214,11 @@ enum L10n {
         localized: "Choose which languages appear when starting transcription.",
         bundle: bundle
     ) }
+    static var transcriptTranslation: String { String(localized: "Transcript Translation", bundle: bundle) }
+    static var transcriptTranslationDescription: String { String(
+        localized: "Show Japanese translations under English transcript lines when available.",
+        bundle: bundle
+    ) }
     static var aiSummarySettingsDescription: String { String(
         localized: "Configure automatic summaries and the LLM connection used to generate them.",
         bundle: bundle

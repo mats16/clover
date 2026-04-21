@@ -6,6 +6,8 @@ import Speech
 /// AudioBufferBridge から受け取った AsyncStream<AnalyzerInput> を SpeechAnalyzer に渡し、
 /// SpeechTranscriber の結果を TranscriptStore に反映する。
 actor SpeechTranscriberService {
+    typealias ConfirmedSegmentTranslationHandler = @Sendable (TranscriptSegment) async -> String?
+
     private nonisolated static let ignoredConfirmedTexts: Set<String> = [".", "あ"]
 
     private var analyzer: SpeechAnalyzer?
@@ -15,10 +17,16 @@ actor SpeechTranscriberService {
 
     private let locale: Locale
     private let speakerLabel: String?
+    private let translateConfirmedSegment: ConfirmedSegmentTranslationHandler?
 
-    init(locale: Locale = Locale(identifier: "ja-JP"), speakerLabel: String? = nil) {
+    init(
+        locale: Locale = Locale(identifier: "ja-JP"),
+        speakerLabel: String? = nil,
+        translateConfirmedSegment: ConfirmedSegmentTranslationHandler? = nil
+    ) {
         self.locale = locale
         self.speakerLabel = speakerLabel
+        self.translateConfirmedSegment = translateConfirmedSegment
     }
 
     nonisolated static func normalizedTranscriptText(_ rawText: String) -> String? {
@@ -88,12 +96,12 @@ actor SpeechTranscriberService {
         resultTask = Task { [weak self] in
             do {
                 for try await result in transcriber.results {
-                    guard self != nil else { break }
+                    guard let self else { break }
 
-                    let label = self?.speakerLabel
+                    let label = self.speakerLabel
                     guard let text = Self.normalizedTranscriptText(String(result.text.characters)) else {
                         if result.isFinal {
-                            Task { @MainActor in
+                            await MainActor.run {
                                 store.replaceUnconfirmedSegments(with: [], forSource: label)
                             }
                         }
@@ -119,12 +127,20 @@ actor SpeechTranscriberService {
                     )
 
                     if result.isFinal {
-                        Task { @MainActor in
+                        await MainActor.run {
                             store.replaceUnconfirmedSegments(with: [], forSource: label)
                             store.addSegment(segment)
                         }
+                        if let translateConfirmedSegment = self.translateConfirmedSegment {
+                            Task {
+                                guard let translatedText = await translateConfirmedSegment(segment) else { return }
+                                await MainActor.run {
+                                    store.updateTranslatedText(for: segment.id, translatedText: translatedText)
+                                }
+                            }
+                        }
                     } else {
-                        Task { @MainActor in
+                        await MainActor.run {
                             store.replaceUnconfirmedSegments(with: [segment], forSource: label)
                         }
                     }

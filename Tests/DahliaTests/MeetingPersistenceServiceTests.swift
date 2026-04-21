@@ -195,6 +195,74 @@ struct MeetingPersistenceServiceTests {
 
         #expect(resolvedMeetingId == meetingId)
     }
+
+    @Test
+    func stopPersistsTranslatedTextWhenAvailableBeforeInsert() throws {
+        let database = try makeDatabase()
+        let store = TranscriptStore()
+        let startDate = Date(timeIntervalSince1970: 1_776_384_000)
+        store.recordingStartTime = startDate
+
+        let service = try MeetingPersistenceService(
+            store: store,
+            dbQueue: database.dbQueue,
+            vaultId: testVault.id,
+            projectId: nil,
+            initialName: "Translated meeting"
+        )
+        let segment = TranscriptSegment(
+            startTime: startDate,
+            text: "Hello world",
+            translatedText: "こんにちは、世界",
+            isConfirmed: true,
+            speakerLabel: "mic"
+        )
+
+        store.loadSegments([segment])
+        service.stop()
+
+        let persisted = try database.dbQueue.read { db in
+            try #require(TranscriptSegmentRecord.fetchOne(db, key: segment.id))
+        }
+
+        #expect(persisted.text == "Hello world")
+        #expect(persisted.translatedText == "こんにちは、世界")
+    }
+
+    @Test
+    func translatedTextUpdatesExistingPersistedSegment() async throws {
+        let database = try makeDatabase()
+        let store = TranscriptStore()
+        let startDate = Date(timeIntervalSince1970: 1_776_384_000)
+        store.recordingStartTime = startDate
+
+        let service = try MeetingPersistenceService(
+            store: store,
+            dbQueue: database.dbQueue,
+            vaultId: testVault.id,
+            projectId: nil,
+            initialName: "Translated meeting"
+        )
+        let segment = TranscriptSegment(
+            startTime: startDate,
+            text: "Hello world",
+            isConfirmed: true,
+            speakerLabel: "mic"
+        )
+
+        store.loadSegments([segment])
+        try await Task.sleep(for: .milliseconds(700))
+
+        store.updateTranslatedText(for: segment.id, translatedText: "こんにちは、世界")
+        try await Task.sleep(for: .milliseconds(700))
+        service.stop()
+
+        let persisted = try database.dbQueue.read { db in
+            try #require(TranscriptSegmentRecord.fetchOne(db, key: segment.id))
+        }
+
+        #expect(persisted.translatedText == "こんにちは、世界")
+    }
 }
 #elseif canImport(XCTest)
 import XCTest
@@ -384,6 +452,72 @@ final class MeetingPersistenceServiceTests: XCTestCase {
         )
 
         XCTAssertEqual(resolvedMeetingId, meetingId)
+    }
+
+    func testStopPersistsTranslatedTextWhenAvailableBeforeInsert() throws {
+        let database = try makeDatabase()
+        let store = TranscriptStore()
+        let startDate = Date(timeIntervalSince1970: 1_776_384_000)
+        store.recordingStartTime = startDate
+
+        let service = try MeetingPersistenceService(
+            store: store,
+            dbQueue: database.dbQueue,
+            vaultId: testVault.id,
+            projectId: nil,
+            initialName: "Translated meeting"
+        )
+        let segment = TranscriptSegment(
+            startTime: startDate,
+            text: "Hello world",
+            translatedText: "こんにちは、世界",
+            isConfirmed: true,
+            speakerLabel: "mic"
+        )
+
+        store.loadSegments([segment])
+        service.stop()
+
+        let persisted = try database.dbQueue.read { db in
+            try XCTUnwrap(TranscriptSegmentRecord.fetchOne(db, key: segment.id))
+        }
+
+        XCTAssertEqual(persisted.text, "Hello world")
+        XCTAssertEqual(persisted.translatedText, "こんにちは、世界")
+    }
+
+    func testTranslatedTextUpdatesExistingPersistedSegment() async throws {
+        let database = try makeDatabase()
+        let store = TranscriptStore()
+        let startDate = Date(timeIntervalSince1970: 1_776_384_000)
+        store.recordingStartTime = startDate
+
+        let service = try MeetingPersistenceService(
+            store: store,
+            dbQueue: database.dbQueue,
+            vaultId: testVault.id,
+            projectId: nil,
+            initialName: "Translated meeting"
+        )
+        let segment = TranscriptSegment(
+            startTime: startDate,
+            text: "Hello world",
+            isConfirmed: true,
+            speakerLabel: "mic"
+        )
+
+        store.loadSegments([segment])
+        try await Task.sleep(for: .milliseconds(700))
+
+        store.updateTranslatedText(for: segment.id, translatedText: "こんにちは、世界")
+        try await Task.sleep(for: .milliseconds(700))
+        service.stop()
+
+        let persisted = try database.dbQueue.read { db in
+            try XCTUnwrap(TranscriptSegmentRecord.fetchOne(db, key: segment.id))
+        }
+
+        XCTAssertEqual(persisted.translatedText, "こんにちは、世界")
     }
 }
 #endif

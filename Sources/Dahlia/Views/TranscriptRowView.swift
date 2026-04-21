@@ -3,6 +3,7 @@ import SwiftUI
 /// 議事録の1セグメントを表示する行ビュー。
 struct TranscriptRowView: View {
     let segment: TranscriptSegment
+    @State private var translationEnabled = AppSettings.shared.transcriptTranslationEnabled
 
     var body: some View {
         HStack(alignment: .top, spacing: 10) {
@@ -24,13 +25,26 @@ struct TranscriptRowView: View {
             }
 
             // テキスト
-            Text(segment.displayText)
-                .font(.body)
-                .foregroundStyle(segment.isConfirmed ? .primary : .secondary)
-                .textSelection(.enabled)
-                .frame(maxWidth: .infinity, alignment: .leading)
+            VStack(alignment: .leading, spacing: 4) {
+                Text(segment.displayText)
+                    .font(.body)
+                    .foregroundStyle(segment.isConfirmed ? .primary : .secondary)
+
+                if let translatedText = segment.visibleTranslatedText(
+                    isEnabled: translationEnabled
+                ) {
+                    Text(translatedText)
+                        .font(.body)
+                        .foregroundStyle(.blue)
+                }
+            }
+            .textSelection(.enabled)
+            .frame(maxWidth: .infinity, alignment: .leading)
         }
         .padding(.vertical, 4)
+        .onReceive(UserDefaults.standard.publisher(for: \.transcriptTranslationEnabled)) { value in
+            translationEnabled = value
+        }
     }
 
     private func speakerDisplayName(for label: String) -> String {

@@ -10,6 +10,16 @@ struct TranscriptionSettingsView: View {
 
     var body: some View {
         SettingsPage {
+            SettingsSection(title: L10n.transcriptTranslation) {
+                SettingsCard {
+                    SettingsToggleRow(
+                        title: L10n.transcriptTranslation,
+                        description: L10n.transcriptTranslationDescription,
+                        isOn: $settings.transcriptTranslationEnabled
+                    )
+                }
+            }
+
             SettingsSection(
                 title: L10n.displayLanguages,
                 description: L10n.displayLanguagesDescription

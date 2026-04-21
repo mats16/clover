@@ -202,6 +202,7 @@ final class CaptionViewModel: ObservableObject {
     private var meetingLoadTask: Task<Void, Never>?
     private let availableInputDevicesProvider: @Sendable () -> [MicrophoneDevice]
     private let defaultInputDeviceIDProvider: @Sendable () -> AudioDeviceID?
+    private let transcriptTranslationService = TranscriptTranslationService()
 
     private var activeDbQueueForSessionControls: DatabaseQueue? {
         recordingContext?.dbQueue ?? currentDbQueue
@@ -1504,7 +1505,11 @@ final class CaptionViewModel: ObservableObject {
         locale: Locale,
         speakerLabel: String
     ) async throws -> (service: SpeechTranscriberService, bridge: AudioBufferBridge, format: AVAudioFormat) {
-        let service = SpeechTranscriberService(locale: locale, speakerLabel: speakerLabel)
+        let service = SpeechTranscriberService(
+            locale: locale,
+            speakerLabel: speakerLabel,
+            translateConfirmedSegment: translationHandler(for: locale)
+        )
         try await service.prepare()
         guard let format = await service.targetAudioFormat() else {
             throw AudioCaptureError.converterCreationFailed
@@ -1512,6 +1517,21 @@ final class CaptionViewModel: ObservableObject {
         let bridge = AudioBufferBridge(sampleRate: format.sampleRate)
         try await service.startStreaming(store: store, bridge: bridge)
         return (service: service, bridge: bridge, format: format)
+    }
+
+    private func translationHandler(for locale: Locale) -> SpeechTranscriberService.ConfirmedSegmentTranslationHandler? {
+        guard locale.language.languageCode == .english else {
+            return nil
+        }
+
+        let translationService = transcriptTranslationService
+        return { segment in
+            let isEnabled = await MainActor.run {
+                AppSettings.shared.transcriptTranslationEnabled
+            }
+            guard isEnabled else { return nil }
+            return await translationService.translateToJapanese(segment.text)
+        }
     }
 
     // MARK: - Private Helpers

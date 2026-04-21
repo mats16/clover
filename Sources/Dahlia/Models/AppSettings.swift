@@ -118,6 +118,7 @@ final class AppSettings: ObservableObject {
     // MARK: - 音声認識設定
 
     @AppStorage("transcriptionLocale") var transcriptionLocale: String = Locale.current.identifier
+    @AppStorage("transcriptTranslationEnabled") var transcriptTranslationEnabled = true
 
     // MARK: - 表示言語設定
 
@@ -313,6 +314,10 @@ extension UserDefaults {
 
     @objc dynamic var enabledLocaleIdentifiers: String? {
         string(forKey: "enabledLocaleIdentifiers")
+    }
+
+    @objc dynamic var transcriptTranslationEnabled: Bool {
+        object(forKey: "transcriptTranslationEnabled") as? Bool ?? true
     }
 
     @objc dynamic var llmAutoSummaryEnabled: Bool {
