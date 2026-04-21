@@ -31,7 +31,6 @@
 "Location" = "Location";
 "Latest Meeting" = "Latest Meeting";
 "Could not create CONTEXT.md." = "Could not create CONTEXT.md.";
-"Edit Context" = "Edit Context";
 "Open in Finder" = "Open in Finder";
 "Open in Obsidian" = "Open in Obsidian";
 "Open in Browser" = "Open in Browser";
@@ -86,6 +85,7 @@
 "Transcription" = "Transcription";
 "%lld segments" = "%lld segments";
 "Stop" = "Stop";
+"Pause" = "Pause";
 "Resume" = "Resume";
 "Record" = "Record";
 "Export" = "Export";
@@ -97,7 +97,7 @@
 "Hide Live Subtitles" = "Hide Live Subtitles";
 "Live Subtitle Overlay" = "Live Subtitle Overlay";
 "Configure how the desktop live subtitle overlay is shown while recording." = "Configure how the desktop live subtitle overlay is shown while recording.";
-"Subtitles" = "Subtitles";
+"Subtitles" = "Live Captions";
 "System Audio Only" = "System Audio Only";
 "Include Microphone" = "Include Microphone";
 "Choose whether live subtitles only show system audio or also include microphone input." = "Choose whether live subtitles only show system audio or also include microphone input.";
@@ -134,6 +134,16 @@
 /* Settings (Agent) */
 "Launch Command" = "Launch Command";
 "Command used to launch the agent. Default: `claude`. A full path is optional when the executable is available in PATH or common user bin directories." = "Command used to launch the agent. Default: `claude`. A full path is optional when the executable is available in PATH or common user bin directories.";
+"Permission Mode" = "Permission Mode";
+"Choose how the agent handles permission prompts when using tools and editing files." = "Choose how the agent handles permission prompts when using tools and editing files.";
+"Auto" = "Auto";
+"Default" = "Default";
+"Accept Edits" = "Accept Edits";
+"Bypass Permissions" = "Bypass Permissions";
+"Allowed Tools" = "Allowed Tools";
+"Space-separated tool allowlist passed to the agent CLI. Leave blank to use the default set." = "Space-separated tool allowlist passed to the agent CLI. Leave blank to use the default set.";
+"Add a tool and press Space" = "Add a tool and press Space";
+"Remove %@" = "Remove %@";
 
 /* Audio Source Mode */
 "Audio source" = "Audio source";
@@ -150,15 +160,17 @@
 
 /* Settings */
 "General" = "General";
+"Notifications" = "Notifications";
 "Calendar" = "Calendar";
-"AI Summary" = "Summary";
+"AI Summary" = "AI Summary";
+"AI Agent" = "AI Agent";
 "Vault" = "Vault";
+"Appearance" = "Appearance";
 "Display" = "Display";
-"Workflow" = "Workflow";
 "App Language" = "App Language";
 "Set the display language for the app." = "Set the display language for the app.";
 "Follow System" = "Follow System";
-"Manage language, meeting prompts, and editor preferences." = "Manage language, meeting prompts, and editor preferences.";
+"Manage meeting detection prompts and related notification behavior." = "Manage meeting detection prompts and related notification behavior.";
 "Choose which languages appear when starting transcription." = "Choose which languages appear when starting transcription.";
 "Transcript Translation" = "Transcript Translation";
 "Show translated transcript lines in the selected target language when available." = "Show translated transcript lines in the selected target language when available.";
@@ -166,7 +178,7 @@
 "Choose which language translated transcript lines should use." = "Choose which language translated transcript lines should use.";
 "Translation is automatically disabled when the target language matches the transcription language." = "Translation is automatically disabled when the target language matches the transcription language.";
 "Configure automatic summaries and the LLM connection used to generate them." = "Configure automatic summaries and the LLM connection used to generate them.";
-"Configure the built-in agent sidebar launch command." = "Configure the built-in agent sidebar launch command.";
+"Configure the built-in agent sidebar launch command and permission mode." = "Configure the built-in agent sidebar launch command and permission mode.";
 "Run a quick request to validate your endpoint, model, and token." = "Run a quick request to validate your endpoint, model, and token.";
 "Google Calendar" = "Google Calendar";
 "Connect a Google account and choose which calendars appear on Home." = "Connect a Google account and choose which calendars appear on Home.";
@@ -217,11 +229,6 @@
 "Show all" = "Show all";
 "Display Languages" = "Display Languages";
 "Only selected languages will appear in the language picker. All languages are shown if none are selected." = "Only selected languages will appear in the language picker. All languages are shown if none are selected.";
-
-/* Settings - Markdown Editor */
-"Markdown Editor" = "Markdown Editor";
-"Editor used to open context and summary files." = "Editor used to open context and summary files.";
-"System Default" = "System Default";
 
 /* Settings - LLM */
 "LLM Settings" = "Model Settings";
@@ -283,7 +290,10 @@
 "Show a prompt when a video meeting is detected." = "Show a prompt when a video meeting is detected.";
 "Meeting detected (%@). Start transcription?" = "Meeting detected (%@). Start transcription?";
 "Start Transcription" = "Start Transcription";
+"Start transcribing" = "Start transcribing";
+"Manage notification settings" = "Manage notification settings";
 "Dismiss" = "Dismiss";
+"Meeting detected" = "Meeting detected";
 "Meeting detected in %@" = "Meeting detected in %@";
 "Microphone is in use" = "Microphone is in use";
 

@@ -81,6 +81,25 @@ struct CaptionViewModelTests {
     }
 
     @Test
+    func currentMeetingHasTranscriptSegmentsTracksStoreContents() {
+        let viewModel = CaptionViewModel()
+        let segment = TranscriptSegment(
+            startTime: Date(),
+            text: "confirmed transcript",
+            isConfirmed: true,
+            speakerLabel: "mic",
+        )
+
+        #expect(!viewModel.currentMeetingHasTranscriptSegments)
+
+        viewModel.store.loadSegments([segment])
+        #expect(viewModel.currentMeetingHasTranscriptSegments)
+
+        viewModel.store.clear()
+        #expect(!viewModel.currentMeetingHasTranscriptSegments)
+    }
+
+    @Test
     func orderedCurrentMeetingActionItemsPrioritizeIncompleteMine() {
         let viewModel = CaptionViewModel()
         let meetingId = UUID.v7()
@@ -314,6 +333,24 @@ final class CaptionViewModelTests: XCTestCase {
         XCTAssertEqual(ObjectIdentifier(viewModel.store), storeIdentity)
         XCTAssertEqual(viewModel.store.segments, [initialSegment])
         XCTAssertEqual(viewModel.recordingMeetingId, meetingId)
+    }
+
+    func testCurrentMeetingHasTranscriptSegmentsTracksStoreContents() {
+        let viewModel = CaptionViewModel()
+        let segment = TranscriptSegment(
+            startTime: Date(),
+            text: "confirmed transcript",
+            isConfirmed: true,
+            speakerLabel: "mic",
+        )
+
+        XCTAssertFalse(viewModel.currentMeetingHasTranscriptSegments)
+
+        viewModel.store.loadSegments([segment])
+        XCTAssertTrue(viewModel.currentMeetingHasTranscriptSegments)
+
+        viewModel.store.clear()
+        XCTAssertFalse(viewModel.currentMeetingHasTranscriptSegments)
     }
 
     func testBeginDraftMeetingDoesNotPersistMeetingRecord() throws {

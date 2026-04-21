@@ -21,6 +21,23 @@ private enum NotesEditorLayout {
     static let placeholderPadding = EdgeInsets(top: 10, leading: 9, bottom: 0, trailing: 0)
 }
 
+private enum ObsidianLauncher {
+    private static let bundleIdentifier = "md.obsidian"
+
+    static let isInstalled: Bool =
+        NSWorkspace.shared.urlForApplication(withBundleIdentifier: bundleIdentifier) != nil
+
+    static func open(_ url: URL) {
+        var components = URLComponents()
+        components.scheme = "obsidian"
+        components.host = "open"
+        components.queryItems = [URLQueryItem(name: "path", value: url.path)]
+
+        guard let obsidianURL = components.url else { return }
+        NSWorkspace.shared.open(obsidianURL)
+    }
+}
+
 /// メイン領域のタブ種別。
 enum DetailTab: String, CaseIterable, Identifiable {
     case summary
@@ -379,7 +396,7 @@ private struct TranscribeButton: View {
     @State private var isHovered = false
 
     private var showsResumeStyle: Bool {
-        !viewModel.isListening && viewModel.isViewingHistory
+        !viewModel.isListening && viewModel.isViewingHistory && viewModel.currentMeetingHasTranscriptSegments
     }
 
     private var isEnabled: Bool {
@@ -484,11 +501,11 @@ private struct TranscribeButton: View {
 
     private var label: String {
         if viewModel.isListening {
-            "Pause"
+            L10n.pause
         } else if showsResumeStyle {
-            "Resume"
+            L10n.resume
         } else {
-            "Start recording"
+            L10n.startTranscribing
         }
     }
 
@@ -1023,12 +1040,12 @@ struct ControlPanelView: View {
                     HStack(spacing: 12) {
                         Button {
                             guard let summaryURL = viewModel.lastSummaryURL else { return }
-                            MarkdownEditor.obsidian.open(summaryURL)
+                            ObsidianLauncher.open(summaryURL)
                         } label: {
                             Label(L10n.openInObsidian, systemImage: "book.closed")
                         }
-                        .disabled(viewModel.lastSummaryURL == nil || !MarkdownEditor.obsidian.isInstalled)
-                        .actionCursor(isEnabled: viewModel.lastSummaryURL != nil && MarkdownEditor.obsidian.isInstalled)
+                        .disabled(viewModel.lastSummaryURL == nil || !ObsidianLauncher.isInstalled)
+                        .actionCursor(isEnabled: viewModel.lastSummaryURL != nil && ObsidianLauncher.isInstalled)
 
                         Button {
                             guard let browserURL = viewModel.currentSummaryGoogleFileURL else { return }

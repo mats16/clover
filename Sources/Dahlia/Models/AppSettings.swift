@@ -1,4 +1,3 @@
-import AppKit
 import Combine
 import SwiftUI
 
@@ -40,72 +39,6 @@ enum AppLanguage: String, CaseIterable, Identifiable {
         case .en:
             Locale(identifier: "en")
         }
-    }
-}
-
-/// Markdown ファイルを開くエディタの選択肢。
-enum MarkdownEditor: String, CaseIterable, Identifiable {
-    case system
-    case obsidian
-    case vscode
-    case cursor
-    case antigravity
-
-    var id: String { rawValue }
-
-    var displayName: String {
-        switch self {
-        case .system: L10n.systemDefault
-        case .obsidian: "Obsidian"
-        case .vscode: "Visual Studio Code"
-        case .cursor: "Cursor"
-        case .antigravity: "Antigravity"
-        }
-    }
-
-    var bundleIdentifier: String? {
-        switch self {
-        case .system: nil
-        case .obsidian: "md.obsidian"
-        case .vscode: "com.microsoft.VSCode"
-        case .cursor: "com.todesktop.230313mzl4w4u92"
-        case .antigravity: "com.google.antigravity"
-        }
-    }
-
-    var isInstalled: Bool {
-        guard let bid = bundleIdentifier else { return true }
-        return NSWorkspace.shared.urlForApplication(withBundleIdentifier: bid) != nil
-    }
-
-    static var availableEditors: [MarkdownEditor] {
-        allCases.filter(\.isInstalled)
-    }
-
-    func open(_ url: URL) {
-        // Obsidian は file:// URL を渡してもファイルを開けないため URI スキームを使う
-        if self == .obsidian {
-            var components = URLComponents()
-            components.scheme = "obsidian"
-            components.host = "open"
-            components.queryItems = [URLQueryItem(name: "path", value: url.path)]
-            if let obsidianURL = components.url {
-                NSWorkspace.shared.open(obsidianURL)
-                return
-            }
-        }
-
-        guard let bid = bundleIdentifier,
-              let appURL = NSWorkspace.shared.urlForApplication(withBundleIdentifier: bid)
-        else {
-            NSWorkspace.shared.open(url)
-            return
-        }
-        NSWorkspace.shared.open(
-            [url],
-            withApplicationAt: appURL,
-            configuration: NSWorkspace.OpenConfiguration()
-        )
     }
 }
 
@@ -180,15 +113,6 @@ final class AppSettings: ObservableObject {
         return enabled.isEmpty || enabled.contains(identifier)
     }
 
-    // MARK: - Markdown エディタ設定
-
-    @AppStorage("markdownEditor") var markdownEditorRawValue: String = MarkdownEditor.system.rawValue
-
-    var markdownEditor: MarkdownEditor {
-        get { MarkdownEditor(rawValue: markdownEditorRawValue) ?? .system }
-        set { markdownEditorRawValue = newValue.rawValue }
-    }
-
     // MARK: - 保管庫（ランタイム状態）
 
     /// 現在開いている保管庫。DB の `vaults` テーブルから選択される。
@@ -206,6 +130,13 @@ final class AppSettings: ObservableObject {
     // MARK: - Agent 設定
 
     @AppStorage("agentLaunchCommand") var agentLaunchCommand = AppSettings.defaultAgentLaunchCommand
+    @AppStorage("agentPermissionMode") var agentPermissionModeRawValue = AgentPermissionMode.auto.rawValue
+    @AppStorage("agentAllowedTools") var agentAllowedTools = AgentService.defaultAllowedTools
+
+    var agentPermissionMode: AgentPermissionMode {
+        get { AgentPermissionMode(rawValue: agentPermissionModeRawValue) ?? .auto }
+        set { agentPermissionModeRawValue = newValue.rawValue }
+    }
 
     // MARK: - LLM 設定
 

@@ -145,7 +145,6 @@ final class SidebarViewModel {
         return (url, project.id, project.name)
     }
 
-    @ObservationIgnored private let folderService = FolderProjectService()
     @ObservationIgnored private var meetingRepository: MeetingRepository?
     @ObservationIgnored private var fileWatcher: TranscriptFileWatcher?
     @ObservationIgnored private var meetingObservations: [UUID: AnyDatabaseCancellable] = [:]
@@ -733,13 +732,6 @@ final class SidebarViewModel {
         if isActive, let updated = try? meetingRepository?.fetchOrCreateProject(name: newName, vaultId: vault.id) {
             selectProject(id: updated.id, name: updated.name)
         }
-    }
-
-    /// CONTEXT.md を作成（未存在の場合）し、設定されたエディタで開く。
-    func openContext(projectName: String) {
-        let projectURL = projectURL(for: projectName)
-        guard let contextURL = folderService.ensureContextFileExists(at: projectURL) else { return }
-        AppSettings.shared.markdownEditor.open(contextURL)
     }
 
     func deleteProject(id: UUID, name: String) {

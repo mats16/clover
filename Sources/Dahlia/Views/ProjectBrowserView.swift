@@ -139,9 +139,6 @@ private struct ProjectSectionView: View {
                     editingName = row.displayName
                     editingProjectId = row.id
                 },
-                onEditContext: {
-                    sidebarViewModel.openContext(projectName: row.name)
-                },
                 onOpenInFinder: {
                     NSWorkspace.shared.open(sidebarViewModel.projectURL(for: row.name))
                 },
@@ -203,7 +200,6 @@ private struct ProjectHeaderRow: View {
     let isSelected: Bool
     let onSelect: () -> Void
     let onRename: () -> Void
-    let onEditContext: () -> Void
     let onOpenInFinder: () -> Void
     let onDelete: () -> Void
     let onRecreateFolder: () -> Void
@@ -257,7 +253,6 @@ private struct ProjectHeaderRow: View {
             }
             Button(L10n.rename) { onRename() }
             if !row.missingOnDisk {
-                Button(L10n.editContext) { onEditContext() }
                 Button(L10n.openInFinder) { onOpenInFinder() }
             }
             Divider()

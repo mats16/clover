@@ -108,9 +108,6 @@ struct ProjectsOverviewView: View {
                                     onOpenInFinder: {
                                         NSWorkspace.shared.open(sidebarViewModel.projectURL(for: item.projectName))
                                     },
-                                    onEditContext: {
-                                        sidebarViewModel.openContext(projectName: item.projectName)
-                                    },
                                     onDelete: {
                                         sidebarViewModel.deleteProject(id: item.projectId, name: item.projectName)
                                     },
@@ -243,7 +240,6 @@ private struct ProjectsOverviewRow: View {
     let onToggleCheck: () -> Void
     let onRename: () -> Void
     let onOpenInFinder: () -> Void
-    let onEditContext: () -> Void
     let onDelete: () -> Void
     let onRecreateFolder: () -> Void
 
@@ -329,7 +325,6 @@ private struct ProjectsOverviewRow: View {
         }
         Button(L10n.rename) { onRename() }
         if !item.missingOnDisk {
-            Button(L10n.editContext) { onEditContext() }
             Button(L10n.openInFinder) { onOpenInFinder() }
         }
         Divider()

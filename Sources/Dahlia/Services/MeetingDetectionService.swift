@@ -17,7 +17,9 @@ final class MeetingDetectionService: ObservableObject {
     // MARK: - External Dependencies
 
     var isRecording: () -> Bool = { false }
-    var onStartTranscription: () -> Void = {}
+    var onOpenMeeting: (DetectedMeeting) -> Void = { _ in }
+    var onStartTranscription: (DetectedMeeting) -> Void = { _ in }
+    var onManageNotifications: () -> Void = {}
 
     // MARK: - Constants
 
@@ -65,6 +67,11 @@ final class MeetingDetectionService: ObservableObject {
     private var panelCloseObserver: NSObjectProtocol?
     /// CoreAudio リスナーコールバック用の共有キュー。
     private let micMonitorQueue = DispatchQueue(label: "com.dahlia.micMonitor")
+    private let now: () -> Date
+
+    init(now: @escaping () -> Date = Date.init) {
+        self.now = now
+    }
 
     // MARK: - Lifecycle
 
@@ -332,15 +339,29 @@ final class MeetingDetectionService: ObservableObject {
     // MARK: - Floating Panel
 
     private func showMeetingPopup(appName: String, bundleIdentifier: String) {
-        let meeting = DetectedMeeting(appName: appName, bundleIdentifier: bundleIdentifier)
+        let calendarEvent = recentCalendarEvent()
+        let meeting = DetectedMeeting(
+            title: meetingTitle(for: calendarEvent),
+            appName: appName,
+            bundleIdentifier: bundleIdentifier,
+            calendarEvent: calendarEvent
+        )
         detectedMeeting = meeting
 
         closePanel()
 
         let popupView = MeetingDetectionPopupView(
             meeting: meeting,
+            onOpen: { [weak self] in
+                self?.onOpenMeeting(meeting)
+                self?.dismiss()
+            },
             onStart: { [weak self] in
-                self?.onStartTranscription()
+                self?.onStartTranscription(meeting)
+                self?.dismiss()
+            },
+            onManageNotifications: { [weak self] in
+                self?.onManageNotifications()
                 self?.dismiss()
             },
             onDismiss: { [weak self] in
@@ -354,7 +375,7 @@ final class MeetingDetectionService: ObservableObject {
         let panelRect = panelFrame(for: hostingView.fittingSize)
         let newPanel = NSPanel(
             contentRect: panelRect,
-            styleMask: [.nonactivatingPanel, .fullSizeContentView],
+            styleMask: [.borderless, .nonactivatingPanel, .fullSizeContentView],
             backing: .buffered,
             defer: false
         )
@@ -365,7 +386,7 @@ final class MeetingDetectionService: ObservableObject {
         newPanel.isMovableByWindowBackground = true
         newPanel.isOpaque = false
         newPanel.backgroundColor = .clear
-        newPanel.hasShadow = true
+        newPanel.hasShadow = false
         newPanel.contentView = hostingView
         newPanel.collectionBehavior = [.canJoinAllSpaces, .fullScreenAuxiliary]
         newPanel.animationBehavior = .utilityWindow
@@ -423,5 +444,32 @@ final class MeetingDetectionService: ObservableObject {
         let x = visibleFrame.midX - size.width / 2
         let y = visibleFrame.maxY - size.height - 12
         return NSRect(x: x, y: y, width: size.width, height: size.height)
+    }
+
+    private func recentCalendarEvent() -> GoogleCalendarEvent? {
+        let currentDate = now()
+        let windowStart = currentDate.addingTimeInterval(-300)
+
+        return GoogleCalendarStore.shared.upcomingEvents
+            .filter { event in
+                !event.isAllDay
+                    && event.startDate >= windowStart
+                    && event.startDate <= currentDate
+                    && event.endDate >= currentDate
+            }
+            .min { lhs, rhs in
+                if lhs.startDate != rhs.startDate {
+                    return lhs.startDate > rhs.startDate
+                }
+                if lhs.endDate != rhs.endDate {
+                    return lhs.endDate < rhs.endDate
+                }
+                return lhs.title.localizedStandardCompare(rhs.title) == .orderedAscending
+            }
+    }
+
+    private func meetingTitle(for calendarEvent: GoogleCalendarEvent?) -> String {
+        let trimmed = calendarEvent?.title.trimmingCharacters(in: .whitespacesAndNewlines) ?? ""
+        return trimmed.isEmpty ? L10n.newMeeting : trimmed
     }
 }

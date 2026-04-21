@@ -28,7 +28,11 @@ final class CaptionViewModel: ObservableObject {
 
     // MARK: - Published State
 
-    @Published var store = TranscriptStore()
+    @Published var store = TranscriptStore() {
+        didSet {
+            bindStoreSegments()
+        }
+    }
     @Published var isListening = false
     @Published var analyzerReady = false
     @Published var isPreparingAnalyzer = false
@@ -89,6 +93,7 @@ final class CaptionViewModel: ObservableObject {
     @Published var availableWindows: [ScreenshotWindowOption] = []
     /// 選択中のウィンドウ ID。nil の場合はデスクトップ全体をキャプチャ。
     @Published var selectedWindowID: CGWindowID?
+    @Published private(set) var currentMeetingHasTranscriptSegments = false
 
     var hasCurrentMeetingSummary: Bool {
         guard let currentMeetingSummary else { return false }
@@ -197,6 +202,7 @@ final class CaptionViewModel: ObservableObject {
     private var pipelines: [(service: SpeechTranscriberService, bridge: AudioBufferBridge)] = []
     private var persistenceService: MeetingPersistenceService?
     private var settingsCancellable: AnyCancellable?
+    private var storeSegmentsCancellable: AnyCancellable?
     private var transcriptionLocaleCancellable: AnyCancellable?
     private var meetingLoadTask: Task<Void, Never>?
     private let availableInputDevicesProvider: @Sendable () -> [MicrophoneDevice]
@@ -213,6 +219,7 @@ final class CaptionViewModel: ObservableObject {
     ) {
         self.availableInputDevicesProvider = availableInputDevicesProvider
         self.defaultInputDeviceIDProvider = defaultInputDeviceIDProvider
+        bindStoreSegments()
         refreshAvailableMicrophones()
 
         // AppSettings の表示言語設定変更を監視
@@ -232,6 +239,16 @@ final class CaptionViewModel: ObservableObject {
             .sink { [weak self] localeIdentifier in
                 guard let self, self.selectedLocale != localeIdentifier else { return }
                 self.selectedLocale = localeIdentifier
+            }
+    }
+
+    private func bindStoreSegments() {
+        currentMeetingHasTranscriptSegments = !store.segments.isEmpty
+        storeSegmentsCancellable = store.$segments
+            .map { !$0.isEmpty }
+            .removeDuplicates()
+            .sink { [weak self] hasSegments in
+                self?.currentMeetingHasTranscriptSegments = hasSegments
             }
     }
 

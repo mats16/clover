@@ -34,6 +34,54 @@ struct AgentServiceTests {
     }
 
     @Test
+    func sessionArgumentsUseConfiguredPermissionMode() {
+        let arguments = AgentService.sessionArguments(
+            systemPrompt: "hello",
+            permissionMode: .acceptEdits,
+            allowedTools: AgentService.defaultAllowedTools
+        )
+
+        #expect(arguments.contains("--permission-mode"))
+        #expect(arguments.contains("acceptEdits"))
+    }
+
+    @Test
+    func sessionArgumentsSupportAutoPermissionMode() {
+        let arguments = AgentService.sessionArguments(
+            systemPrompt: "hello",
+            permissionMode: .auto,
+            allowedTools: AgentService.defaultAllowedTools
+        )
+
+        #expect(arguments.contains("--permission-mode"))
+        #expect(arguments.contains("auto"))
+        #expect(arguments.contains("plan") == false)
+    }
+
+    @Test
+    func sessionArgumentsUseConfiguredAllowedTools() {
+        let arguments = AgentService.sessionArguments(
+            systemPrompt: "hello",
+            permissionMode: .auto,
+            allowedTools: "Read WebSearch"
+        )
+
+        #expect(arguments.contains("--allowedTools"))
+        #expect(arguments.contains("Read WebSearch"))
+    }
+
+    @Test
+    func sessionArgumentsFallBackToDefaultAllowedToolsWhenBlank() {
+        let arguments = AgentService.sessionArguments(
+            systemPrompt: "hello",
+            permissionMode: .auto,
+            allowedTools: "   "
+        )
+
+        #expect(arguments.contains(AgentService.defaultAllowedTools))
+    }
+
+    @Test
     func resolveLaunchConfigurationFindsExecutableInInjectedPath() throws {
         let fixture = try LaunchFixture(commandName: "isaac")
         let configuration = try AgentService.resolveLaunchConfiguration(

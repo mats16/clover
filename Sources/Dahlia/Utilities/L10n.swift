@@ -61,7 +61,6 @@ enum L10n {
     static var location: String { String(localized: "Location", bundle: bundle) }
     static var latestMeeting: String { String(localized: "Latest Meeting", bundle: bundle) }
     static var contextCreationFailed: String { String(localized: "Could not create CONTEXT.md.", bundle: bundle) }
-    static var editContext: String { String(localized: "Edit Context", bundle: bundle) }
     static var openInFinder: String { String(localized: "Open in Finder", bundle: bundle) }
     static var openInObsidian: String { String(localized: "Open in Obsidian", bundle: bundle) }
     static var openInBrowser: String { String(localized: "Open in Browser", bundle: bundle) }
@@ -126,6 +125,7 @@ enum L10n {
     static var transcription: String { String(localized: "Transcription", bundle: bundle) }
     static func segmentCount(_ count: Int) -> String { String(localized: "\(count) segments", bundle: bundle) }
     static var stop: String { String(localized: "Stop", bundle: bundle) }
+    static var pause: String { String(localized: "Pause", bundle: bundle) }
     static var resume: String { String(localized: "Resume", bundle: bundle) }
     static var record: String { String(localized: "Record", bundle: bundle) }
     static var export: String { String(localized: "Export", bundle: bundle) }
@@ -189,6 +189,25 @@ enum L10n {
         localized: "Command used to launch the agent. Default: `claude`. A full path is optional when the executable is available in PATH or common user bin directories.",
         bundle: bundle
     ) }
+    static var agentPermissionMode: String { String(localized: "Permission Mode", bundle: bundle) }
+    static var agentPermissionModeDescription: String { String(
+        localized: "Choose how the agent handles permission prompts when using tools and editing files.",
+        bundle: bundle
+    ) }
+    static var agentPermissionModeAuto: String { String(localized: "Auto", bundle: bundle) }
+    static var agentPermissionModeDefault: String { String(localized: "Default", bundle: bundle) }
+    static var agentPermissionModeAcceptEdits: String { String(localized: "Accept Edits", bundle: bundle) }
+    static var agentPermissionModeBypassPermissions: String { String(localized: "Bypass Permissions", bundle: bundle) }
+    static var agentAllowedTools: String { String(localized: "Allowed Tools", bundle: bundle) }
+    static var agentAllowedToolsDescription: String { String(
+        localized: "Space-separated tool allowlist passed to the agent CLI. Leave blank to use the default set.",
+        bundle: bundle
+    ) }
+    static var agentAllowedToolsPlaceholder: String { String(
+        localized: "Add a tool and press Space",
+        bundle: bundle
+    ) }
+    static func agentAllowedToolsRemoveToken(_ token: String) -> String { String(localized: "Remove \(token)", bundle: bundle) }
 
     // MARK: - Audio Source Mode
 
@@ -206,18 +225,19 @@ enum L10n {
     // MARK: - Settings
 
     static var general: String { String(localized: "General", bundle: bundle) }
+    static var notifications: String { String(localized: "Notifications", bundle: bundle) }
     static var calendar: String { String(localized: "Calendar", bundle: bundle) }
     static var cloudStorage: String { String(localized: "Cloud Storage", bundle: bundle) }
     static var aiSummary: String { String(localized: "AI Summary", bundle: bundle) }
-    static var editor: String { String(localized: "Editor", bundle: bundle) }
+    static var aiAgent: String { String(localized: "AI Agent", bundle: bundle) }
     static var vault: String { String(localized: "Vault", bundle: bundle) }
+    static var appearance: String { String(localized: "Appearance", bundle: bundle) }
     static var display: String { String(localized: "Display", bundle: bundle) }
-    static var workflow: String { String(localized: "Workflow", bundle: bundle) }
     static var appLanguage: String { String(localized: "App Language", bundle: bundle) }
     static var appLanguageDescription: String { String(localized: "Set the display language for the app.", bundle: bundle) }
     static var followSystem: String { String(localized: "Follow System", bundle: bundle) }
-    static var generalSettingsDescription: String { String(
-        localized: "Manage language, meeting prompts, and editor preferences.",
+    static var notificationSettingsDescription: String { String(
+        localized: "Manage meeting detection prompts and related notification behavior.",
         bundle: bundle
     ) }
     static var transcriptionSettingsDescription: String { String(
@@ -243,7 +263,7 @@ enum L10n {
         bundle: bundle
     ) }
     static var agentSettingsDescription: String { String(
-        localized: "Configure the built-in agent sidebar launch command.",
+        localized: "Configure the built-in agent sidebar launch command and permission mode.",
         bundle: bundle
     ) }
     static var connectionDiagnosticsDescription: String { String(
@@ -400,12 +420,6 @@ enum L10n {
         bundle: bundle
     ) }
 
-    // MARK: - Settings (Markdown Editor)
-
-    static var markdownEditor: String { String(localized: "Markdown Editor", bundle: bundle) }
-    static var markdownEditorDescription: String { String(localized: "Editor used to open context and summary files.", bundle: bundle) }
-    static var systemDefault: String { String(localized: "System Default", bundle: bundle) }
-
     // MARK: - Settings (LLM)
 
     static var model: String { String(localized: "Model", bundle: bundle) }
@@ -495,7 +509,10 @@ enum L10n {
         bundle: bundle
     ) }
     static var startTranscription: String { String(localized: "Start Transcription", bundle: bundle) }
+    static var startTranscribing: String { String(localized: "Start transcribing", bundle: bundle) }
+    static var manageNotificationSettings: String { String(localized: "Manage notification settings", bundle: bundle) }
     static var dismiss: String { String(localized: "Dismiss", bundle: bundle) }
+    static var meetingDetected: String { String(localized: "Meeting detected", bundle: bundle) }
     static func meetingDetectedSubtitle(_ appName: String) -> String { String(
         localized: "Meeting detected in \(appName)",
         bundle: bundle

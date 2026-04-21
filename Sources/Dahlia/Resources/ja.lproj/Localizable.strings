@@ -31,7 +31,6 @@
 "Location" = "場所";
 "Latest Meeting" = "最新の meeting";
 "Could not create CONTEXT.md." = "CONTEXT.md を作成できませんでした。";
-"Edit Context" = "コンテキストを編集";
 "Open in Finder" = "Finder で開く";
 "Open in Obsidian" = "Obsidian で開く";
 "Open in Browser" = "ブラウザで開く";
@@ -86,6 +85,7 @@
 "Transcription" = "文字起こし";
 "%lld segments" = "%lld セグメント";
 "Stop" = "停止";
+"Pause" = "一時停止";
 "Resume" = "再開";
 "Record" = "録音";
 "Export" = "書き出し";
@@ -97,7 +97,7 @@
 "Hide Live Subtitles" = "ライブ字幕を隠す";
 "Live Subtitle Overlay" = "ライブ字幕オーバーレイ";
 "Configure how the desktop live subtitle overlay is shown while recording." = "録音中に表示するデスクトップのライブ字幕オーバーレイ設定を調整します。";
-"Subtitles" = "字幕";
+"Subtitles" = "ライブ字幕";
 "System Audio Only" = "システムオーディオのみ";
 "Include Microphone" = "マイク入力を含める";
 "Choose whether live subtitles only show system audio or also include microphone input." = "ライブ字幕をシステムオーディオのみにするか、マイク入力も含めるかを選びます。";
@@ -134,6 +134,16 @@
 /* Settings (Agent) */
 "Launch Command" = "起動コマンド";
 "Command used to launch the agent. Default: `claude`. A full path is optional when the executable is available in PATH or common user bin directories." = "エージェントの起動コマンドです。デフォルトは `claude` です。実行ファイルが PATH または一般的なユーザー用 bin ディレクトリで見つかる場合、フルパスは不要です。";
+"Permission Mode" = "権限モード";
+"Choose how the agent handles permission prompts when using tools and editing files." = "ツール利用やファイル編集時の権限プロンプトの扱い方を選びます。";
+"Auto" = "自動";
+"Default" = "通常";
+"Accept Edits" = "編集を自動許可";
+"Bypass Permissions" = "権限確認をスキップ";
+"Allowed Tools" = "許可ツール";
+"Space-separated tool allowlist passed to the agent CLI. Leave blank to use the default set." = "Agent CLI に渡す、スペース区切りの許可ツール一覧です。空欄の場合はデフォルト値を使います。";
+"Add a tool and press Space" = "ツール名を入力して Space で追加";
+"Remove %@" = "%@ を削除";
 
 /* Audio Source Mode */
 "Audio source" = "音声ソース";
@@ -150,15 +160,17 @@
 
 /* Settings */
 "General" = "一般";
+"Notifications" = "通知";
 "Calendar" = "カレンダー";
-"AI Summary" = "要約";
+"AI Summary" = "AI Summary";
+"AI Agent" = "AI Agent";
 "Vault" = "保管庫";
+"Appearance" = "外観";
 "Display" = "表示";
-"Workflow" = "ワークフロー";
 "App Language" = "表示言語";
 "Set the display language for the app." = "アプリの表示言語を設定します。";
 "Follow System" = "システムに従う";
-"Manage language, meeting prompts, and editor preferences." = "表示言語、会議検出、エディタ連携を管理します。";
+"Manage meeting detection prompts and related notification behavior." = "会議検出のポップアップと関連する通知設定を管理します。";
 "Choose which languages appear when starting transcription." = "文字起こし開始時に表示する言語を選びます。";
 "Transcript Translation" = "文字起こし翻訳";
 "Show translated transcript lines in the selected target language when available." = "選択したターゲット言語で翻訳済みの文字起こし行を表示します。";
@@ -166,7 +178,7 @@
 "Choose which language translated transcript lines should use." = "翻訳済みの文字起こし行に使う言語を選びます。";
 "Translation is automatically disabled when the target language matches the transcription language." = "翻訳先の言語が文字起こし言語と同じ場合、翻訳は自動的に無効になります。";
 "Configure automatic summaries and the LLM connection used to generate them." = "自動要約と、その生成に使う LLM 接続設定を管理します。";
-"Configure the built-in agent sidebar launch command." = "内蔵 Agent サイドバーの起動コマンドを設定します。";
+"Configure the built-in agent sidebar launch command and permission mode." = "内蔵 Agent サイドバーの起動コマンドと権限モードを設定します。";
 "Run a quick request to validate your endpoint, model, and token." = "エンドポイント、モデル、トークンの組み合わせを簡易的に検証します。";
 "Google Calendar" = "Google カレンダー";
 "Connect a Google account and choose which calendars appear on Home." = "Google アカウントを接続し、Home に表示するカレンダーを選びます。";
@@ -217,11 +229,6 @@
 "Show all" = "すべて表示に戻す";
 "Display Languages" = "表示する言語";
 "Only selected languages will appear in the language picker. All languages are shown if none are selected." = "選択した言語のみが言語ピッカーに表示されます。未選択の場合はすべての言語が表示されます。";
-
-/* Settings - Markdown Editor */
-"Markdown Editor" = "Markdown エディタ";
-"Editor used to open context and summary files." = "コンテキストファイルやサマリファイルを開く際に使用するエディタです。";
-"System Default" = "システムデフォルト";
 
 /* Settings - LLM */
 "LLM Settings" = "モデル設定";
@@ -283,7 +290,10 @@
 "Show a prompt when a video meeting is detected." = "ビデオ会議が検出されたときにプロンプトを表示します。";
 "Meeting detected (%@). Start transcription?" = "会議が検出されました（%@）。文字起こしを開始しますか？";
 "Start Transcription" = "文字起こしを開始";
+"Start transcribing" = "文字起こしを開始";
+"Manage notification settings" = "通知設定を管理";
 "Dismiss" = "閉じる";
+"Meeting detected" = "ミーティングが検出されました";
 "Meeting detected in %@" = "%@ でミーティングが検出されました";
 "Microphone is in use" = "マイクが使用されています";
 
