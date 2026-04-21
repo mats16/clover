@@ -1,6 +1,6 @@
 import SwiftUI
 
-/// 設定画面「一般」タブ。会議検出とエディタを管理する。
+/// 設定画面「一般」タブ。表示言語とエディタを管理する。
 struct GeneralSettingsView: View {
     @ObservedObject private var settings = AppSettings.shared
 
@@ -25,14 +25,6 @@ struct GeneralSettingsView: View {
 
             SettingsSection(title: L10n.workflow) {
                 SettingsCard {
-                    SettingsToggleRow(
-                        title: L10n.meetingDetection,
-                        description: L10n.meetingDetectionDescription,
-                        isOn: $settings.meetingDetectionEnabled
-                    )
-
-                    Divider()
-
                     SettingsControlRow(
                         title: L10n.markdownEditor,
                         description: L10n.markdownEditorDescription

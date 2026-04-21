@@ -206,6 +206,7 @@ enum L10n {
     // MARK: - Settings
 
     static var general: String { String(localized: "General", bundle: bundle) }
+    static var notifications: String { String(localized: "Notifications", bundle: bundle) }
     static var calendar: String { String(localized: "Calendar", bundle: bundle) }
     static var cloudStorage: String { String(localized: "Cloud Storage", bundle: bundle) }
     static var aiSummary: String { String(localized: "AI Summary", bundle: bundle) }
@@ -217,7 +218,11 @@ enum L10n {
     static var appLanguageDescription: String { String(localized: "Set the display language for the app.", bundle: bundle) }
     static var followSystem: String { String(localized: "Follow System", bundle: bundle) }
     static var generalSettingsDescription: String { String(
-        localized: "Manage language, meeting prompts, and editor preferences.",
+        localized: "Manage language and editor preferences.",
+        bundle: bundle
+    ) }
+    static var notificationSettingsDescription: String { String(
+        localized: "Manage meeting detection prompts and related notification behavior.",
         bundle: bundle
     ) }
     static var transcriptionSettingsDescription: String { String(
@@ -495,7 +500,10 @@ enum L10n {
         bundle: bundle
     ) }
     static var startTranscription: String { String(localized: "Start Transcription", bundle: bundle) }
+    static var startTranscribing: String { String(localized: "Start transcribing", bundle: bundle) }
+    static var manageNotificationSettings: String { String(localized: "Manage notification settings", bundle: bundle) }
     static var dismiss: String { String(localized: "Dismiss", bundle: bundle) }
+    static var meetingDetected: String { String(localized: "Meeting detected", bundle: bundle) }
     static func meetingDetectedSubtitle(_ appName: String) -> String { String(
         localized: "Meeting detected in \(appName)",
         bundle: bundle

@@ -150,6 +150,7 @@
 
 /* Settings */
 "General" = "一般";
+"Notifications" = "通知";
 "Calendar" = "カレンダー";
 "AI Summary" = "要約";
 "Vault" = "保管庫";
@@ -158,7 +159,8 @@
 "App Language" = "表示言語";
 "Set the display language for the app." = "アプリの表示言語を設定します。";
 "Follow System" = "システムに従う";
-"Manage language, meeting prompts, and editor preferences." = "表示言語、会議検出、エディタ連携を管理します。";
+"Manage language and editor preferences." = "表示言語とエディタ連携を管理します。";
+"Manage meeting detection prompts and related notification behavior." = "会議検出のポップアップと関連する通知設定を管理します。";
 "Choose which languages appear when starting transcription." = "文字起こし開始時に表示する言語を選びます。";
 "Transcript Translation" = "文字起こし翻訳";
 "Show translated transcript lines in the selected target language when available." = "選択したターゲット言語で翻訳済みの文字起こし行を表示します。";
@@ -283,7 +285,10 @@
 "Show a prompt when a video meeting is detected." = "ビデオ会議が検出されたときにプロンプトを表示します。";
 "Meeting detected (%@). Start transcription?" = "会議が検出されました（%@）。文字起こしを開始しますか？";
 "Start Transcription" = "文字起こしを開始";
+"Start transcribing" = "文字起こしを開始";
+"Manage notification settings" = "通知設定を管理";
 "Dismiss" = "閉じる";
+"Meeting detected" = "ミーティングが検出されました";
 "Meeting detected in %@" = "%@ でミーティングが検出されました";
 "Microphone is in use" = "マイクが使用されています";
 

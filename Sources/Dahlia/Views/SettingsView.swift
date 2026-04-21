@@ -1,8 +1,10 @@
+import AppKit
 import SwiftUI
 
 /// 設定画面のカテゴリ。
 enum SettingsCategory: String, CaseIterable, Identifiable {
     case general
+    case notification
     case calendar
     case cloudStorage
     case transcription
@@ -14,6 +16,7 @@ enum SettingsCategory: String, CaseIterable, Identifiable {
     var label: String {
         switch self {
         case .general: L10n.general
+        case .notification: L10n.notifications
         case .calendar: L10n.calendar
         case .cloudStorage: L10n.cloudStorage
         case .transcription: L10n.transcription
@@ -25,6 +28,7 @@ enum SettingsCategory: String, CaseIterable, Identifiable {
     var systemImage: String {
         switch self {
         case .general: "gearshape"
+        case .notification: "bell.badge"
         case .calendar: "calendar"
         case .cloudStorage: "externaldrive.badge.icloud"
         case .transcription: "waveform"
@@ -34,9 +38,22 @@ enum SettingsCategory: String, CaseIterable, Identifiable {
     }
 }
 
+enum SettingsNavigation {
+    static let selectedCategoryDefaultsKey = "settingsSelectedCategory"
+
+    @MainActor
+    static func open(_ category: SettingsCategory) {
+        UserDefaults.standard.set(category.rawValue, forKey: selectedCategoryDefaultsKey)
+        NSApp.activate(ignoringOtherApps: true)
+        NSApp.sendAction(Selector(("showSettingsWindow:")), to: nil, from: nil)
+    }
+}
+
 /// 設定画面（Cmd+, で表示）。サイドバーでセクションを切り替える。
 struct SettingsView: View {
-    @State private var selection: SettingsCategory? = .general
+    @AppStorage(SettingsNavigation.selectedCategoryDefaultsKey)
+    private var selectionRawValue = SettingsCategory.general.rawValue
+
     private let sidebarWidth: CGFloat = 240
 
     var body: some View {
@@ -65,9 +82,11 @@ struct SettingsView: View {
 
     @ViewBuilder
     private var selectedCategoryView: some View {
-        switch selection ?? .general {
+        switch selectedCategory {
         case .general:
             GeneralSettingsView()
+        case .notification:
+            NotificationSettingsView()
         case .calendar:
             CalendarSettingsView()
         case .cloudStorage:
@@ -83,7 +102,7 @@ struct SettingsView: View {
 
     private func settingsSidebarRow(for category: SettingsCategory) -> some View {
         Button {
-            selection = category
+            selectionRawValue = category.rawValue
         } label: {
             Label(category.label, systemImage: category.systemImage)
                 .font(.body)
@@ -95,7 +114,11 @@ struct SettingsView: View {
         .buttonStyle(.plain)
         .background(
             RoundedRectangle(cornerRadius: 10)
-                .fill(selection == category ? Color.primary.opacity(0.08) : Color.clear)
+                .fill(selectedCategory == category ? Color.primary.opacity(0.08) : Color.clear)
         )
+    }
+
+    private var selectedCategory: SettingsCategory {
+        SettingsCategory(rawValue: selectionRawValue) ?? .general
     }
 }
