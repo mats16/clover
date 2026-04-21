@@ -48,7 +48,7 @@ actor PreviewTranslationCoordinator {
             let translatedText = await translate(segment)
             guard !Task.isCancelled else { return }
 
-            guard await self.generation == currentGeneration else { return }
+            guard self.generation == currentGeneration else { return }
             await applyTranslation(segment.id, translatedText)
         }
     }
