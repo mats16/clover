@@ -189,6 +189,15 @@ enum L10n {
         localized: "Command used to launch the agent. Default: `claude`. A full path is optional when the executable is available in PATH or common user bin directories.",
         bundle: bundle
     ) }
+    static var agentPermissionMode: String { String(localized: "Permission Mode", bundle: bundle) }
+    static var agentPermissionModeDescription: String { String(
+        localized: "Choose how the agent handles permission prompts when using tools and editing files.",
+        bundle: bundle
+    ) }
+    static var agentPermissionModeAuto: String { String(localized: "Auto", bundle: bundle) }
+    static var agentPermissionModeDefault: String { String(localized: "Default", bundle: bundle) }
+    static var agentPermissionModeAcceptEdits: String { String(localized: "Accept Edits", bundle: bundle) }
+    static var agentPermissionModeBypassPermissions: String { String(localized: "Bypass Permissions", bundle: bundle) }
 
     // MARK: - Audio Source Mode
 
@@ -244,7 +253,7 @@ enum L10n {
         bundle: bundle
     ) }
     static var agentSettingsDescription: String { String(
-        localized: "Configure the built-in agent sidebar launch command.",
+        localized: "Configure the built-in agent sidebar launch command and permission mode.",
         bundle: bundle
     ) }
     static var connectionDiagnosticsDescription: String { String(

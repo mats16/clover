@@ -130,10 +130,10 @@ final class AppSettings: ObservableObject {
     // MARK: - Agent 設定
 
     @AppStorage("agentLaunchCommand") var agentLaunchCommand = AppSettings.defaultAgentLaunchCommand
-    @AppStorage("agentPermissionMode") var agentPermissionModeRawValue = AgentPermissionMode.default.rawValue
+    @AppStorage("agentPermissionMode") var agentPermissionModeRawValue = AgentPermissionMode.auto.rawValue
 
     var agentPermissionMode: AgentPermissionMode {
-        get { AgentPermissionMode(rawValue: agentPermissionModeRawValue) ?? .default }
+        get { AgentPermissionMode(rawValue: agentPermissionModeRawValue) ?? .auto }
         set { agentPermissionModeRawValue = newValue.rawValue }
     }
 

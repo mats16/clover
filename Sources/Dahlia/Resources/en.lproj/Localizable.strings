@@ -134,6 +134,12 @@
 /* Settings (Agent) */
 "Launch Command" = "Launch Command";
 "Command used to launch the agent. Default: `claude`. A full path is optional when the executable is available in PATH or common user bin directories." = "Command used to launch the agent. Default: `claude`. A full path is optional when the executable is available in PATH or common user bin directories.";
+"Permission Mode" = "Permission Mode";
+"Choose how the agent handles permission prompts when using tools and editing files." = "Choose how the agent handles permission prompts when using tools and editing files.";
+"Auto" = "Auto";
+"Default" = "Default";
+"Accept Edits" = "Accept Edits";
+"Bypass Permissions" = "Bypass Permissions";
 
 /* Audio Source Mode */
 "Audio source" = "Audio source";
@@ -168,7 +174,7 @@
 "Choose which language translated transcript lines should use." = "Choose which language translated transcript lines should use.";
 "Translation is automatically disabled when the target language matches the transcription language." = "Translation is automatically disabled when the target language matches the transcription language.";
 "Configure automatic summaries and the LLM connection used to generate them." = "Configure automatic summaries and the LLM connection used to generate them.";
-"Configure the built-in agent sidebar launch command." = "Configure the built-in agent sidebar launch command.";
+"Configure the built-in agent sidebar launch command and permission mode." = "Configure the built-in agent sidebar launch command and permission mode.";
 "Run a quick request to validate your endpoint, model, and token." = "Run a quick request to validate your endpoint, model, and token.";
 "Google Calendar" = "Google Calendar";
 "Connect a Google account and choose which calendars appear on Home." = "Connect a Google account and choose which calendars appear on Home.";

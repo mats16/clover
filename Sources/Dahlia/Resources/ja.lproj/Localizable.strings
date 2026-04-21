@@ -134,6 +134,12 @@
 /* Settings (Agent) */
 "Launch Command" = "起動コマンド";
 "Command used to launch the agent. Default: `claude`. A full path is optional when the executable is available in PATH or common user bin directories." = "エージェントの起動コマンドです。デフォルトは `claude` です。実行ファイルが PATH または一般的なユーザー用 bin ディレクトリで見つかる場合、フルパスは不要です。";
+"Permission Mode" = "権限モード";
+"Choose how the agent handles permission prompts when using tools and editing files." = "ツール利用やファイル編集時の権限プロンプトの扱い方を選びます。";
+"Auto" = "自動";
+"Default" = "通常";
+"Accept Edits" = "編集を自動許可";
+"Bypass Permissions" = "権限確認をスキップ";
 
 /* Audio Source Mode */
 "Audio source" = "音声ソース";
@@ -168,7 +174,7 @@
 "Choose which language translated transcript lines should use." = "翻訳済みの文字起こし行に使う言語を選びます。";
 "Translation is automatically disabled when the target language matches the transcription language." = "翻訳先の言語が文字起こし言語と同じ場合、翻訳は自動的に無効になります。";
 "Configure automatic summaries and the LLM connection used to generate them." = "自動要約と、その生成に使う LLM 接続設定を管理します。";
-"Configure the built-in agent sidebar launch command." = "内蔵 Agent サイドバーの起動コマンドを設定します。";
+"Configure the built-in agent sidebar launch command and permission mode." = "内蔵 Agent サイドバーの起動コマンドと権限モードを設定します。";
 "Run a quick request to validate your endpoint, model, and token." = "エンドポイント、モデル、トークンの組み合わせを簡易的に検証します。";
 "Google Calendar" = "Google カレンダー";
 "Connect a Google account and choose which calendars appear on Home." = "Google アカウントを接続し、Home に表示するカレンダーを選びます。";
