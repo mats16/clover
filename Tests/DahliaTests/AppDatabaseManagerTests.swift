@@ -100,6 +100,55 @@ struct AppDatabaseManagerTests {
 
         #expect(tables.contains("instructions"))
     }
+
+    @Test
+    func existingV3DatabasePreservesExistingDataDuringMigration() throws {
+        let databaseURL = URL(fileURLWithPath: NSTemporaryDirectory())
+            .appendingPathComponent(UUID().uuidString)
+            .appendingPathExtension("sqlite")
+        let legacyVaultID = UUID.v7()
+        let createdAt = Date.now
+
+        defer { try? FileManager.default.removeItem(at: databaseURL) }
+
+        let legacyQueue = try DatabaseQueue(path: databaseURL.path)
+        try legacyQueue.write { db in
+            try db.create(table: "vaults") { t in
+                t.primaryKey("id", .blob)
+                t.column("path", .text).notNull().unique()
+                t.column("name", .text).notNull()
+                t.column("createdAt", .datetime).notNull()
+                t.column("lastOpenedAt", .datetime).notNull()
+            }
+            try db.create(table: "grdb_migrations") { t in
+                t.column("identifier", .text).primaryKey()
+            }
+            try db.execute(
+                sql: """
+                INSERT INTO vaults (id, path, name, createdAt, lastOpenedAt)
+                VALUES (?, ?, ?, ?, ?)
+                """,
+                arguments: [legacyVaultID, "/tmp/legacy-vault", "Legacy Vault", createdAt, createdAt]
+            )
+            try db.execute(
+                sql: "INSERT INTO grdb_migrations (identifier) VALUES (?)",
+                arguments: ["v3_googleDriveFolderSchema"]
+            )
+        }
+
+        let migrated = try AppDatabaseManager(path: databaseURL.path)
+        let migratedVault = try migrated.dbQueue.read { db in
+            try Row.fetchOne(
+                db,
+                sql: "SELECT id, path, name FROM vaults WHERE id = ?",
+                arguments: [legacyVaultID]
+            )
+        }
+
+        #expect(migratedVault != nil)
+        #expect(migratedVault?["path"] == "/tmp/legacy-vault")
+        #expect(migratedVault?["name"] == "Legacy Vault")
+    }
 }
 #elseif canImport(XCTest)
 import XCTest
@@ -194,6 +243,54 @@ final class AppDatabaseManagerTests: XCTestCase {
         }
 
         XCTAssertTrue(tables.contains("instructions"))
+    }
+
+    func testExistingV3DatabasePreservesExistingDataDuringMigration() throws {
+        let databaseURL = URL(fileURLWithPath: NSTemporaryDirectory())
+            .appendingPathComponent(UUID().uuidString)
+            .appendingPathExtension("sqlite")
+        let legacyVaultID = UUID.v7()
+        let createdAt = Date.now
+
+        defer { try? FileManager.default.removeItem(at: databaseURL) }
+
+        let legacyQueue = try DatabaseQueue(path: databaseURL.path)
+        try legacyQueue.write { db in
+            try db.create(table: "vaults") { t in
+                t.primaryKey("id", .blob)
+                t.column("path", .text).notNull().unique()
+                t.column("name", .text).notNull()
+                t.column("createdAt", .datetime).notNull()
+                t.column("lastOpenedAt", .datetime).notNull()
+            }
+            try db.create(table: "grdb_migrations") { t in
+                t.column("identifier", .text).primaryKey()
+            }
+            try db.execute(
+                sql: """
+                INSERT INTO vaults (id, path, name, createdAt, lastOpenedAt)
+                VALUES (?, ?, ?, ?, ?)
+                """,
+                arguments: [legacyVaultID, "/tmp/legacy-vault", "Legacy Vault", createdAt, createdAt]
+            )
+            try db.execute(
+                sql: "INSERT INTO grdb_migrations (identifier) VALUES (?)",
+                arguments: ["v3_googleDriveFolderSchema"]
+            )
+        }
+
+        let migrated = try AppDatabaseManager(path: databaseURL.path)
+        let migratedVault = try migrated.dbQueue.read { db in
+            try Row.fetchOne(
+                db,
+                sql: "SELECT id, path, name FROM vaults WHERE id = ?",
+                arguments: [legacyVaultID]
+            )
+        }
+
+        XCTAssertNotNil(migratedVault)
+        XCTAssertEqual(migratedVault?["path"], "/tmp/legacy-vault")
+        XCTAssertEqual(migratedVault?["name"], "Legacy Vault")
     }
 }
 #endif

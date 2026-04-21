@@ -57,6 +57,7 @@ Projects map to filesystem folders under a vault directory. `VaultSyncService` m
 ## Code Conventions
 
 - **Concurrency**: `@MainActor` on ViewModels, Store, Repository. `actor` for `SpeechTranscriberService`. `@unchecked Sendable` only for ScreenCaptureKit delegates. `@preconcurrency import` to suppress Apple framework Sendable warnings.
+- **DB migrations**: リリース向けのマイグレーションでは既存ユーザーデータを保持すること。`eraseDatabaseOnSchemaChange` のような破壊的リセットは使わず、GRDB の前方互換な追加マイグレーションで対応する。
 - **UI strings**: Japanese (primary) + English via `L10n` dynamic localization.
 - **Formatting**: SwiftFormat + SwiftLint enforced (see `.swiftformat`, `.swiftlint.yml`). 4-space indent, 150 char line limit, trailing commas required.
 - **IDs**: UUID v7 (`UUID.v7()`) for time-sortable ordering.

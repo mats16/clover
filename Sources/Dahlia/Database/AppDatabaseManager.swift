@@ -34,8 +34,8 @@ final class AppDatabaseManager: Sendable {
     private static let migrator: DatabaseMigrator = {
         var migrator = DatabaseMigrator()
 
-        // リリース前のため、旧スキーマとの互換性は持たず現行スキーマへ作り直す。
-        migrator.eraseDatabaseOnSchemaChange = true
+        // リリース後は既存ユーザーデータを保持する。破壊的な自動再作成は行わない。
+        migrator.eraseDatabaseOnSchemaChange = false
 
         migrator.registerMigration("v3_googleDriveFolderSchema") { db in
             try createSchema(in: db)
