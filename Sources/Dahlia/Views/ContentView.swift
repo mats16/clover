@@ -5,6 +5,7 @@ struct ContentView: View {
     private let primarySidebarWidth: CGFloat = 220
     @ObservedObject var viewModel: CaptionViewModel
     var sidebarViewModel: SidebarViewModel
+    let liveSubtitleOverlayService: LiveSubtitleOverlayService
     var onSelectVault: (VaultRecord) -> Void = { _ in }
     @State private var isPrimarySidebarPresented = true
     @State private var isAgentSidebarPresented = false
@@ -32,8 +33,18 @@ struct ContentView: View {
             detailArea
         }
         .background(WindowTitlebarConfigurator())
+        .background {
+            LiveSubtitleOverlaySyncView(
+                store: viewModel.activeTranscriptStoreForAgent,
+                isListening: viewModel.isListening,
+                liveSubtitleOverlayService: liveSubtitleOverlayService
+            )
+        }
         .toolbar(content: windowToolbarContent)
         .onAppear(perform: initializeNavigationHistoryIfNeeded)
+        .onDisappear {
+            liveSubtitleOverlayService.hide()
+        }
         .onChange(of: sidebarViewModel.selectedMeetingSelection) { oldSelection, newSelection in
             guard oldSelection != newSelection else { return }
             switch newSelection {
@@ -650,5 +661,65 @@ struct ContentView: View {
         }
         .frame(maxWidth: .infinity, maxHeight: .infinity)
         .background(.background)
+    }
+}
+
+private struct LiveSubtitleOverlaySyncView: View {
+    @ObservedObject var store: TranscriptStore
+    let isListening: Bool
+    let liveSubtitleOverlayService: LiveSubtitleOverlayService
+
+    @AppStorage("liveSubtitleOverlayEnabled") private var liveSubtitleOverlayEnabled = false
+    @AppStorage("liveSubtitleOverlaySegmentCount") private var liveSubtitleOverlaySegmentCount = 2
+    @AppStorage("transcriptTranslationEnabled") private var transcriptTranslationEnabled = true
+    @AppStorage("transcriptionLocale") private var transcriptionLocale = Locale.current.identifier
+    @AppStorage("transcriptTranslationTargetLanguage") private var targetLanguageIdentifier = TranscriptTranslationLanguage.defaultIdentifier
+
+    var body: some View {
+        Color.clear
+            .frame(width: 0, height: 0)
+            .allowsHitTesting(false)
+            .onAppear(perform: syncOverlay)
+            .onDisappear {
+                liveSubtitleOverlayService.hide()
+            }
+            .onChange(of: store.segments) { _, _ in
+                syncOverlay()
+            }
+            .onChange(of: isListening) { _, _ in
+                syncOverlay()
+            }
+            .onChange(of: liveSubtitleOverlayEnabled) { _, _ in
+                syncOverlay()
+            }
+            .onChange(of: liveSubtitleOverlaySegmentCount) { _, _ in
+                syncOverlay()
+            }
+            .onChange(of: transcriptTranslationEnabled) { _, _ in
+                syncOverlay()
+            }
+            .onChange(of: transcriptionLocale) { _, _ in
+                syncOverlay()
+            }
+            .onChange(of: targetLanguageIdentifier) { _, _ in
+                syncOverlay()
+            }
+    }
+
+    private func syncOverlay() {
+        guard isListening, liveSubtitleOverlayEnabled else {
+            liveSubtitleOverlayService.hide()
+            return
+        }
+
+        let payload = LiveSubtitleOverlayPayload.latest(
+            from: store.segments,
+            transcriptionLocaleIdentifier: transcriptionLocale,
+            translationEnabled: transcriptTranslationEnabled,
+            targetLanguageIdentifier: targetLanguageIdentifier,
+            maxEntries: max(1, liveSubtitleOverlaySegmentCount)
+        )
+
+        liveSubtitleOverlayService.update(payload: payload)
     }
 }

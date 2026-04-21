@@ -133,6 +133,12 @@ enum L10n {
     static var newTranscription: String { String(localized: "New Transcription", bundle: bundle) }
     static var screen: String { String(localized: "Screen", bundle: bundle) }
     static var source: String { String(localized: "Source", bundle: bundle) }
+    static var showLiveSubtitles: String { String(localized: "Show Live Subtitles", bundle: bundle) }
+    static var hideLiveSubtitles: String { String(localized: "Hide Live Subtitles", bundle: bundle) }
+    static var liveSubtitleOverlay: String { String(localized: "Live Subtitle Overlay", bundle: bundle) }
+    static var liveSubtitleOverlayDescription: String { String(localized: "Configure how the desktop live subtitle overlay is shown while recording.", bundle: bundle) }
+    static var liveSubtitleOverlaySegmentCount: String { String(localized: "Overlay Segment Count", bundle: bundle) }
+    static var liveSubtitleOverlaySegmentCountDescription: String { String(localized: "Choose how many recent transcript segments the live subtitle overlay shows.", bundle: bundle) }
 
     // MARK: - Detail Tabs
 

@@ -131,6 +131,8 @@ final class AppSettings: ObservableObject {
     @AppStorage("transcriptionLocale") var transcriptionLocale: String = Locale.current.identifier
     @AppStorage("transcriptTranslationEnabled") var transcriptTranslationEnabled = true
     @AppStorage("transcriptTranslationTargetLanguage") var transcriptTranslationTargetLanguage = TranscriptTranslationLanguage.defaultIdentifier
+    @AppStorage("liveSubtitleOverlayEnabled") var liveSubtitleOverlayEnabled = false
+    @AppStorage("liveSubtitleOverlaySegmentCount") var liveSubtitleOverlaySegmentCount = 2
 
     var isTranscriptTranslationEffectivelyEnabled: Bool {
         transcriptTranslationEnabled && TranscriptTranslationLanguage.shouldTranslate(
@@ -341,6 +343,10 @@ extension UserDefaults {
 
     @objc dynamic var transcriptTranslationTargetLanguage: String? {
         string(forKey: "transcriptTranslationTargetLanguage")
+    }
+
+    @objc dynamic var liveSubtitleOverlayEnabled: Bool {
+        bool(forKey: "liveSubtitleOverlayEnabled")
     }
 
     @objc dynamic var llmAutoSummaryEnabled: Bool {

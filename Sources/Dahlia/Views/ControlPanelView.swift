@@ -106,6 +106,10 @@ struct FloatingActionBar: View {
             SessionSettingsMenu(viewModel: viewModel, sidebarViewModel: sidebarViewModel)
             FloatingActionBarSeparator()
             TranscribeButton(viewModel: viewModel, sidebarViewModel: sidebarViewModel)
+            if viewModel.isListening {
+                FloatingActionBarSeparator()
+                LiveSubtitleOverlayToggleButton()
+            }
             if shouldShowGenerateSummaryButton {
                 FloatingActionBarSeparator()
                 GenerateSummaryButton(viewModel: viewModel)
@@ -474,6 +478,31 @@ private struct TranscribeButton: View {
         }
     }
 
+}
+
+private struct LiveSubtitleOverlayToggleButton: View {
+    @AppStorage("liveSubtitleOverlayEnabled") private var liveSubtitleOverlayEnabled = false
+
+    var body: some View {
+        HStack(spacing: 8) {
+            Image(systemName: "text.alignleft")
+                .font(.system(size: 14, weight: .medium))
+                .foregroundStyle(.primary)
+
+            Toggle(
+                liveSubtitleOverlayEnabled ? L10n.hideLiveSubtitles : L10n.showLiveSubtitles,
+                isOn: $liveSubtitleOverlayEnabled
+            )
+            .labelsHidden()
+            .toggleStyle(.switch)
+            .controlSize(.small)
+        }
+        .fixedSize()
+        .padding(.horizontal, 8)
+        .padding(.vertical, 8)
+        .help(liveSubtitleOverlayEnabled ? L10n.hideLiveSubtitles : L10n.showLiveSubtitles)
+        .accessibilityLabel(liveSubtitleOverlayEnabled ? L10n.hideLiveSubtitles : L10n.showLiveSubtitles)
+    }
 }
 
 /// スクリーンショット拡大表示オーバーレイ。

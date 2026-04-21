@@ -50,6 +50,27 @@ struct TranscriptionSettingsView: View {
             }
 
             SettingsSection(
+                title: L10n.liveSubtitleOverlay,
+                description: L10n.liveSubtitleOverlayDescription
+            ) {
+                SettingsCard {
+                    SettingsControlRow(
+                        title: L10n.liveSubtitleOverlaySegmentCount,
+                        description: L10n.liveSubtitleOverlaySegmentCountDescription
+                    ) {
+                        Picker(L10n.liveSubtitleOverlaySegmentCount, selection: $settings.liveSubtitleOverlaySegmentCount) {
+                            ForEach(1 ..< 6, id: \.self) { count in
+                                Text("\(count)").tag(count)
+                            }
+                        }
+                        .labelsHidden()
+                        .pickerStyle(.menu)
+                        .frame(width: 120, alignment: .trailing)
+                    }
+                }
+            }
+
+            SettingsSection(
                 title: L10n.displayLanguages,
                 description: L10n.displayLanguagesDescription
             ) {

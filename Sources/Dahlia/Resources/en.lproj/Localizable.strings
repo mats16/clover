@@ -93,6 +93,12 @@
 "New Transcription" = "New Transcription";
 "Screen" = "Screen";
 "Source" = "Source";
+"Show Live Subtitles" = "Show Live Subtitles";
+"Hide Live Subtitles" = "Hide Live Subtitles";
+"Live Subtitle Overlay" = "Live Subtitle Overlay";
+"Configure how the desktop live subtitle overlay is shown while recording." = "Configure how the desktop live subtitle overlay is shown while recording.";
+"Overlay Segment Count" = "Overlay Segment Count";
+"Choose how many recent transcript segments the live subtitle overlay shows." = "Choose how many recent transcript segments the live subtitle overlay shows.";
 
 /* Detail Tabs */
 "Summary" = "Summary";

@@ -93,6 +93,12 @@
 "New Transcription" = "新規文字起こし";
 "Screen" = "画面";
 "Source" = "ソース";
+"Show Live Subtitles" = "ライブ字幕を表示";
+"Hide Live Subtitles" = "ライブ字幕を隠す";
+"Live Subtitle Overlay" = "ライブ字幕オーバーレイ";
+"Configure how the desktop live subtitle overlay is shown while recording." = "録音中に表示するデスクトップのライブ字幕オーバーレイ設定を調整します。";
+"Overlay Segment Count" = "表示セグメント数";
+"Choose how many recent transcript segments the live subtitle overlay shows." = "ライブ字幕オーバーレイに表示する最近の文字起こしセグメント数を選びます。";
 
 /* Detail Tabs */
 "Summary" = "要約";
