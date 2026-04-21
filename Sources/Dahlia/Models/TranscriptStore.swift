@@ -6,6 +6,11 @@ import SwiftUI
 /// @MainActor で SwiftUI と直接バインドする。
 @MainActor
 final class TranscriptStore: ObservableObject {
+    private enum UnconfirmedMutation {
+        case clear
+        case upsert(TranscriptSegment)
+    }
+
     @Published var segments: [TranscriptSegment] = []
 
     var recordingStartTime: Date?
@@ -13,7 +18,7 @@ final class TranscriptStore: ObservableObject {
     // MARK: - Unconfirmed Segment Throttle (per source)
 
     private var unconfirmedThrottleTasks: [String: Task<Void, Never>] = [:]
-    private var pendingUnconfirmed: [String: [TranscriptSegment]] = [:]
+    private var pendingUnconfirmed: [String: UnconfirmedMutation] = [:]
     private var lastUnconfirmedUpdate: [String: ContinuousClock.Instant] = [:]
     private let throttleInterval: Duration = .milliseconds(200)
 
@@ -26,13 +31,24 @@ final class TranscriptStore: ObservableObject {
         segments.insert(segment, at: insertIndex)
     }
 
-    /// 指定ソースの未確定セグメントを置き換える。
+    /// 指定ソースの未確定セグメントを更新する。
     /// 他ソースの未確定セグメントには影響しない。
     /// 200ms 以内の連続呼び出しはスロットルし、最後の状態のみ反映する。
-    func replaceUnconfirmedSegments(with newSegments: [TranscriptSegment], forSource sourceLabel: String? = nil) {
+    @discardableResult
+    func updateUnconfirmedSegment(_ segment: TranscriptSegment, forSource sourceLabel: String? = nil) -> TranscriptSegment {
+        let mergedSegment = mergedUnconfirmedSegment(segment, forSource: sourceLabel)
+        scheduleUnconfirmedMutation(.upsert(mergedSegment), forSource: sourceLabel)
+        return mergedSegment
+    }
+
+    func clearUnconfirmedSegments(forSource sourceLabel: String? = nil) {
+        scheduleUnconfirmedMutation(.clear, forSource: sourceLabel)
+    }
+
+    private func scheduleUnconfirmedMutation(_ mutation: UnconfirmedMutation, forSource sourceLabel: String? = nil) {
         let key = sourceLabel ?? ""
         let now = ContinuousClock.now
-        pendingUnconfirmed[key] = newSegments
+        pendingUnconfirmed[key] = mutation
 
         let lastUpdate = lastUnconfirmedUpdate[key] ?? .now - throttleInterval
         guard now - lastUpdate >= throttleInterval else {
@@ -40,22 +56,51 @@ final class TranscriptStore: ObservableObject {
                 unconfirmedThrottleTasks[key] = Task { @MainActor [weak self] in
                     try? await Task.sleep(for: .milliseconds(200))
                     guard let self, let pending = self.pendingUnconfirmed[key] else { return }
-                    self.applyUnconfirmedReplace(pending, forSource: sourceLabel)
+                    self.applyUnconfirmedMutation(pending, forSource: sourceLabel)
                     self.unconfirmedThrottleTasks[key] = nil
                 }
             }
             return
         }
 
-        applyUnconfirmedReplace(newSegments, forSource: sourceLabel)
+        applyUnconfirmedMutation(mutation, forSource: sourceLabel)
     }
 
-    private func applyUnconfirmedReplace(_ newSegments: [TranscriptSegment], forSource sourceLabel: String? = nil) {
+    private func applyUnconfirmedMutation(_ mutation: UnconfirmedMutation, forSource sourceLabel: String? = nil) {
         segments.removeAll { !$0.isConfirmed && $0.speakerLabel == sourceLabel }
-        segments.append(contentsOf: newSegments)
+        if case let .upsert(segment) = mutation {
+            segments.append(segment)
+        }
         let key = sourceLabel ?? ""
         lastUnconfirmedUpdate[key] = .now
         pendingUnconfirmed[key] = nil
+    }
+
+    private func mergedUnconfirmedSegment(_ segment: TranscriptSegment, forSource sourceLabel: String?) -> TranscriptSegment {
+        let existingSegment = existingUnconfirmedSegment(forSource: sourceLabel)
+        return TranscriptSegment(
+            id: existingSegment?.id ?? segment.id,
+            startTime: segment.startTime,
+            endTime: segment.endTime,
+            text: segment.text,
+            translatedText: segment.translatedText ?? existingSegment?.translatedText,
+            isConfirmed: false,
+            speakerLabel: segment.speakerLabel
+        )
+    }
+
+    private func existingUnconfirmedSegment(forSource sourceLabel: String?) -> TranscriptSegment? {
+        let key = sourceLabel ?? ""
+        if let pendingMutation = pendingUnconfirmed[key] {
+            switch pendingMutation {
+            case .clear:
+                return nil
+            case let .upsert(segment):
+                return segment
+            }
+        }
+
+        return segments.last(where: { !$0.isConfirmed && $0.speakerLabel == sourceLabel })
     }
 
     /// DB から読み込んだセグメントを一括セットする。
@@ -72,6 +117,10 @@ final class TranscriptStore: ObservableObject {
     func clear() {
         segments.removeAll()
         recordingStartTime = nil
+        unconfirmedThrottleTasks.values.forEach { $0.cancel() }
+        unconfirmedThrottleTasks.removeAll()
+        pendingUnconfirmed.removeAll()
+        lastUnconfirmedUpdate.removeAll()
     }
 
     func exportAsText() -> String {

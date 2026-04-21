@@ -183,6 +183,29 @@ struct LiveSubtitleOverlayPayloadTests {
     }
 
     @Test
+    func latestIncludesTranslatedTextForUnconfirmedSegmentWhenAvailable() {
+        let payload = LiveSubtitleOverlayPayload.latest(
+            from: [
+                TranscriptSegment(
+                    startTime: Date(timeIntervalSince1970: 1_776_384_001),
+                    text: "Unconfirmed current",
+                    translatedText: "未確定の現在行",
+                    isConfirmed: false,
+                    speakerLabel: "system"
+                ),
+            ],
+            transcriptionLocaleIdentifier: "en_US",
+            translationEnabled: true,
+            targetLanguageIdentifier: "ja",
+            maxEntries: 2
+        )
+
+        #expect(payload?.entries == [
+            LiveSubtitleOverlayPayload.Entry(primaryText: "Unconfirmed current", secondaryText: "未確定の現在行"),
+        ])
+    }
+
+    @Test
     func latestRespectsConfiguredSegmentCount() {
         let payload = LiveSubtitleOverlayPayload.latest(
             from: [
@@ -199,6 +222,58 @@ struct LiveSubtitleOverlayPayloadTests {
         #expect(payload?.entries == [
             LiveSubtitleOverlayPayload.Entry(primaryText: "Three", secondaryText: nil),
         ])
+    }
+
+    @Test
+    func latestCanRestrictSubtitlesToSystemAudioOnly() {
+        let payload = LiveSubtitleOverlayPayload.latest(
+            from: [
+                TranscriptSegment(
+                    startTime: Date(timeIntervalSince1970: 1_776_384_000),
+                    text: "Mic line",
+                    translatedText: "マイク",
+                    isConfirmed: true,
+                    speakerLabel: "mic"
+                ),
+                TranscriptSegment(
+                    startTime: Date(timeIntervalSince1970: 1_776_384_001),
+                    text: "System line",
+                    translatedText: "システム",
+                    isConfirmed: true,
+                    speakerLabel: "system"
+                ),
+            ],
+            sourceMode: .systemAudioOnly,
+            transcriptionLocaleIdentifier: "en_US",
+            translationEnabled: true,
+            targetLanguageIdentifier: "ja",
+            maxEntries: 2
+        )
+
+        #expect(payload?.entries == [
+            LiveSubtitleOverlayPayload.Entry(primaryText: "System line", secondaryText: "システム"),
+        ])
+    }
+
+    @Test
+    func latestReturnsNilWhenNoSystemAudioExistsInSystemOnlyMode() {
+        let payload = LiveSubtitleOverlayPayload.latest(
+            from: [
+                TranscriptSegment(
+                    startTime: Date(timeIntervalSince1970: 1_776_384_000),
+                    text: "Mic only",
+                    isConfirmed: true,
+                    speakerLabel: "mic"
+                ),
+            ],
+            sourceMode: .systemAudioOnly,
+            transcriptionLocaleIdentifier: "en_US",
+            translationEnabled: false,
+            targetLanguageIdentifier: "ja",
+            maxEntries: 2
+        )
+
+        #expect(payload == nil)
     }
 }
 #elseif canImport(XCTest)
@@ -375,6 +450,28 @@ final class LiveSubtitleOverlayPayloadTests: XCTestCase {
         ])
     }
 
+    func testLatestIncludesTranslatedTextForUnconfirmedSegmentWhenAvailable() {
+        let payload = LiveSubtitleOverlayPayload.latest(
+            from: [
+                TranscriptSegment(
+                    startTime: Date(timeIntervalSince1970: 1_776_384_001),
+                    text: "Unconfirmed current",
+                    translatedText: "未確定の現在行",
+                    isConfirmed: false,
+                    speakerLabel: "system"
+                ),
+            ],
+            transcriptionLocaleIdentifier: "en_US",
+            translationEnabled: true,
+            targetLanguageIdentifier: "ja",
+            maxEntries: 2
+        )
+
+        XCTAssertEqual(payload?.entries, [
+            LiveSubtitleOverlayPayload.Entry(primaryText: "Unconfirmed current", secondaryText: "未確定の現在行"),
+        ])
+    }
+
     func testLatestRespectsConfiguredSegmentCount() {
         let payload = LiveSubtitleOverlayPayload.latest(
             from: [
@@ -391,6 +488,56 @@ final class LiveSubtitleOverlayPayloadTests: XCTestCase {
         XCTAssertEqual(payload?.entries, [
             LiveSubtitleOverlayPayload.Entry(primaryText: "Three", secondaryText: nil),
         ])
+    }
+
+    func testLatestCanRestrictSubtitlesToSystemAudioOnly() {
+        let payload = LiveSubtitleOverlayPayload.latest(
+            from: [
+                TranscriptSegment(
+                    startTime: Date(timeIntervalSince1970: 1_776_384_000),
+                    text: "Mic line",
+                    translatedText: "マイク",
+                    isConfirmed: true,
+                    speakerLabel: "mic"
+                ),
+                TranscriptSegment(
+                    startTime: Date(timeIntervalSince1970: 1_776_384_001),
+                    text: "System line",
+                    translatedText: "システム",
+                    isConfirmed: true,
+                    speakerLabel: "system"
+                ),
+            ],
+            sourceMode: .systemAudioOnly,
+            transcriptionLocaleIdentifier: "en_US",
+            translationEnabled: true,
+            targetLanguageIdentifier: "ja",
+            maxEntries: 2
+        )
+
+        XCTAssertEqual(payload?.entries, [
+            LiveSubtitleOverlayPayload.Entry(primaryText: "System line", secondaryText: "システム"),
+        ])
+    }
+
+    func testLatestReturnsNilWhenNoSystemAudioExistsInSystemOnlyMode() {
+        let payload = LiveSubtitleOverlayPayload.latest(
+            from: [
+                TranscriptSegment(
+                    startTime: Date(timeIntervalSince1970: 1_776_384_000),
+                    text: "Mic only",
+                    isConfirmed: true,
+                    speakerLabel: "mic"
+                ),
+            ],
+            sourceMode: .systemAudioOnly,
+            transcriptionLocaleIdentifier: "en_US",
+            translationEnabled: false,
+            targetLanguageIdentifier: "ja",
+            maxEntries: 2
+        )
+
+        XCTAssertNil(payload)
     }
 }
 #endif

@@ -133,6 +133,12 @@ final class AppSettings: ObservableObject {
     @AppStorage("transcriptTranslationTargetLanguage") var transcriptTranslationTargetLanguage = TranscriptTranslationLanguage.defaultIdentifier
     @AppStorage("liveSubtitleOverlayEnabled") var liveSubtitleOverlayEnabled = false
     @AppStorage("liveSubtitleOverlaySegmentCount") var liveSubtitleOverlaySegmentCount = 2
+    @AppStorage("liveSubtitleSourceMode") var liveSubtitleSourceModeRawValue = LiveSubtitleSourceMode.includeMicrophone.rawValue
+
+    var liveSubtitleSourceMode: LiveSubtitleSourceMode {
+        get { LiveSubtitleSourceMode(rawValue: liveSubtitleSourceModeRawValue) ?? .includeMicrophone }
+        set { liveSubtitleSourceModeRawValue = newValue.rawValue }
+    }
 
     var isTranscriptTranslationEffectivelyEnabled: Bool {
         transcriptTranslationEnabled && TranscriptTranslationLanguage.shouldTranslate(

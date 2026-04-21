@@ -263,6 +263,40 @@ struct MeetingPersistenceServiceTests {
 
         #expect(persisted.translatedText == "こんにちは、世界")
     }
+
+    @Test
+    func unconfirmedTranslatedTextIsNotPersisted() throws {
+        let database = try makeDatabase()
+        let store = TranscriptStore()
+        let startDate = Date(timeIntervalSince1970: 1_776_384_000)
+        store.recordingStartTime = startDate
+
+        let service = try MeetingPersistenceService(
+            store: store,
+            dbQueue: database.dbQueue,
+            vaultId: testVault.id,
+            projectId: nil,
+            initialName: "Preview meeting"
+        )
+
+        store.updateUnconfirmedSegment(
+            TranscriptSegment(
+                startTime: startDate,
+                text: "Preview",
+                translatedText: "プレビュー",
+                isConfirmed: false,
+                speakerLabel: "mic"
+            ),
+            forSource: "mic"
+        )
+        service.stop()
+
+        let persistedCount = try database.dbQueue.read { db in
+            try TranscriptSegmentRecord.fetchCount(db)
+        }
+
+        #expect(persistedCount == 0)
+    }
 }
 #elseif canImport(XCTest)
 import XCTest
@@ -518,6 +552,39 @@ final class MeetingPersistenceServiceTests: XCTestCase {
         }
 
         XCTAssertEqual(persisted.translatedText, "こんにちは、世界")
+    }
+
+    func testUnconfirmedTranslatedTextIsNotPersisted() throws {
+        let database = try makeDatabase()
+        let store = TranscriptStore()
+        let startDate = Date(timeIntervalSince1970: 1_776_384_000)
+        store.recordingStartTime = startDate
+
+        let service = try MeetingPersistenceService(
+            store: store,
+            dbQueue: database.dbQueue,
+            vaultId: testVault.id,
+            projectId: nil,
+            initialName: "Preview meeting"
+        )
+
+        store.updateUnconfirmedSegment(
+            TranscriptSegment(
+                startTime: startDate,
+                text: "Preview",
+                translatedText: "プレビュー",
+                isConfirmed: false,
+                speakerLabel: "mic"
+            ),
+            forSource: "mic"
+        )
+        service.stop()
+
+        let persistedCount = try database.dbQueue.read { db in
+            try TranscriptSegmentRecord.fetchCount(db)
+        }
+
+        XCTAssertEqual(persistedCount, 0)
     }
 }
 #endif

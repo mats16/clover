@@ -97,6 +97,10 @@
 "Hide Live Subtitles" = "Hide Live Subtitles";
 "Live Subtitle Overlay" = "Live Subtitle Overlay";
 "Configure how the desktop live subtitle overlay is shown while recording." = "Configure how the desktop live subtitle overlay is shown while recording.";
+"Subtitles" = "Subtitles";
+"System Audio Only" = "System Audio Only";
+"Include Microphone" = "Include Microphone";
+"Choose whether live subtitles only show system audio or also include microphone input." = "Choose whether live subtitles only show system audio or also include microphone input.";
 "Overlay Segment Count" = "Overlay Segment Count";
 "Choose how many recent transcript segments the live subtitle overlay shows." = "Choose how many recent transcript segments the live subtitle overlay shows.";
 

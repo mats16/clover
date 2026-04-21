@@ -671,6 +671,7 @@ private struct LiveSubtitleOverlaySyncView: View {
 
     @AppStorage("liveSubtitleOverlayEnabled") private var liveSubtitleOverlayEnabled = false
     @AppStorage("liveSubtitleOverlaySegmentCount") private var liveSubtitleOverlaySegmentCount = 2
+    @AppStorage("liveSubtitleSourceMode") private var liveSubtitleSourceModeRawValue = LiveSubtitleSourceMode.includeMicrophone.rawValue
     @AppStorage("transcriptTranslationEnabled") private var transcriptTranslationEnabled = true
     @AppStorage("transcriptionLocale") private var transcriptionLocale = Locale.current.identifier
     @AppStorage("transcriptTranslationTargetLanguage") private var targetLanguageIdentifier = TranscriptTranslationLanguage.defaultIdentifier
@@ -695,6 +696,9 @@ private struct LiveSubtitleOverlaySyncView: View {
             .onChange(of: liveSubtitleOverlaySegmentCount) { _, _ in
                 syncOverlay()
             }
+            .onChange(of: liveSubtitleSourceModeRawValue) { _, _ in
+                syncOverlay()
+            }
             .onChange(of: transcriptTranslationEnabled) { _, _ in
                 syncOverlay()
             }
@@ -714,6 +718,7 @@ private struct LiveSubtitleOverlaySyncView: View {
 
         let payload = LiveSubtitleOverlayPayload.latest(
             from: store.segments,
+            sourceMode: LiveSubtitleSourceMode(rawValue: liveSubtitleSourceModeRawValue) ?? .includeMicrophone,
             transcriptionLocaleIdentifier: transcriptionLocale,
             translationEnabled: transcriptTranslationEnabled,
             targetLanguageIdentifier: targetLanguageIdentifier,

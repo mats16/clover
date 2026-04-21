@@ -54,18 +54,36 @@ struct TranscriptionSettingsView: View {
                 description: L10n.liveSubtitleOverlayDescription
             ) {
                 SettingsCard {
-                    SettingsControlRow(
-                        title: L10n.liveSubtitleOverlaySegmentCount,
-                        description: L10n.liveSubtitleOverlaySegmentCountDescription
-                    ) {
-                        Picker(L10n.liveSubtitleOverlaySegmentCount, selection: $settings.liveSubtitleOverlaySegmentCount) {
-                            ForEach(1 ..< 6, id: \.self) { count in
-                                Text("\(count)").tag(count)
+                    VStack(spacing: 0) {
+                        SettingsControlRow(
+                            title: L10n.source,
+                            description: L10n.liveSubtitleSourceDescription
+                        ) {
+                            Picker(L10n.source, selection: $settings.liveSubtitleSourceModeRawValue) {
+                                ForEach(LiveSubtitleSourceMode.allCases) { mode in
+                                    Text(mode.displayName).tag(mode.rawValue)
+                                }
                             }
+                            .labelsHidden()
+                            .pickerStyle(.menu)
+                            .frame(width: 220, alignment: .trailing)
                         }
-                        .labelsHidden()
-                        .pickerStyle(.menu)
-                        .frame(width: 120, alignment: .trailing)
+
+                        Divider()
+
+                        SettingsControlRow(
+                            title: L10n.liveSubtitleOverlaySegmentCount,
+                            description: L10n.liveSubtitleOverlaySegmentCountDescription
+                        ) {
+                            Picker(L10n.liveSubtitleOverlaySegmentCount, selection: $settings.liveSubtitleOverlaySegmentCount) {
+                                ForEach(1 ..< 6, id: \.self) { count in
+                                    Text("\(count)").tag(count)
+                                }
+                            }
+                            .labelsHidden()
+                            .pickerStyle(.menu)
+                            .frame(width: 120, alignment: .trailing)
+                        }
                     }
                 }
             }

@@ -10,6 +10,7 @@ struct LiveSubtitleOverlayPayload: Equatable {
 
     static func latest(
         from segments: [TranscriptSegment],
+        sourceMode: LiveSubtitleSourceMode = .includeMicrophone,
         transcriptionLocaleIdentifier: String,
         translationEnabled: Bool,
         targetLanguageIdentifier: String,
@@ -22,6 +23,7 @@ struct LiveSubtitleOverlayPayload: Equatable {
         )
 
         let validSegments = segments.compactMap { segment -> (segment: TranscriptSegment, entry: Entry)? in
+            guard sourceMode.includesSpeakerLabel(segment.speakerLabel) else { return nil }
             guard let primaryText = segment.displayText.nilIfBlank else { return nil }
             return (
                 segment,

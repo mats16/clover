@@ -1494,7 +1494,7 @@ final class CaptionViewModel: ObservableObject {
         let service = SpeechTranscriberService(
             locale: locale,
             speakerLabel: speakerLabel,
-            translateConfirmedSegment: translationHandler(for: locale)
+            translateSegment: translationHandler(for: locale)
         )
         try await service.prepare()
         guard let format = await service.targetAudioFormat() else {
@@ -1505,7 +1505,7 @@ final class CaptionViewModel: ObservableObject {
         return (service: service, bridge: bridge, format: format)
     }
 
-    private func translationHandler(for locale: Locale) -> SpeechTranscriberService.ConfirmedSegmentTranslationHandler? {
+    private func translationHandler(for locale: Locale) -> SpeechTranscriberService.SegmentTranslationHandler? {
         let sourceLocaleIdentifier = locale.identifier
         let translationService = transcriptTranslationService
         return { segment in

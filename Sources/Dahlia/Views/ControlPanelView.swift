@@ -297,6 +297,20 @@ private struct SessionSettingsMenu: View {
                 } label: {
                     Label("Language", systemImage: "globe")
                 }
+
+                Menu {
+                    Picker(selection: $appSettings.liveSubtitleSourceModeRawValue) {
+                        ForEach(LiveSubtitleSourceMode.allCases) { mode in
+                            Text(mode.displayName).tag(mode.rawValue)
+                        }
+                    } label: {
+                        EmptyView()
+                    }
+                    .pickerStyle(.inline)
+                    .labelsHidden()
+                } label: {
+                    Label(L10n.subtitles, systemImage: "text.bubble.fill")
+                }
             }
 
             // ── Screenshots ──

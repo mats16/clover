@@ -6,7 +6,7 @@ import Speech
 /// AudioBufferBridge から受け取った AsyncStream<AnalyzerInput> を SpeechAnalyzer に渡し、
 /// SpeechTranscriber の結果を TranscriptStore に反映する。
 actor SpeechTranscriberService {
-    typealias ConfirmedSegmentTranslationHandler = @Sendable (TranscriptSegment) async -> String?
+    typealias SegmentTranslationHandler = @Sendable (TranscriptSegment) async -> String?
 
     private nonisolated static let ignoredConfirmedTexts: Set<String> = [".", "あ"]
 
@@ -17,16 +17,22 @@ actor SpeechTranscriberService {
 
     private let locale: Locale
     private let speakerLabel: String?
-    private let translateConfirmedSegment: ConfirmedSegmentTranslationHandler?
+    private let translateSegment: SegmentTranslationHandler?
+    private let previewTranslationCoordinator: PreviewTranslationCoordinator?
 
     init(
         locale: Locale = Locale(identifier: "ja-JP"),
         speakerLabel: String? = nil,
-        translateConfirmedSegment: ConfirmedSegmentTranslationHandler? = nil
+        translateSegment: SegmentTranslationHandler? = nil
     ) {
         self.locale = locale
         self.speakerLabel = speakerLabel
-        self.translateConfirmedSegment = translateConfirmedSegment
+        self.translateSegment = translateSegment
+        if let translateSegment {
+            previewTranslationCoordinator = PreviewTranslationCoordinator(translate: translateSegment)
+        } else {
+            previewTranslationCoordinator = nil
+        }
     }
 
     nonisolated static func normalizedTranscriptText(_ rawText: String) -> String? {
@@ -101,8 +107,9 @@ actor SpeechTranscriberService {
                     let label = self.speakerLabel
                     guard let text = Self.normalizedTranscriptText(String(result.text.characters)) else {
                         if result.isFinal {
+                            await self.previewTranslationCoordinator?.reset()
                             await MainActor.run {
-                                store.replaceUnconfirmedSegments(with: [], forSource: label)
+                                store.clearUnconfirmedSegments(forSource: label)
                             }
                         }
                         continue
@@ -127,21 +134,25 @@ actor SpeechTranscriberService {
                     )
 
                     if result.isFinal {
+                        await self.previewTranslationCoordinator?.reset()
                         await MainActor.run {
-                            store.replaceUnconfirmedSegments(with: [], forSource: label)
+                            store.clearUnconfirmedSegments(forSource: label)
                             store.addSegment(segment)
                         }
-                        if let translateConfirmedSegment = self.translateConfirmedSegment {
+                        if let translateSegment = self.translateSegment {
                             Task {
-                                guard let translatedText = await translateConfirmedSegment(segment) else { return }
+                                guard let translatedText = await translateSegment(segment) else { return }
                                 await MainActor.run {
                                     store.updateTranslatedText(for: segment.id, translatedText: translatedText)
                                 }
                             }
                         }
                     } else {
-                        await MainActor.run {
-                            store.replaceUnconfirmedSegments(with: [segment], forSource: label)
+                        let unconfirmedSegment = await MainActor.run {
+                            store.updateUnconfirmedSegment(segment, forSource: label)
+                        }
+                        await self.previewTranslationCoordinator?.unconfirmedSegmentDidChange(unconfirmedSegment) { segmentID, translatedText in
+                            store.updateTranslatedText(for: segmentID, translatedText: translatedText)
                         }
                     }
                 }
@@ -153,6 +164,7 @@ actor SpeechTranscriberService {
 
     /// ストリーミング文字起こしを停止する。残りのバッファを処理してから終了。
     func stopStreaming() async {
+        await previewTranslationCoordinator?.reset()
         do {
             try await analyzer?.finalizeAndFinishThroughEndOfInput()
         } catch {
@@ -166,13 +178,15 @@ actor SpeechTranscriberService {
 
     /// 即時キャンセル。残りのバッファは破棄する。
     func cancel() async {
+        await previewTranslationCoordinator?.reset()
         await analyzer?.cancelAndFinishNow()
         resultTask?.cancel()
         resultTask = nil
     }
 
     /// 状態をリセットする。
-    func reset() {
+    func reset() async {
+        await previewTranslationCoordinator?.reset()
         resultTask?.cancel()
         resultTask = nil
         analyzer = nil
