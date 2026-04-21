@@ -2,15 +2,12 @@ import Foundation
 @preconcurrency import Sentry
 
 /// Sentry を用いたエラー報告サービス。
-/// 環境変数 `SENTRY_DSN` が設定されている場合のみ有効化される。
 enum ErrorReportingService {
+    private static let dsnInfoKey = "SENTRY_DSN"
     private nonisolated(unsafe) static var isEnabled = false
 
-    /// アプリ起動時に一度だけ呼ぶ。`SENTRY_DSN` 環境変数が未設定なら何もしない。
     static func start() {
-        guard let dsn = ProcessInfo.processInfo.environment["SENTRY_DSN"],
-              !dsn.isEmpty
-        else { return }
+        guard let dsn = configuredDSN else { return }
 
         isEnabled = true
         SentrySDK.start { options in
@@ -34,5 +31,25 @@ enum ErrorReportingService {
                 scope.setExtra(value: value, key: key)
             }
         }
+    }
+
+    static func resolveDSN(infoDictionary: [String: Any], isDebugBuild: Bool) -> String? {
+        guard !isDebugBuild else { return nil }
+        guard let rawDSN = infoDictionary[dsnInfoKey] as? String else { return nil }
+
+        let dsn = rawDSN.trimmingCharacters(in: .whitespacesAndNewlines)
+        return dsn.isEmpty ? nil : dsn
+    }
+
+    private static var configuredDSN: String? {
+        resolveDSN(infoDictionary: Bundle.main.infoDictionary ?? [:], isDebugBuild: isDebugBuild)
+    }
+
+    private static var isDebugBuild: Bool {
+        #if DEBUG
+            true
+        #else
+            false
+        #endif
     }
 }

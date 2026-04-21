@@ -196,12 +196,12 @@ final class CaptionViewModel: ObservableObject {
     private var systemAudioManager: SystemAudioCaptureManager?
     private var pipelines: [(service: SpeechTranscriberService, bridge: AudioBufferBridge)] = []
     private var persistenceService: MeetingPersistenceService?
-    private var storeCancellable: AnyCancellable?
     private var settingsCancellable: AnyCancellable?
     private var transcriptionLocaleCancellable: AnyCancellable?
     private var meetingLoadTask: Task<Void, Never>?
     private let availableInputDevicesProvider: @Sendable () -> [MicrophoneDevice]
     private let defaultInputDeviceIDProvider: @Sendable () -> AudioDeviceID?
+    private let transcriptTranslationService = TranscriptTranslationService()
 
     private var activeDbQueueForSessionControls: DatabaseQueue? {
         recordingContext?.dbQueue ?? currentDbQueue
@@ -213,7 +213,6 @@ final class CaptionViewModel: ObservableObject {
     ) {
         self.availableInputDevicesProvider = availableInputDevicesProvider
         self.defaultInputDeviceIDProvider = defaultInputDeviceIDProvider
-        resubscribeStoreCancellable()
         refreshAvailableMicrophones()
 
         // AppSettings の表示言語設定変更を監視
@@ -332,7 +331,6 @@ final class CaptionViewModel: ObservableObject {
             meetingLoadTask?.cancel()
             saveNoteImmediately()
             store = TranscriptStore()
-            resubscribeStoreCancellable()
         } else {
             resetMeetingState()
         }
@@ -508,7 +506,6 @@ final class CaptionViewModel: ObservableObject {
         if isListening {
             saveRecordingContextIfNeeded()
             store = TranscriptStore()
-            resubscribeStoreCancellable()
             screenshots = []
             resetNoteState()
             resetSummaryState()
@@ -540,7 +537,6 @@ final class CaptionViewModel: ObservableObject {
         draftMeeting = nil
 
         store = ctx.store
-        resubscribeStoreCancellable()
         recordingContext = nil
 
         reloadMeetingDetail()
@@ -600,15 +596,6 @@ final class CaptionViewModel: ObservableObject {
             vaultURL: currentVaultURL,
             dbQueue: currentDbQueue
         )
-    }
-
-    /// storeCancellable を現在の store に再接続する。
-    private func resubscribeStoreCancellable() {
-        storeCancellable = store.objectWillChange
-            .throttle(for: .milliseconds(100), scheduler: RunLoop.main, latest: true)
-            .sink { [weak self] _ in
-                self?.objectWillChange.send()
-            }
     }
 
     /// UI 状態をリセットし、次の文字起こし読み込みに備える。
@@ -1504,7 +1491,11 @@ final class CaptionViewModel: ObservableObject {
         locale: Locale,
         speakerLabel: String
     ) async throws -> (service: SpeechTranscriberService, bridge: AudioBufferBridge, format: AVAudioFormat) {
-        let service = SpeechTranscriberService(locale: locale, speakerLabel: speakerLabel)
+        let service = SpeechTranscriberService(
+            locale: locale,
+            speakerLabel: speakerLabel,
+            translateSegment: translationHandler(for: locale)
+        )
         try await service.prepare()
         guard let format = await service.targetAudioFormat() else {
             throw AudioCaptureError.converterCreationFailed
@@ -1512,6 +1503,32 @@ final class CaptionViewModel: ObservableObject {
         let bridge = AudioBufferBridge(sampleRate: format.sampleRate)
         try await service.startStreaming(store: store, bridge: bridge)
         return (service: service, bridge: bridge, format: format)
+    }
+
+    private func translationHandler(for locale: Locale) -> SpeechTranscriberService.SegmentTranslationHandler? {
+        let sourceLocaleIdentifier = locale.identifier
+        let translationService = transcriptTranslationService
+        return { segment in
+            let configuration = await MainActor.run {
+                (
+                    isEnabled: AppSettings.shared.transcriptTranslationEnabled,
+                    targetLanguageIdentifier: AppSettings.shared.transcriptTranslationTargetLanguage
+                )
+            }
+            guard configuration.isEnabled,
+                  TranscriptTranslationLanguage.shouldTranslate(
+                      transcriptionLocaleIdentifier: sourceLocaleIdentifier,
+                      targetLanguageIdentifier: configuration.targetLanguageIdentifier
+                  )
+            else {
+                return nil
+            }
+            return await translationService.translate(
+                segment.text,
+                from: sourceLocaleIdentifier,
+                to: configuration.targetLanguageIdentifier
+            )
+        }
     }
 
     // MARK: - Private Helpers

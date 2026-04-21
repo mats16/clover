@@ -106,6 +106,10 @@ struct FloatingActionBar: View {
             SessionSettingsMenu(viewModel: viewModel, sidebarViewModel: sidebarViewModel)
             FloatingActionBarSeparator()
             TranscribeButton(viewModel: viewModel, sidebarViewModel: sidebarViewModel)
+            if viewModel.isListening {
+                FloatingActionBarSeparator()
+                LiveSubtitleOverlayToggleButton()
+            }
             if shouldShowGenerateSummaryButton {
                 FloatingActionBarSeparator()
                 GenerateSummaryButton(viewModel: viewModel)
@@ -293,6 +297,20 @@ private struct SessionSettingsMenu: View {
                 } label: {
                     Label("Language", systemImage: "globe")
                 }
+
+                Menu {
+                    Picker(selection: $appSettings.liveSubtitleSourceModeRawValue) {
+                        ForEach(LiveSubtitleSourceMode.allCases) { mode in
+                            Text(mode.displayName).tag(mode.rawValue)
+                        }
+                    } label: {
+                        EmptyView()
+                    }
+                    .pickerStyle(.inline)
+                    .labelsHidden()
+                } label: {
+                    Label(L10n.subtitles, systemImage: "text.bubble.fill")
+                }
             }
 
             // ── Screenshots ──
@@ -474,6 +492,31 @@ private struct TranscribeButton: View {
         }
     }
 
+}
+
+private struct LiveSubtitleOverlayToggleButton: View {
+    @AppStorage("liveSubtitleOverlayEnabled") private var liveSubtitleOverlayEnabled = false
+
+    var body: some View {
+        HStack(spacing: 8) {
+            Image(systemName: "text.alignleft")
+                .font(.system(size: 14, weight: .medium))
+                .foregroundStyle(.primary)
+
+            Toggle(
+                liveSubtitleOverlayEnabled ? L10n.hideLiveSubtitles : L10n.showLiveSubtitles,
+                isOn: $liveSubtitleOverlayEnabled
+            )
+            .labelsHidden()
+            .toggleStyle(.switch)
+            .controlSize(.small)
+        }
+        .fixedSize()
+        .padding(.horizontal, 8)
+        .padding(.vertical, 8)
+        .help(liveSubtitleOverlayEnabled ? L10n.hideLiveSubtitles : L10n.showLiveSubtitles)
+        .accessibilityLabel(liveSubtitleOverlayEnabled ? L10n.hideLiveSubtitles : L10n.showLiveSubtitles)
+    }
 }
 
 /// スクリーンショット拡大表示オーバーレイ。
@@ -801,6 +844,7 @@ private struct MeetingProjectBreadcrumbBar: View {
 struct ControlPanelView: View {
     @ObservedObject var viewModel: CaptionViewModel
     var sidebarViewModel: SidebarViewModel
+    @ObservedObject private var appSettings = AppSettings.shared
     @State private var selectedTab: DetailTab = .notes
     @State private var expandedScreenshot: MeetingScreenshotRecord?
     @State private var isEditingMeetingName = false
@@ -877,7 +921,12 @@ struct ControlPanelView: View {
                 case .screenshots:
                     screenshotsTabContent
                 case .transcript:
-                    transcriptTabContent
+                    TranscriptTabView(
+                        store: viewModel.store,
+                        isListening: viewModel.isListening,
+                        showsRecordingIndicator: viewModel.isListening && !viewModel.isViewingOtherWhileRecording,
+                        showsTranslatedText: appSettings.isTranscriptTranslationEffectivelyEnabled
+                    )
                 }
             }
             .frame(minHeight: 280)
@@ -1081,51 +1130,6 @@ struct ControlPanelView: View {
                     }
                 }
                 .padding(12)
-            }
-        }
-    }
-
-    private var transcriptTabContent: some View {
-        Group {
-            if viewModel.store.segments.isEmpty, !viewModel.isListening {
-                ContentUnavailableView {
-                    Label(L10n.transcript, systemImage: "waveform.badge.microphone")
-                } description: {
-                    Text("文字起こしはまだありません")
-                }
-                .frame(maxWidth: .infinity, maxHeight: .infinity)
-            } else {
-                ScrollViewReader { proxy in
-                    ScrollView {
-                        LazyVStack(alignment: .leading, spacing: 2) {
-                            ForEach(viewModel.store.segments) { segment in
-                                TranscriptRowView(segment: segment)
-                            }
-
-                            // 録音中インジケータ（録音対象のトランスクリプト表示中のみ）
-                            if viewModel.isListening, !viewModel.isViewingOtherWhileRecording {
-                                HStack(spacing: 6) {
-                                    ProgressView()
-                                        .scaleEffect(0.5)
-                                        .frame(width: 12, height: 12)
-                                    Text(L10n.recognizing)
-                                        .font(.caption)
-                                        .foregroundStyle(.secondary)
-                                }
-                                .padding(.vertical, 4)
-                                .padding(.leading, 68)
-                            }
-
-                            Color.clear.frame(height: 1).id("bottom")
-                        }
-                        .padding(8)
-                    }
-                    .onChange(of: viewModel.store.segments.count) {
-                        withAnimation {
-                            proxy.scrollTo("bottom")
-                        }
-                    }
-                }
             }
         }
     }

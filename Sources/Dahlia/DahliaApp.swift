@@ -11,6 +11,7 @@ struct DahliaApp: App {
     @StateObject private var viewModel = CaptionViewModel()
     @State private var sidebarViewModel = SidebarViewModel()
     @StateObject private var meetingDetectionService = MeetingDetectionService()
+    @StateObject private var liveSubtitleOverlayService = LiveSubtitleOverlayService()
     @State private var appDatabase: AppDatabaseManager?
     @State private var showVaultPicker = true
 
@@ -25,6 +26,7 @@ struct DahliaApp: App {
                     ContentView(
                         viewModel: viewModel,
                         sidebarViewModel: sidebarViewModel,
+                        liveSubtitleOverlayService: liveSubtitleOverlayService,
                         onSelectVault: { vault in openVault(vault) }
                     )
                 }

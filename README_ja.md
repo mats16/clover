@@ -41,6 +41,15 @@ swift build && swift run
 
 > **注意:** `swift run` は署名なしバイナリのため Data Protection Keychain を使用できません。フル機能を利用するには `run-dev.sh` を使用してください。
 
+`build-app.sh` または `notarize.sh` の実行前に `SENTRY_DSN` を設定すると、生成される release アプリの `Info.plist` に DSN を埋め込み、Finder 起動でも Sentry を有効化できます。Debug 実行では送信しないため、`swift run` と `run-dev.sh` は既定で Sentry イベントを送信しません。
+
+Sentry を使う場合、`run-dev.sh` と `build-app.sh` は `SENTRY_AUTH_TOKEN` が設定されていれば `Dahlia.dSYM` のアップロードも試みます。事前に `sentry-cli` をインストールしてください。
+
+```bash
+export SENTRY_DSN="https://<key>@o0.ingest.sentry.io/<project>"
+brew install getsentry/tools/sentry-cli
+```
+
 notarization の初回実行前に、`notarytool` のキーチェーンプロファイルを作成してください。
 
 ```bash

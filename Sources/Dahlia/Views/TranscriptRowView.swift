@@ -1,8 +1,9 @@
 import SwiftUI
 
 /// 議事録の1セグメントを表示する行ビュー。
-struct TranscriptRowView: View {
+struct TranscriptRowView: View, Equatable {
     let segment: TranscriptSegment
+    let showsTranslatedText: Bool
 
     var body: some View {
         HStack(alignment: .top, spacing: 10) {
@@ -24,11 +25,19 @@ struct TranscriptRowView: View {
             }
 
             // テキスト
-            Text(segment.displayText)
-                .font(.body)
-                .foregroundStyle(segment.isConfirmed ? .primary : .secondary)
-                .textSelection(.enabled)
-                .frame(maxWidth: .infinity, alignment: .leading)
+            VStack(alignment: .leading, spacing: 4) {
+                Text(segment.displayText)
+                    .font(.body)
+                    .foregroundStyle(segment.isConfirmed ? .primary : .secondary)
+
+                if let translatedText = segment.visibleTranslatedText(isEnabled: showsTranslatedText) {
+                    Text(translatedText)
+                        .font(.body)
+                        .foregroundStyle(.blue)
+                }
+            }
+            .textSelection(.enabled)
+            .frame(maxWidth: .infinity, alignment: .leading)
         }
         .padding(.vertical, 4)
     }

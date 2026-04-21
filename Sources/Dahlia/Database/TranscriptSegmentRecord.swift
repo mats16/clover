@@ -10,6 +10,7 @@ struct TranscriptSegmentRecord: Codable, FetchableRecord, PersistableRecord {
     var startTime: Date
     var endTime: Date?
     var text: String
+    var translatedText: String?
     var isConfirmed: Bool
     var speakerLabel: String?
 }
@@ -22,6 +23,7 @@ extension TranscriptSegmentRecord {
         self.startTime = segment.startTime
         self.endTime = segment.endTime
         self.text = segment.text
+        self.translatedText = segment.translatedText
         self.isConfirmed = segment.isConfirmed
         self.speakerLabel = segment.speakerLabel
     }

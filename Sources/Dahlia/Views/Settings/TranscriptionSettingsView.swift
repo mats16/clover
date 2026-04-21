@@ -10,6 +10,84 @@ struct TranscriptionSettingsView: View {
 
     var body: some View {
         SettingsPage {
+            SettingsSection(title: L10n.transcriptTranslation) {
+                SettingsCard {
+                    VStack(spacing: 0) {
+                        SettingsToggleRow(
+                            title: L10n.transcriptTranslation,
+                            description: L10n.transcriptTranslationDescription,
+                            isOn: $settings.transcriptTranslationEnabled
+                        )
+
+                        Divider()
+
+                        SettingsControlRow(
+                            title: L10n.translationTargetLanguage,
+                            description: L10n.translationTargetLanguageDescription
+                        ) {
+                            Picker(L10n.translationTargetLanguage, selection: $settings.transcriptTranslationTargetLanguage) {
+                                ForEach(targetLanguageOptions) { option in
+                                    Text(option.displayName).tag(option.identifier)
+                                }
+                            }
+                            .labelsHidden()
+                            .pickerStyle(.menu)
+                            .frame(width: 220, alignment: .trailing)
+                        }
+
+                        if !settings.isTranscriptTranslationEffectivelyEnabled && settings.transcriptTranslationEnabled {
+                            Divider()
+
+                            SettingsStatusMessage(
+                                text: L10n.translationDisabledForMatchingLanguage,
+                                systemImage: "info.circle",
+                                tint: .secondary
+                            )
+                            .padding(20)
+                        }
+                    }
+                }
+            }
+
+            SettingsSection(
+                title: L10n.liveSubtitleOverlay,
+                description: L10n.liveSubtitleOverlayDescription
+            ) {
+                SettingsCard {
+                    VStack(spacing: 0) {
+                        SettingsControlRow(
+                            title: L10n.source,
+                            description: L10n.liveSubtitleSourceDescription
+                        ) {
+                            Picker(L10n.source, selection: $settings.liveSubtitleSourceModeRawValue) {
+                                ForEach(LiveSubtitleSourceMode.allCases) { mode in
+                                    Text(mode.displayName).tag(mode.rawValue)
+                                }
+                            }
+                            .labelsHidden()
+                            .pickerStyle(.menu)
+                            .frame(width: 220, alignment: .trailing)
+                        }
+
+                        Divider()
+
+                        SettingsControlRow(
+                            title: L10n.liveSubtitleOverlaySegmentCount,
+                            description: L10n.liveSubtitleOverlaySegmentCountDescription
+                        ) {
+                            Picker(L10n.liveSubtitleOverlaySegmentCount, selection: $settings.liveSubtitleOverlaySegmentCount) {
+                                ForEach(1 ..< 6, id: \.self) { count in
+                                    Text("\(count)").tag(count)
+                                }
+                            }
+                            .labelsHidden()
+                            .pickerStyle(.menu)
+                            .frame(width: 120, alignment: .trailing)
+                        }
+                    }
+                }
+            }
+
             SettingsSection(
                 title: L10n.displayLanguages,
                 description: L10n.displayLanguagesDescription
@@ -84,6 +162,27 @@ struct TranscriptionSettingsView: View {
                 }
             }
         }
+    }
+
+    private var targetLanguageOptions: [TranscriptTranslationLanguageOption] {
+        let displayLocale = settings.appLanguage.locale
+        let options = TranscriptTranslationLanguage.availableTargetLanguages(
+            from: supportedLocales,
+            locale: displayLocale
+        )
+        if options.contains(where: { $0.identifier == settings.transcriptTranslationTargetLanguage }) {
+            return options
+        }
+
+        return options + [
+            TranscriptTranslationLanguageOption(
+                identifier: settings.transcriptTranslationTargetLanguage,
+                displayName: TranscriptTranslationLanguage.displayName(
+                    for: settings.transcriptTranslationTargetLanguage,
+                    locale: displayLocale
+                )
+            ),
+        ]
     }
 
     private var searchFilteredLocales: [Locale] {

@@ -37,6 +37,7 @@ mkdir -p "${CONTENTS}/Resources"
 cp "${BUILD_DIR}/${APP_NAME}" "${MACOS}/${APP_NAME}"
 cp "Resources/Info.plist" "${CONTENTS}/Info.plist"
 configure_google_calendar_plist "${CONTENTS}/Info.plist"
+configure_sentry_plist "${CONTENTS}/Info.plist"
 
 # アイコン生成（.iconset → .icns）
 ICON_SRC="Sources/Dahlia/Resources/Assets.xcassets/AppIcon.appiconset/AppIcon.png"
@@ -77,5 +78,6 @@ else
     codesign_path "${APP_BUNDLE}"
 fi
 codesign --verify --deep --strict --verbose=2 "${APP_BUNDLE}"
+"${SCRIPT_DIR}/upload-dsyms.sh" "${BUILD_DIR}" "${APP_NAME}"
 
 echo "=== Build complete: ${APP_BUNDLE} ==="

@@ -17,6 +17,16 @@ configure_google_calendar_plist() {
     fi
 }
 
+configure_sentry_plist() {
+    local plist_path="$1"
+
+    /usr/libexec/PlistBuddy -c "Delete :SENTRY_DSN" "$plist_path" >/dev/null 2>&1 || true
+
+    if [ -n "${SENTRY_DSN:-}" ]; then
+        /usr/libexec/PlistBuddy -c "Add :SENTRY_DSN string ${SENTRY_DSN}" "$plist_path"
+    fi
+}
+
 has_entitlements() {
     local entitlements_path="$1"
 

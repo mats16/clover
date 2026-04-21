@@ -24,11 +24,21 @@ struct TranscriptSegment: Identifiable, Equatable {
     let startTime: Date
     var endTime: Date?
     var text: String
+    var translatedText: String?
     var isConfirmed: Bool
     var speakerLabel: String?
 
     /// 表示用テキスト。
     var displayText: String { text }
+
+    var displayTranslatedText: String? {
+        translatedText?.nilIfBlank
+    }
+
+    func visibleTranslatedText(isEnabled: Bool) -> String? {
+        guard isEnabled else { return nil }
+        return displayTranslatedText
+    }
 
     /// セグメントの長さ（秒）。endTime が未設定なら nil。
     var duration: TimeInterval? {
@@ -41,6 +51,7 @@ struct TranscriptSegment: Identifiable, Equatable {
         startTime: Date,
         endTime: Date? = nil,
         text: String,
+        translatedText: String? = nil,
         isConfirmed: Bool = false,
         speakerLabel: String? = nil
     ) {
@@ -48,6 +59,7 @@ struct TranscriptSegment: Identifiable, Equatable {
         self.startTime = startTime
         self.endTime = endTime
         self.text = text
+        self.translatedText = translatedText
         self.isConfirmed = isConfirmed
         self.speakerLabel = speakerLabel
     }
@@ -58,6 +70,7 @@ struct TranscriptSegment: Identifiable, Equatable {
         self.startTime = record.startTime
         self.endTime = record.endTime
         self.text = record.text
+        self.translatedText = record.translatedText
         self.isConfirmed = record.isConfirmed
         self.speakerLabel = record.speakerLabel
     }

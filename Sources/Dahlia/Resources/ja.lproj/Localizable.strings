@@ -93,6 +93,16 @@
 "New Transcription" = "新規文字起こし";
 "Screen" = "画面";
 "Source" = "ソース";
+"Show Live Subtitles" = "ライブ字幕を表示";
+"Hide Live Subtitles" = "ライブ字幕を隠す";
+"Live Subtitle Overlay" = "ライブ字幕オーバーレイ";
+"Configure how the desktop live subtitle overlay is shown while recording." = "録音中に表示するデスクトップのライブ字幕オーバーレイ設定を調整します。";
+"Subtitles" = "字幕";
+"System Audio Only" = "システムオーディオのみ";
+"Include Microphone" = "マイク入力を含める";
+"Choose whether live subtitles only show system audio or also include microphone input." = "ライブ字幕をシステムオーディオのみにするか、マイク入力も含めるかを選びます。";
+"Overlay Segment Count" = "表示セグメント数";
+"Choose how many recent transcript segments the live subtitle overlay shows." = "ライブ字幕オーバーレイに表示する最近の文字起こしセグメント数を選びます。";
 
 /* Detail Tabs */
 "Summary" = "要約";
@@ -150,6 +160,11 @@
 "Follow System" = "システムに従う";
 "Manage language, meeting prompts, and editor preferences." = "表示言語、会議検出、エディタ連携を管理します。";
 "Choose which languages appear when starting transcription." = "文字起こし開始時に表示する言語を選びます。";
+"Transcript Translation" = "文字起こし翻訳";
+"Show translated transcript lines in the selected target language when available." = "選択したターゲット言語で翻訳済みの文字起こし行を表示します。";
+"Target Language" = "翻訳先の言語";
+"Choose which language translated transcript lines should use." = "翻訳済みの文字起こし行に使う言語を選びます。";
+"Translation is automatically disabled when the target language matches the transcription language." = "翻訳先の言語が文字起こし言語と同じ場合、翻訳は自動的に無効になります。";
 "Configure automatic summaries and the LLM connection used to generate them." = "自動要約と、その生成に使う LLM 接続設定を管理します。";
 "Configure the built-in agent sidebar launch command." = "内蔵 Agent サイドバーの起動コマンドを設定します。";
 "Run a quick request to validate your endpoint, model, and token." = "エンドポイント、モデル、トークンの組み合わせを簡易的に検証します。";

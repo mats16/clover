@@ -133,6 +133,16 @@ enum L10n {
     static var newTranscription: String { String(localized: "New Transcription", bundle: bundle) }
     static var screen: String { String(localized: "Screen", bundle: bundle) }
     static var source: String { String(localized: "Source", bundle: bundle) }
+    static var showLiveSubtitles: String { String(localized: "Show Live Subtitles", bundle: bundle) }
+    static var hideLiveSubtitles: String { String(localized: "Hide Live Subtitles", bundle: bundle) }
+    static var liveSubtitleOverlay: String { String(localized: "Live Subtitle Overlay", bundle: bundle) }
+    static var liveSubtitleOverlayDescription: String { String(localized: "Configure how the desktop live subtitle overlay is shown while recording.", bundle: bundle) }
+    static var subtitles: String { String(localized: "Subtitles", bundle: bundle) }
+    static var systemAudioOnly: String { String(localized: "System Audio Only", bundle: bundle) }
+    static var includeMicrophone: String { String(localized: "Include Microphone", bundle: bundle) }
+    static var liveSubtitleSourceDescription: String { String(localized: "Choose whether live subtitles only show system audio or also include microphone input.", bundle: bundle) }
+    static var liveSubtitleOverlaySegmentCount: String { String(localized: "Overlay Segment Count", bundle: bundle) }
+    static var liveSubtitleOverlaySegmentCountDescription: String { String(localized: "Choose how many recent transcript segments the live subtitle overlay shows.", bundle: bundle) }
 
     // MARK: - Detail Tabs
 
@@ -212,6 +222,20 @@ enum L10n {
     ) }
     static var transcriptionSettingsDescription: String { String(
         localized: "Choose which languages appear when starting transcription.",
+        bundle: bundle
+    ) }
+    static var transcriptTranslation: String { String(localized: "Transcript Translation", bundle: bundle) }
+    static var transcriptTranslationDescription: String { String(
+        localized: "Show translated transcript lines in the selected target language when available.",
+        bundle: bundle
+    ) }
+    static var translationTargetLanguage: String { String(localized: "Target Language", bundle: bundle) }
+    static var translationTargetLanguageDescription: String { String(
+        localized: "Choose which language translated transcript lines should use.",
+        bundle: bundle
+    ) }
+    static var translationDisabledForMatchingLanguage: String { String(
+        localized: "Translation is automatically disabled when the target language matches the transcription language.",
         bundle: bundle
     ) }
     static var aiSummarySettingsDescription: String { String(

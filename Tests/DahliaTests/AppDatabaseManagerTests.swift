@@ -29,6 +29,17 @@ struct AppDatabaseManagerTests {
     }
 
     @Test
+    func initializesInMemoryDatabaseWithTranscriptTranslatedTextColumn() throws {
+        let database = try AppDatabaseManager(path: ":memory:")
+
+        let columns = try database.dbQueue.read { db in
+            try String.fetchAll(db, sql: "SELECT name FROM pragma_table_info('transcript_segments')")
+        }
+
+        #expect(columns.contains("translatedText"))
+    }
+
+    @Test
     func repositoryUpdatesProjectGoogleDriveFolder() throws {
         let database = try AppDatabaseManager(path: ":memory:")
         let repository = MeetingRepository(dbQueue: database.dbQueue)
@@ -193,6 +204,61 @@ struct AppDatabaseManagerTests {
 
         #expect(columns.contains("googleFileId"))
     }
+
+    @Test
+    func existingV5DatabaseMigratesTranscriptTranslatedTextColumnWithoutDataLoss() throws {
+        let databaseURL = URL(fileURLWithPath: NSTemporaryDirectory())
+            .appendingPathComponent(UUID().uuidString)
+            .appendingPathExtension("sqlite")
+        let segmentID = UUID.v7()
+        let meetingID = UUID.v7()
+        let startTime = Date(timeIntervalSince1970: 1_776_384_000)
+
+        defer { try? FileManager.default.removeItem(at: databaseURL) }
+
+        let legacyQueue = try DatabaseQueue(path: databaseURL.path)
+        try legacyQueue.write { db in
+            try db.execute(
+                sql: """
+                CREATE TABLE transcript_segments (
+                    id BLOB PRIMARY KEY,
+                    meetingId BLOB NOT NULL,
+                    startTime DATETIME NOT NULL,
+                    endTime DATETIME,
+                    text TEXT NOT NULL,
+                    isConfirmed BOOLEAN NOT NULL DEFAULT 0,
+                    speakerLabel TEXT
+                )
+                """
+            )
+            try db.create(table: "grdb_migrations") { t in
+                t.column("identifier", .text).primaryKey()
+            }
+            try db.execute(
+                sql: """
+                INSERT INTO transcript_segments (id, meetingId, startTime, text, isConfirmed, speakerLabel)
+                VALUES (?, ?, ?, ?, ?, ?)
+                """,
+                arguments: [segmentID, meetingID, startTime, "Hello world", true, "mic"]
+            )
+            try db.execute(
+                sql: "INSERT INTO grdb_migrations (identifier) VALUES (?)",
+                arguments: ["v5_summaryGoogleFileId"]
+            )
+        }
+
+        let migrated = try AppDatabaseManager(path: databaseURL.path)
+        let result = try migrated.dbQueue.read { db in
+            (
+                try String.fetchAll(db, sql: "SELECT name FROM pragma_table_info('transcript_segments')"),
+                try Row.fetchOne(db, sql: "SELECT text, translatedText FROM transcript_segments WHERE id = ?", arguments: [segmentID])
+            )
+        }
+
+        #expect(result.0.contains("translatedText"))
+        #expect(result.1?["text"] == "Hello world")
+        #expect(result.1?["translatedText"] == nil as String?)
+    }
 }
 #elseif canImport(XCTest)
 import XCTest
@@ -216,6 +282,16 @@ final class AppDatabaseManagerTests: XCTestCase {
         }
 
         XCTAssertTrue(columns.contains("googleFileId"))
+    }
+
+    func testInitializesInMemoryDatabaseWithTranscriptTranslatedTextColumn() throws {
+        let database = try AppDatabaseManager(path: ":memory:")
+
+        let columns = try database.dbQueue.read { db in
+            try String.fetchAll(db, sql: "SELECT name FROM pragma_table_info('transcript_segments')")
+        }
+
+        XCTAssertTrue(columns.contains("translatedText"))
     }
 
     func testRepositoryUpdatesProjectGoogleDriveFolder() throws {
@@ -377,6 +453,60 @@ final class AppDatabaseManagerTests: XCTestCase {
         }
 
         XCTAssertTrue(columns.contains("googleFileId"))
+    }
+
+    func testExistingV5DatabaseMigratesTranscriptTranslatedTextColumnWithoutDataLoss() throws {
+        let databaseURL = URL(fileURLWithPath: NSTemporaryDirectory())
+            .appendingPathComponent(UUID().uuidString)
+            .appendingPathExtension("sqlite")
+        let segmentID = UUID.v7()
+        let meetingID = UUID.v7()
+        let startTime = Date(timeIntervalSince1970: 1_776_384_000)
+
+        defer { try? FileManager.default.removeItem(at: databaseURL) }
+
+        let legacyQueue = try DatabaseQueue(path: databaseURL.path)
+        try legacyQueue.write { db in
+            try db.execute(
+                sql: """
+                CREATE TABLE transcript_segments (
+                    id BLOB PRIMARY KEY,
+                    meetingId BLOB NOT NULL,
+                    startTime DATETIME NOT NULL,
+                    endTime DATETIME,
+                    text TEXT NOT NULL,
+                    isConfirmed BOOLEAN NOT NULL DEFAULT 0,
+                    speakerLabel TEXT
+                )
+                """
+            )
+            try db.create(table: "grdb_migrations") { t in
+                t.column("identifier", .text).primaryKey()
+            }
+            try db.execute(
+                sql: """
+                INSERT INTO transcript_segments (id, meetingId, startTime, text, isConfirmed, speakerLabel)
+                VALUES (?, ?, ?, ?, ?, ?)
+                """,
+                arguments: [segmentID, meetingID, startTime, "Hello world", true, "mic"]
+            )
+            try db.execute(
+                sql: "INSERT INTO grdb_migrations (identifier) VALUES (?)",
+                arguments: ["v5_summaryGoogleFileId"]
+            )
+        }
+
+        let migrated = try AppDatabaseManager(path: databaseURL.path)
+        let result = try migrated.dbQueue.read { db in
+            (
+                try String.fetchAll(db, sql: "SELECT name FROM pragma_table_info('transcript_segments')"),
+                try Row.fetchOne(db, sql: "SELECT text, translatedText FROM transcript_segments WHERE id = ?", arguments: [segmentID])
+            )
+        }
+
+        XCTAssertTrue(result.0.contains("translatedText"))
+        XCTAssertEqual(result.1?["text"], "Hello world")
+        XCTAssertNil(result.1?["translatedText"] as String?)
     }
 }
 #endif

@@ -93,6 +93,16 @@
 "New Transcription" = "New Transcription";
 "Screen" = "Screen";
 "Source" = "Source";
+"Show Live Subtitles" = "Show Live Subtitles";
+"Hide Live Subtitles" = "Hide Live Subtitles";
+"Live Subtitle Overlay" = "Live Subtitle Overlay";
+"Configure how the desktop live subtitle overlay is shown while recording." = "Configure how the desktop live subtitle overlay is shown while recording.";
+"Subtitles" = "Subtitles";
+"System Audio Only" = "System Audio Only";
+"Include Microphone" = "Include Microphone";
+"Choose whether live subtitles only show system audio or also include microphone input." = "Choose whether live subtitles only show system audio or also include microphone input.";
+"Overlay Segment Count" = "Overlay Segment Count";
+"Choose how many recent transcript segments the live subtitle overlay shows." = "Choose how many recent transcript segments the live subtitle overlay shows.";
 
 /* Detail Tabs */
 "Summary" = "Summary";
@@ -150,6 +160,11 @@
 "Follow System" = "Follow System";
 "Manage language, meeting prompts, and editor preferences." = "Manage language, meeting prompts, and editor preferences.";
 "Choose which languages appear when starting transcription." = "Choose which languages appear when starting transcription.";
+"Transcript Translation" = "Transcript Translation";
+"Show translated transcript lines in the selected target language when available." = "Show translated transcript lines in the selected target language when available.";
+"Target Language" = "Target Language";
+"Choose which language translated transcript lines should use." = "Choose which language translated transcript lines should use.";
+"Translation is automatically disabled when the target language matches the transcription language." = "Translation is automatically disabled when the target language matches the transcription language.";
 "Configure automatic summaries and the LLM connection used to generate them." = "Configure automatic summaries and the LLM connection used to generate them.";
 "Configure the built-in agent sidebar launch command." = "Configure the built-in agent sidebar launch command.";
 "Run a quick request to validate your endpoint, model, and token." = "Run a quick request to validate your endpoint, model, and token.";

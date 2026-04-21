@@ -30,6 +30,17 @@ enum AppLanguage: String, CaseIterable, Identifiable {
         case .en: "en"
         }
     }
+
+    var locale: Locale {
+        switch self {
+        case .system:
+            .current
+        case .ja:
+            Locale(identifier: "ja")
+        case .en:
+            Locale(identifier: "en")
+        }
+    }
 }
 
 /// Markdown ファイルを開くエディタの選択肢。
@@ -118,6 +129,23 @@ final class AppSettings: ObservableObject {
     // MARK: - 音声認識設定
 
     @AppStorage("transcriptionLocale") var transcriptionLocale: String = Locale.current.identifier
+    @AppStorage("transcriptTranslationEnabled") var transcriptTranslationEnabled = true
+    @AppStorage("transcriptTranslationTargetLanguage") var transcriptTranslationTargetLanguage = TranscriptTranslationLanguage.defaultIdentifier
+    @AppStorage("liveSubtitleOverlayEnabled") var liveSubtitleOverlayEnabled = false
+    @AppStorage("liveSubtitleOverlaySegmentCount") var liveSubtitleOverlaySegmentCount = 2
+    @AppStorage("liveSubtitleSourceMode") var liveSubtitleSourceModeRawValue = LiveSubtitleSourceMode.includeMicrophone.rawValue
+
+    var liveSubtitleSourceMode: LiveSubtitleSourceMode {
+        get { LiveSubtitleSourceMode(rawValue: liveSubtitleSourceModeRawValue) ?? .includeMicrophone }
+        set { liveSubtitleSourceModeRawValue = newValue.rawValue }
+    }
+
+    var isTranscriptTranslationEffectivelyEnabled: Bool {
+        transcriptTranslationEnabled && TranscriptTranslationLanguage.shouldTranslate(
+            transcriptionLocaleIdentifier: transcriptionLocale,
+            targetLanguageIdentifier: transcriptTranslationTargetLanguage
+        )
+    }
 
     // MARK: - 表示言語設定
 
@@ -313,6 +341,18 @@ extension UserDefaults {
 
     @objc dynamic var enabledLocaleIdentifiers: String? {
         string(forKey: "enabledLocaleIdentifiers")
+    }
+
+    @objc dynamic var transcriptTranslationEnabled: Bool {
+        object(forKey: "transcriptTranslationEnabled") as? Bool ?? true
+    }
+
+    @objc dynamic var transcriptTranslationTargetLanguage: String? {
+        string(forKey: "transcriptTranslationTargetLanguage")
+    }
+
+    @objc dynamic var liveSubtitleOverlayEnabled: Bool {
+        bool(forKey: "liveSubtitleOverlayEnabled")
     }
 
     @objc dynamic var llmAutoSummaryEnabled: Bool {
