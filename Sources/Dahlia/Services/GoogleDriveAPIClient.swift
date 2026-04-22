@@ -100,7 +100,9 @@ final class GoogleDriveAPIClient: GoogleDriveAPIClientProviding, @unchecked Send
                 id: $0.id,
                 name: $0.name,
                 detail: L10n.googleDriveSharedDriveLabel,
-                kind: .sharedDrive
+                kind: .sharedDrive,
+                driveId: $0.id,
+                driveName: $0.name
             )
         }
         .sorted {
@@ -173,20 +175,42 @@ final class GoogleDriveAPIClient: GoogleDriveAPIClientProviding, @unchecked Send
     }
 
     private func enrichFolders(_ files: [DriveFilePayload], accessToken: String) async throws -> [GoogleDriveFolderItem] {
-        let parentNames = try await fetchParentNames(
-            accessToken: accessToken,
-            parentIds: Set(files.compactMap { $0.parents?.first })
-        )
+        async let parentNames = batchFetchNames(
+            ids: Set(files.compactMap { $0.parents?.first }),
+            accessToken: accessToken
+        ) { id in
+            (try? await self.getFile(accessToken: accessToken, id: id, fields: "id,name"))?.name
+        }
+        async let driveNames = batchFetchNames(
+            ids: Set(files.compactMap(\.driveId)),
+            accessToken: accessToken
+        ) { id in
+            (try? await self.getDrive(accessToken: accessToken, id: id, fields: "id,name"))?.name
+        }
+        let (resolvedParentNames, resolvedDriveNames) = try await (parentNames, driveNames)
 
         return files.map { file in
-            let detail: String = if let driveId = file.driveId, !driveId.isEmpty {
-                "Shared Drive (\(driveId))"
-            } else if let parentId = file.parents?.first, let parentName = parentNames[parentId] {
+            let parentId = file.parents?.first
+            let parentName = parentId.flatMap { resolvedParentNames[$0] }
+            let driveName = file.driveId.flatMap { resolvedDriveNames[$0] }
+            let detail: String = if let driveName {
+                if let parentName, !parentName.isEmpty {
+                    "\(driveName) / \(parentName)"
+                } else {
+                    driveName
+                }
+            } else if let parentName {
                 parentName
             } else {
                 file.id
             }
-            return GoogleDriveFolderItem(id: file.id, name: file.name, detail: detail)
+            return GoogleDriveFolderItem(
+                id: file.id,
+                name: file.name,
+                detail: detail,
+                driveId: file.driveId,
+                driveName: driveName
+            )
         }
         .sorted {
             let nameOrder = $0.name.localizedStandardCompare($1.name)
@@ -197,19 +221,22 @@ final class GoogleDriveAPIClient: GoogleDriveAPIClientProviding, @unchecked Send
         }
     }
 
-    private func fetchParentNames(accessToken: String, parentIds: Set<String>) async throws -> [String: String] {
-        guard !parentIds.isEmpty else { return [:] }
+    private func batchFetchNames(
+        ids: Set<String>,
+        accessToken: String,
+        fetchName: @Sendable @escaping (String) async -> String?
+    ) async throws -> [String: String] {
+        guard !ids.isEmpty else { return [:] }
         return try await withThrowingTaskGroup(of: (String, String?).self) { group in
-            for parentId in parentIds {
+            for id in ids {
                 group.addTask {
-                    let file = try? await self.getFile(accessToken: accessToken, id: parentId, fields: "id,name")
-                    return (parentId, file?.name)
+                    (id, await fetchName(id))
                 }
             }
             var result: [String: String] = [:]
-            for try await (parentId, parentName) in group {
-                if let parentName {
-                    result[parentId] = parentName
+            for try await (id, name) in group {
+                if let name {
+                    result[id] = name
                 }
             }
             return result
@@ -296,6 +323,15 @@ final class GoogleDriveAPIClient: GoogleDriveAPIClientProviding, @unchecked Send
         ]
         let data = try await request(accessToken: accessToken, url: components.url!)
         return try JSONDecoder().decode(DriveFilePayload.self, from: data)
+    }
+
+    private func getDrive(accessToken: String, id: String, fields: String) async throws -> DrivePayload {
+        var components = URLComponents(string: "https://www.googleapis.com/drive/v3/drives/\(id)")!
+        components.queryItems = [
+            .init(name: "fields", value: fields),
+        ]
+        let data = try await request(accessToken: accessToken, url: components.url!)
+        return try JSONDecoder().decode(DrivePayload.self, from: data)
     }
 
     private func request(accessToken: String, url: URL) async throws -> Data {
