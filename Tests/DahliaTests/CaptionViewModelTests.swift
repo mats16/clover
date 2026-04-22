@@ -49,6 +49,37 @@ struct CaptionViewModelTests {
     }
 
     @Test
+    func unsupportedLocaleFallsBackToPreferredSupportedLanguageVariant() {
+        let supportedLocales = [
+            Locale(identifier: "en_AU"),
+            Locale(identifier: "en_US"),
+            Locale(identifier: "ja_JP"),
+        ]
+
+        let resolved = CaptionViewModel.resolvedSupportedLocaleIdentifier(
+            preferredIdentifier: "en_JP",
+            supportedLocales: supportedLocales
+        )
+
+        #expect(resolved == "en_US")
+    }
+
+    @Test
+    func localeIdentifierExtensionsAreStrippedBeforeSupportLookup() {
+        let supportedLocales = [
+            Locale(identifier: "en_US"),
+            Locale(identifier: "ja_JP"),
+        ]
+
+        let resolved = CaptionViewModel.resolvedSupportedLocaleIdentifier(
+            preferredIdentifier: "ja_JP@calendar=iso8601",
+            supportedLocales: supportedLocales
+        )
+
+        #expect(resolved == "ja_JP")
+    }
+
+    @Test
     func selectingActiveRecordingMeetingKeepsLiveTranscriptStore() throws {
         let viewModel = CaptionViewModel()
         let dbQueue = try DatabaseQueue(path: ":memory:")

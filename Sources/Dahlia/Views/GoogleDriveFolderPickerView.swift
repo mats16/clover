@@ -187,40 +187,28 @@ struct GoogleDriveFolderPickerView: View {
             .frame(maxWidth: .infinity, maxHeight: .infinity)
         } else {
             List(driveStore.folders) { folder in
-                HStack(spacing: 12) {
-                    Button {
-                        open(folder)
-                    } label: {
-                        HStack(spacing: 12) {
-                            Image(systemName: "folder")
-                                .foregroundStyle(Color.accentColor)
-                            VStack(alignment: .leading, spacing: 4) {
-                                Text(folder.name)
-                                    .font(.headline)
-                                    .foregroundStyle(.primary)
-                                Text(folder.detail)
-                                    .font(.caption)
-                                    .foregroundStyle(.secondary)
-                            }
-                            Spacer(minLength: 0)
-                            if !isSearching {
-                                Image(systemName: "chevron.right")
-                                    .font(.caption)
-                                    .foregroundStyle(.tertiary)
-                            }
+                Button {
+                    open(folder)
+                } label: {
+                    HStack(spacing: 12) {
+                        Image(systemName: "folder")
+                            .foregroundStyle(Color.accentColor)
+                        VStack(alignment: .leading, spacing: 4) {
+                            Text(folder.name)
+                                .font(.headline)
+                                .foregroundStyle(.primary)
+                            Text(folder.detail)
+                                .font(.caption)
+                                .foregroundStyle(.secondary)
                         }
-                        .contentShape(Rectangle())
+                        Spacer(minLength: 0)
+                        Image(systemName: "chevron.right")
+                            .font(.caption)
+                            .foregroundStyle(.tertiary)
                     }
-                    .buttonStyle(.plain)
-
-                    if isSearching {
-                        Button(L10n.selectFolder) {
-                            onSelect(folder)
-                            dismiss()
-                        }
-                        .buttonStyle(.link)
-                    }
+                    .contentShape(Rectangle())
                 }
+                .buttonStyle(.plain)
                 .padding(.vertical, 4)
             }
             .listStyle(.inset)
@@ -254,8 +242,7 @@ struct GoogleDriveFolderPickerView: View {
 
     private func open(_ folder: GoogleDriveFolderItem) {
         if isSearching {
-            onSelect(folder)
-            dismiss()
+            openSearchResult(folder)
             return
         }
 
@@ -271,6 +258,35 @@ struct GoogleDriveFolderPickerView: View {
         }
         Task {
             await reloadCurrentView()
+        }
+    }
+
+    private func openSearchResult(_ folder: GoogleDriveFolderItem) {
+        let targetTab: PickerTab
+
+        if let driveId = folder.driveId, !driveId.isEmpty {
+            targetTab = .sharedDrives
+            let driveName = folder.driveName ?? L10n.googleDriveSharedDrives
+            sharedDrivePath = [.init(id: driveId, name: driveName)]
+            if folder.kind != .sharedDrive || folder.id != driveId {
+                sharedDrivePath.append(.init(id: folder.id, name: folder.name))
+            }
+        } else {
+            targetTab = .myDrive
+            myDrivePath = [
+                .init(id: "root", name: L10n.googleDriveMyDrive),
+                .init(id: folder.id, name: folder.name),
+            ]
+        }
+
+        clearSearch()
+
+        if selectedTab == targetTab {
+            Task {
+                await reloadCurrentView()
+            }
+        } else {
+            selectedTab = targetTab
         }
     }
 
@@ -361,8 +377,8 @@ struct GoogleDriveFolderPickerView: View {
     }
 
     private func clearSearch() {
-        searchText = ""
         searchQuery = ""
+        searchText = ""
         dismissSearchFocus()
     }
 

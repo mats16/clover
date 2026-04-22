@@ -44,6 +44,7 @@ final class CaptionViewModel: ObservableObject {
         didSet {
             guard selectedLocale != oldValue else { return }
             updateFilteredLocales()
+            guard !isSynchronizingSelectedLocale else { return }
             applyLocaleChange(from: oldValue, to: selectedLocale)
         }
     }
@@ -205,9 +206,15 @@ final class CaptionViewModel: ObservableObject {
     private var storeSegmentsCancellable: AnyCancellable?
     private var transcriptionLocaleCancellable: AnyCancellable?
     private var meetingLoadTask: Task<Void, Never>?
+    private var isSynchronizingSelectedLocale = false
     private let availableInputDevicesProvider: @Sendable () -> [MicrophoneDevice]
     private let defaultInputDeviceIDProvider: @Sendable () -> AudioDeviceID?
     private let transcriptTranslationService = TranscriptTranslationService()
+
+    nonisolated private static let preferredTranscriptionLocaleFallbacksByLanguage = [
+        "en": "en_US",
+        "ja": "ja_JP",
+    ]
 
     private var activeDbQueueForSessionControls: DatabaseQueue? {
         recordingContext?.dbQueue ?? currentDbQueue
@@ -264,6 +271,78 @@ final class CaptionViewModel: ObservableObject {
                     || locale.identifier == selectedLocale
             }
         }
+    }
+
+    nonisolated static func resolvedSupportedLocaleIdentifier(
+        preferredIdentifier: String,
+        supportedLocales: [Locale]
+    ) -> String {
+        let trimmedIdentifier = preferredIdentifier.trimmingCharacters(in: .whitespacesAndNewlines)
+        let normalizedIdentifier = normalizedLocaleIdentifier(from: trimmedIdentifier)
+        let supportedLocaleIdentifiers = Set(supportedLocales.map(\.identifier))
+
+        if supportedLocaleIdentifiers.contains(normalizedIdentifier) {
+            return normalizedIdentifier
+        }
+
+        let preferredLanguageIdentifier = TranscriptTranslationLanguage.normalizedLanguageIdentifier(from: trimmedIdentifier)
+        if let preferredFallback = preferredTranscriptionLocaleFallbacksByLanguage[preferredLanguageIdentifier],
+           supportedLocaleIdentifiers.contains(preferredFallback) {
+            return preferredFallback
+        }
+
+        let sortedLocales = supportedLocales.sorted(by: { $0.identifier < $1.identifier })
+
+        if let sameLanguageLocale = sortedLocales
+            .first(where: {
+                TranscriptTranslationLanguage.normalizedLanguageIdentifier(from: $0.identifier) == preferredLanguageIdentifier
+            }) {
+            return sameLanguageLocale.identifier
+        }
+
+        for fallback in preferredTranscriptionLocaleFallbacksByLanguage.values.sorted() {
+            if supportedLocaleIdentifiers.contains(fallback) {
+                return fallback
+            }
+        }
+
+        return sortedLocales.first?.identifier ?? normalizedIdentifier
+    }
+
+    private nonisolated static func normalizedLocaleIdentifier(from identifier: String) -> String {
+        guard !identifier.isEmpty else { return identifier }
+
+        let locale = Locale(identifier: identifier)
+        guard let languageCode = locale.language.languageCode?.identifier.nilIfBlank else {
+            return identifier
+                .replacingOccurrences(of: "-", with: "_")
+                .split(separator: "@", maxSplits: 1)
+                .first
+                .map(String.init) ?? identifier
+        }
+
+        guard let regionCode = locale.region?.identifier.nilIfBlank else {
+            return languageCode
+        }
+
+        return "\(languageCode)_\(regionCode)"
+    }
+
+    private func resolvedSelectedLocale() -> Locale {
+        let resolvedIdentifier = Self.resolvedSupportedLocaleIdentifier(
+            preferredIdentifier: selectedLocale,
+            supportedLocales: supportedLocales
+        )
+        synchronizeSelectedLocaleIfNeeded(resolvedIdentifier)
+        return Locale(identifier: resolvedIdentifier)
+    }
+
+    private func synchronizeSelectedLocaleIfNeeded(_ localeIdentifier: String) {
+        guard selectedLocale != localeIdentifier else { return }
+        isSynchronizingSelectedLocale = true
+        selectedLocale = localeIdentifier
+        isSynchronizingSelectedLocale = false
+        AppSettings.shared.transcriptionLocale = localeIdentifier
     }
 
     func refreshAvailableMicrophones() {
@@ -668,9 +747,6 @@ final class CaptionViewModel: ObservableObject {
         isPreparingAnalyzer = true
         errorMessage = nil
 
-        let localeIdentifier = selectedLocale
-        let locale = Locale(identifier: localeIdentifier)
-
         Task {
             do {
                 guard SpeechTranscriber.isAvailable else {
@@ -685,6 +761,7 @@ final class CaptionViewModel: ObservableObject {
                 self.updateFilteredLocales()
 
                 // モデルのダウンロードと準備確認
+                let locale = self.resolvedSelectedLocale()
                 try await SpeechTranscriberService.ensureModelInstalled(locale: locale)
                 self.analyzerReady = true
                 self.isPreparingAnalyzer = false
@@ -740,7 +817,7 @@ final class CaptionViewModel: ObservableObject {
         await stopActivePipelines()
         stopActiveCaptures()
 
-        let primaryLocale = Locale(identifier: selectedLocale)
+        let primaryLocale = resolvedSelectedLocale()
         do {
             try await SpeechTranscriberService.ensureModelInstalled(locale: primaryLocale)
         } catch {
@@ -883,7 +960,7 @@ final class CaptionViewModel: ObservableObject {
         persistenceService = nil
 
         do {
-            let primaryLocale = Locale(identifier: selectedLocale)
+            let primaryLocale = resolvedSelectedLocale()
             try await SpeechTranscriberService.ensureModelInstalled(locale: primaryLocale)
 
             if isMicEnabled {
