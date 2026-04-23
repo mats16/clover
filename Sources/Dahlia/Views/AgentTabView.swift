@@ -357,6 +357,9 @@ private struct AgentChatView: View {
                     withTransaction(transaction) {
                         proxy.scrollTo("agent-bottom", anchor: .bottom)
                     }
+                    if messageWindowSize > WindowMetrics.initialWindowSize {
+                        messageWindowSize = WindowMetrics.initialWindowSize
+                    }
                 }
             }
         }

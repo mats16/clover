@@ -206,6 +206,7 @@ struct DahliaApp: App {
 
 final class AppDelegate: NSObject, NSApplicationDelegate {
     func applicationDidFinishLaunching(_: Notification) {
+        // Agent サブプロセスの stdin パイプが閉じた際の SIGPIPE クラッシュを防止
         signal(SIGPIPE, SIG_IGN)
         ErrorReportingService.start()
         NSApplication.shared.setActivationPolicy(.regular)

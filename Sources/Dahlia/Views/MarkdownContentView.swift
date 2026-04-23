@@ -51,7 +51,7 @@ struct MarkdownContentView: View {
                 .font(.body)
         case let .unorderedList(items):
             VStack(alignment: .leading, spacing: 2) {
-                ForEach(items, id: \.self) { item in
+                ForEach(Array(items.enumerated()), id: \.offset) { _, item in
                     HStack(alignment: .firstTextBaseline, spacing: 6) {
                         Text("•")
                         inlineMarkdownText(item)
@@ -118,7 +118,7 @@ struct MarkdownContentView: View {
     private func tableView(headers: [String], rows: [[String]]) -> some View {
         Grid(alignment: .leading, horizontalSpacing: 0, verticalSpacing: 0) {
             GridRow {
-                ForEach(headers, id: \.self) { header in
+                ForEach(Array(headers.enumerated()), id: \.offset) { _, header in
                     Text(header)
                         .font(.caption.bold())
                         .padding(.horizontal, 8)
