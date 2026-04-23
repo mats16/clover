@@ -1,6 +1,6 @@
 import CoreAudio
 
-enum MicrophoneSelection: Hashable, Sendable {
+enum MicrophoneSelection: Hashable {
     case none
     case systemDefault
     case device(AudioDeviceID)

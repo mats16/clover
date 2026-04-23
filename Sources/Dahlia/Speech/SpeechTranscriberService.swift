@@ -8,7 +8,7 @@ import Speech
 actor SpeechTranscriberService {
     typealias SegmentTranslationHandler = @Sendable (TranscriptSegment) async -> String?
 
-    private nonisolated static let ignoredConfirmedTexts: Set<String> = [".", "あ"]
+    private nonisolated static let ignoredConfirmedTexts: Set = [".", "あ"]
 
     private var analyzer: SpeechAnalyzer?
     private var transcriber: SpeechTranscriber?

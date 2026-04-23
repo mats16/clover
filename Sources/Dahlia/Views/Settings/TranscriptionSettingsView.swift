@@ -35,7 +35,7 @@ struct TranscriptionSettingsView: View {
                             .frame(width: 220, alignment: .trailing)
                         }
 
-                        if !settings.isTranscriptTranslationEffectivelyEnabled && settings.transcriptTranslationEnabled {
+                        if !settings.isTranscriptTranslationEffectivelyEnabled, settings.transcriptTranslationEnabled {
                             Divider()
 
                             SettingsStatusMessage(

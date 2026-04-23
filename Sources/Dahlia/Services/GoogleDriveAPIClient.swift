@@ -179,13 +179,13 @@ final class GoogleDriveAPIClient: GoogleDriveAPIClientProviding, @unchecked Send
             ids: Set(files.compactMap { $0.parents?.first }),
             accessToken: accessToken
         ) { id in
-            (try? await self.getFile(accessToken: accessToken, id: id, fields: "id,name"))?.name
+            await (try? self.getFile(accessToken: accessToken, id: id, fields: "id,name"))?.name
         }
         async let driveNames = batchFetchNames(
             ids: Set(files.compactMap(\.driveId)),
             accessToken: accessToken
         ) { id in
-            (try? await self.getDrive(accessToken: accessToken, id: id, fields: "id,name"))?.name
+            await (try? self.getDrive(accessToken: accessToken, id: id, fields: "id,name"))?.name
         }
         let (resolvedParentNames, resolvedDriveNames) = try await (parentNames, driveNames)
 
@@ -223,14 +223,14 @@ final class GoogleDriveAPIClient: GoogleDriveAPIClientProviding, @unchecked Send
 
     private func batchFetchNames(
         ids: Set<String>,
-        accessToken: String,
+        accessToken _: String,
         fetchName: @Sendable @escaping (String) async -> String?
     ) async throws -> [String: String] {
         guard !ids.isEmpty else { return [:] }
         return try await withThrowingTaskGroup(of: (String, String?).self) { group in
             for id in ids {
                 group.addTask {
-                    (id, await fetchName(id))
+                    await (id, fetchName(id))
                 }
             }
             var result: [String: String] = [:]

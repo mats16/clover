@@ -465,4 +465,3 @@ struct MeetingProjectPicker: View {
         showProjectPopover = false
     }
 }
-

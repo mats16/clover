@@ -386,7 +386,6 @@ struct ContentView: View {
         ActionItemsOverviewView(sidebarViewModel: sidebarViewModel)
     }
 
-    @ViewBuilder
     private var askWorkspaceContent: some View {
         AgentSidebarView(viewModel: viewModel, sidebarViewModel: sidebarViewModel)
             .frame(maxWidth: .infinity, maxHeight: .infinity)
@@ -401,8 +400,7 @@ struct ContentView: View {
         }
     }
 
-    @ViewBuilder
-    private func workspaceContent<Content: View>(@ViewBuilder content: () -> Content) -> some View {
+    private func workspaceContent(@ViewBuilder content: () -> some View) -> some View {
         HSplitView {
             content()
                 .frame(maxWidth: .infinity, maxHeight: .infinity)

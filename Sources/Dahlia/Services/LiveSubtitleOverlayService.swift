@@ -112,7 +112,7 @@ final class LiveSubtitleOverlayService: ObservableObject {
             )
         }
 
-        if let persistedTopLeft = persistedTopLeft {
+        if let persistedTopLeft {
             return frame(
                 anchoredAtTopLeft: persistedTopLeft,
                 size: resolvedSize,

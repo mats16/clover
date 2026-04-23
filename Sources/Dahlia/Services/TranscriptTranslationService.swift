@@ -1,6 +1,6 @@
 import Foundation
-import Translation
 import os
+import Translation
 
 actor TranscriptTranslationService {
     private struct LanguagePair: Hashable {

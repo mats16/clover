@@ -1,6 +1,6 @@
 import Foundation
 
-enum LiveSubtitleSourceMode: String, CaseIterable, Identifiable, Sendable {
+enum LiveSubtitleSourceMode: String, CaseIterable, Identifiable {
     case systemAudioOnly
     case includeMicrophone
 

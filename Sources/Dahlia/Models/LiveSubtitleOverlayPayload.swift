@@ -40,7 +40,7 @@ struct LiveSubtitleOverlayPayload: Equatable {
             var selectedIndices = [latestUnconfirmedIndex]
             var candidateIndex = latestUnconfirmedIndex - 1
 
-            while candidateIndex >= 0 && selectedIndices.count < clampedMaxEntries {
+            while candidateIndex >= 0, selectedIndices.count < clampedMaxEntries {
                 selectedIndices.append(candidateIndex)
                 candidateIndex -= 1
             }

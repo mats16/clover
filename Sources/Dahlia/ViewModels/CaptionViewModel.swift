@@ -33,6 +33,7 @@ final class CaptionViewModel: ObservableObject {
             bindStoreSegments()
         }
     }
+
     @Published var isListening = false
     @Published var analyzerReady = false
     @Published var isPreparingAnalyzer = false
@@ -48,6 +49,7 @@ final class CaptionViewModel: ObservableObject {
             applyLocaleChange(from: oldValue, to: selectedLocale)
         }
     }
+
     @Published var supportedLocales: [Locale] = []
     @Published var filteredLocales: [Locale] = []
 
@@ -211,7 +213,7 @@ final class CaptionViewModel: ObservableObject {
     private let defaultInputDeviceIDProvider: @Sendable () -> AudioDeviceID?
     private let transcriptTranslationService = TranscriptTranslationService()
 
-    nonisolated private static let preferredTranscriptionLocaleFallbacksByLanguage = [
+    private nonisolated static let preferredTranscriptionLocaleFallbacksByLanguage = [
         "en": "en_US",
         "ja": "ja_JP",
     ]
@@ -240,7 +242,7 @@ final class CaptionViewModel: ObservableObject {
 
         transcriptionLocaleCancellable = UserDefaults.standard
             .publisher(for: \.transcriptionLocale)
-            .compactMap { $0 }
+            .compactMap(\.self)
             .removeDuplicates()
             .receive(on: RunLoop.main)
             .sink { [weak self] localeIdentifier in
