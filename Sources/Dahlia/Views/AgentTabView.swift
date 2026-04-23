@@ -243,10 +243,26 @@ private struct AgentLauncherView: View {
 
 /// AgentService を直接 @ObservedObject で監視するチャットビュー。
 private struct AgentChatView: View {
+    private enum WindowMetrics {
+        static let initialWindowSize = 50
+        static let loadMoreCount = 30
+    }
+
     @ObservedObject var service: AgentService
     let projectName: String
     let showsLiveModeBadge: Bool
     @State private var inputText = ""
+    @State private var messageWindowSize = WindowMetrics.initialWindowSize
+
+    private var windowedMessages: ArraySlice<AgentMessage> {
+        let messages = service.messages
+        guard messages.count > messageWindowSize else { return messages[...] }
+        return messages.suffix(messageWindowSize)
+    }
+
+    private var hasMoreAbove: Bool {
+        service.messages.count > messageWindowSize
+    }
 
     var body: some View {
         chatContentView
@@ -295,8 +311,21 @@ private struct AgentChatView: View {
             ScrollViewReader { proxy in
                 ScrollView {
                     LazyVStack(spacing: 12) {
-                        ForEach(service.messages) { message in
+                        if hasMoreAbove {
+                            ProgressView()
+                                .frame(maxWidth: .infinity)
+                                .padding(.vertical, 8)
+                                .onAppear {
+                                    messageWindowSize = min(
+                                        messageWindowSize + WindowMetrics.loadMoreCount,
+                                        service.messages.count
+                                    )
+                                }
+                        }
+
+                        ForEach(windowedMessages) { message in
                             ChatBubbleView(message: message)
+                                .equatable()
                         }
 
                         if service.isProcessing {
@@ -323,7 +352,9 @@ private struct AgentChatView: View {
                     proxy.scrollTo("agent-bottom", anchor: .bottom)
                 }
                 .onChange(of: service.messages.count) {
-                    withAnimation(.easeOut(duration: 0.2)) {
+                    var transaction = Transaction(animation: nil)
+                    transaction.disablesAnimations = true
+                    withTransaction(transaction) {
                         proxy.scrollTo("agent-bottom", anchor: .bottom)
                     }
                 }
@@ -410,7 +441,16 @@ private struct ChatInputBar: View {
 }
 
 /// チャット風の吹き出しビュー。
-private struct ChatBubbleView: View {
+private struct ChatBubbleView: View, Equatable {
+    nonisolated static func == (lhs: ChatBubbleView, rhs: ChatBubbleView) -> Bool {
+        lhs.message.id == rhs.message.id
+            && lhs.message.content == rhs.message.content
+            && lhs.message.role == rhs.message.role
+            && lhs.message.toolCallInfo?.toolName == rhs.message.toolCallInfo?.toolName
+            && lhs.message.toolCallInfo?.toolResult?.content == rhs.message.toolCallInfo?.toolResult?.content
+            && lhs.message.toolCallInfo?.toolResult?.isError == rhs.message.toolCallInfo?.toolResult?.isError
+    }
+
     let message: AgentMessage
 
     private var isUser: Bool { message.role == .user }

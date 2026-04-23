@@ -31,7 +31,8 @@ struct ToolResultInfo {
 }
 
 /// ツール呼び出しの詳細情報。
-struct ToolCallInfo {
+/// `@unchecked Sendable`: toolInput の `[String: Any]` は JSONSerialization 由来の不変値型のみ含む。
+struct ToolCallInfo: @unchecked Sendable {
     let toolName: String
     let toolUseId: String
     let toolInput: [String: Any]
@@ -39,7 +40,7 @@ struct ToolCallInfo {
 }
 
 /// Agent CLI プロセスからの出力メッセージ。
-struct AgentMessage: Identifiable {
+struct AgentMessage: Identifiable, @unchecked Sendable {
     let id: UUID = .v7()
     let role: AgentMessageRole
     var content: String
@@ -465,7 +466,7 @@ final class AgentService: ObservableObject {
             pendingDeltaText += text
             if deltaFlushTask == nil {
                 deltaFlushTask = Task { @MainActor [weak self] in
-                    try? await Task.sleep(for: .milliseconds(50))
+                    try? await Task.sleep(for: .milliseconds(100))
                     self?.flushPendingDelta()
                 }
             }

@@ -3,7 +3,6 @@ import SwiftUI
 struct TranscriptTabView: View {
     private enum ScrollMetrics {
         static let bottomAnchorID = "transcript-bottom"
-        static let coordinateSpaceName = "TranscriptTabScrollView"
         static let followThreshold: CGFloat = 32
     }
 
@@ -12,41 +11,19 @@ struct TranscriptTabView: View {
         static let loadMoreCount = 100
     }
 
-    private struct BottomOffsetPreferenceKey: PreferenceKey {
-        static let defaultValue: CGFloat = 0
-
-        static func reduce(value: inout CGFloat, nextValue: () -> CGFloat) {
-            value = nextValue()
-        }
-    }
-
-    private struct BottomOffsetReader: View {
-        var body: some View {
-            GeometryReader { proxy in
-                Color.clear
-                    .preference(
-                        key: BottomOffsetPreferenceKey.self,
-                        value: proxy.frame(in: .named(ScrollMetrics.coordinateSpaceName)).maxY
-                    )
-            }
-            .frame(height: 1)
-        }
-    }
-
     @ObservedObject var store: TranscriptStore
     let isListening: Bool
     let showsRecordingIndicator: Bool
     let showsTranslatedText: Bool
 
-    @State private var bottomOffset: CGFloat = 0
     @State private var shouldFollowLatest = true
     @State private var windowSize = WindowMetrics.initialWindowSize
 
     /// ForEach の ID 照合対象を制限するため、末尾 windowSize 件のみ返す。
-    private var windowedSegments: [TranscriptSegment] {
+    private var windowedSegments: ArraySlice<TranscriptSegment> {
         let segments = store.segments
-        guard segments.count > windowSize else { return segments }
-        return Array(segments.suffix(windowSize))
+        guard segments.count > windowSize else { return segments[...] }
+        return segments.suffix(windowSize)
     }
 
     /// 配列確保なしでウィンドウ内のセグメント数を返す。
@@ -74,64 +51,60 @@ struct TranscriptTabView: View {
     }
 
     private var transcriptScrollView: some View {
-        GeometryReader { geometry in
-            ScrollViewReader { proxy in
-                ScrollView {
-                    LazyVStack(alignment: .leading, spacing: 2) {
-                        if hasMoreAbove {
-                            ProgressView()
-                                .frame(maxWidth: .infinity)
-                                .padding(.vertical, 8)
-                                .onAppear {
-                                    loadMoreSegments()
-                                }
-                        }
-
-                        ForEach(windowedSegments) { segment in
-                            TranscriptRowView(
-                                segment: segment,
-                                showsTranslatedText: showsTranslatedText
-                            )
-                            .equatable()
-                        }
-
-                        if showsRecordingIndicator {
-                            HStack(spacing: 6) {
-                                ProgressView()
-                                    .scaleEffect(0.5)
-                                    .frame(width: 12, height: 12)
-                                Text(L10n.recognizing)
-                                    .font(.caption)
-                                    .foregroundStyle(.secondary)
+        ScrollViewReader { proxy in
+            ScrollView {
+                LazyVStack(alignment: .leading, spacing: 2) {
+                    if hasMoreAbove {
+                        ProgressView()
+                            .frame(maxWidth: .infinity)
+                            .padding(.vertical, 8)
+                            .onAppear {
+                                loadMoreSegments()
                             }
-                            .padding(.vertical, 4)
-                            .padding(.leading, 68)
-                        }
+                    }
 
-                        BottomOffsetReader()
-                            .id(ScrollMetrics.bottomAnchorID)
+                    ForEach(windowedSegments) { segment in
+                        TranscriptRowView(
+                            segment: segment,
+                            showsTranslatedText: showsTranslatedText
+                        )
+                        .equatable()
                     }
-                    .padding(8)
-                }
-                .coordinateSpace(name: ScrollMetrics.coordinateSpaceName)
-                .onAppear {
-                    refreshFollowState(viewportHeight: geometry.size.height, bottomOffset: bottomOffset)
-                }
-                .onChange(of: geometry.size.height) { _, newHeight in
-                    refreshFollowState(viewportHeight: newHeight, bottomOffset: bottomOffset)
-                }
-                .onPreferenceChange(BottomOffsetPreferenceKey.self) { newOffset in
-                    bottomOffset = newOffset
-                    refreshFollowState(viewportHeight: geometry.size.height, bottomOffset: newOffset)
-                }
-                .onChange(of: windowedSegmentCount) { oldCount, newCount in
-                    guard newCount > oldCount, shouldFollowLatest else { return }
-                    scrollToBottom(using: proxy)
-                }
-                .onChange(of: shouldFollowLatest) { _, isFollowing in
-                    if isFollowing {
-                        windowSize = WindowMetrics.initialWindowSize
+
+                    if showsRecordingIndicator {
+                        HStack(spacing: 6) {
+                            ProgressView()
+                                .scaleEffect(0.5)
+                                .frame(width: 12, height: 12)
+                            Text(L10n.recognizing)
+                                .font(.caption)
+                                .foregroundStyle(.secondary)
+                        }
+                        .padding(.vertical, 4)
+                        .padding(.leading, 68)
                     }
+
+                    Color.clear
+                        .frame(height: 1)
+                        .id(ScrollMetrics.bottomAnchorID)
+                }
+                .padding(8)
+            }
+            .onScrollGeometryChange(for: Bool.self) { geometry in
+                let distanceFromBottom = geometry.contentSize.height
+                    - geometry.contentOffset.y
+                    - geometry.containerSize.height
+                return distanceFromBottom <= ScrollMetrics.followThreshold
+            } action: { _, isNearBottom in
+                shouldFollowLatest = isNearBottom
+            }
+            .onChange(of: windowedSegmentCount) { oldCount, newCount in
+                guard newCount > oldCount, shouldFollowLatest else { return }
+                scrollToBottom(using: proxy)
+            }
+            .onChange(of: shouldFollowLatest) { _, isFollowing in
+                if isFollowing {
+                    windowSize = WindowMetrics.initialWindowSize
                 }
             }
         }
@@ -139,18 +112,6 @@ struct TranscriptTabView: View {
 
     private func loadMoreSegments() {
         windowSize = min(windowSize + WindowMetrics.loadMoreCount, store.segments.count)
-    }
-
-    private func refreshFollowState(viewportHeight: CGFloat, bottomOffset: CGFloat) {
-        guard viewportHeight > 0 else {
-            shouldFollowLatest = true
-            return
-        }
-
-        let isNearBottom = bottomOffset - viewportHeight <= ScrollMetrics.followThreshold
-        if shouldFollowLatest != isNearBottom {
-            shouldFollowLatest = isNearBottom
-        }
     }
 
     private func scrollToBottom(using proxy: ScrollViewProxy) {
