@@ -242,12 +242,21 @@ private struct AgentLauncherView: View {
 }
 
 /// AgentService を直接 @ObservedObject で監視するチャットビュー。
+///
+/// 親 (`AgentSidebarView`) が agentService 切替時に if/else で本ビューを再生成するため、
+/// セッション切替時の状態リセットは @State の初期化に依存する（明示的な onChange は不要）。
 private struct AgentChatView: View {
     private enum WindowMetrics {
         static let initialWindowSize = 50
         static let loadMoreCount = 30
+        static let followThreshold: CGFloat = 32
         static let loadMoreThreshold: CGFloat = 24
         static let bottomAnchorID = "agent-bottom"
+    }
+
+    private struct EdgeProximity: Equatable {
+        let isNearBottom: Bool
+        let isNearTop: Bool
     }
 
     @ObservedObject var service: AgentService
@@ -256,7 +265,12 @@ private struct AgentChatView: View {
     @State private var inputText = ""
     @State private var messageWindowSize = WindowMetrics.initialWindowSize
     @State private var didCompleteInitialBottomScroll = false
+    @State private var shouldFollowLatest = true
+    /// 上端到達時の onAppear が連射しないようにする単発フラグ。
+    /// 一度 false に倒したら、ユーザーが上端から離れた瞬間 (`!isNearTop`) にのみ再アームする。
     @State private var canLoadMoreFromTop = true
+    /// resetMessageWindowAndScrollToBottom 中の deferred scroll を保持し、リセット連発時に古い Task を cancel する。
+    @State private var pendingScrollTask: Task<Void, Never>?
 
     private var windowedMessages: ArraySlice<AgentMessage> {
         let messages = service.messages
@@ -352,20 +366,26 @@ private struct AgentChatView: View {
                 .onAppear {
                     resetMessageWindowAndScrollToBottom(using: proxy)
                 }
-                .onScrollGeometryChange(for: Bool.self) { geometry in
-                    geometry.contentOffset.y <= WindowMetrics.loadMoreThreshold
-                } action: { _, isNearTop in
-                    if !isNearTop {
+                .onScrollGeometryChange(for: EdgeProximity.self) { geometry in
+                    let distanceFromBottom = geometry.contentSize.height
+                        - geometry.contentOffset.y
+                        - geometry.containerSize.height
+                    return EdgeProximity(
+                        isNearBottom: distanceFromBottom <= WindowMetrics.followThreshold,
+                        isNearTop: geometry.contentOffset.y <= WindowMetrics.loadMoreThreshold
+                    )
+                } action: { _, proximity in
+                    shouldFollowLatest = proximity.isNearBottom
+                    if !proximity.isNearTop {
                         canLoadMoreFromTop = true
                     }
                 }
-                .onChange(of: service.messages.count) {
-                    var transaction = Transaction(animation: nil)
-                    transaction.disablesAnimations = true
-                    withTransaction(transaction) {
-                        proxy.scrollTo(WindowMetrics.bottomAnchorID, anchor: .bottom)
-                    }
-                    if messageWindowSize > WindowMetrics.initialWindowSize {
+                .onChange(of: service.messages.count) { oldCount, newCount in
+                    guard newCount > oldCount, shouldFollowLatest else { return }
+                    scrollToBottom(using: proxy)
+                }
+                .onChange(of: shouldFollowLatest) { _, isFollowing in
+                    if isFollowing {
                         messageWindowSize = WindowMetrics.initialWindowSize
                     }
                 }
@@ -374,7 +394,7 @@ private struct AgentChatView: View {
     }
 
     private func loadMoreMessagesIfNeeded() {
-        guard didCompleteInitialBottomScroll, canLoadMoreFromTop else { return }
+        guard didCompleteInitialBottomScroll, !shouldFollowLatest, canLoadMoreFromTop else { return }
         canLoadMoreFromTop = false
         messageWindowSize = min(
             messageWindowSize + WindowMetrics.loadMoreCount,
@@ -385,13 +405,25 @@ private struct AgentChatView: View {
     private func resetMessageWindowAndScrollToBottom(using proxy: ScrollViewProxy) {
         didCompleteInitialBottomScroll = false
         canLoadMoreFromTop = true
+        shouldFollowLatest = true
         messageWindowSize = WindowMetrics.initialWindowSize
 
-        // LazyVStack の初期レイアウト確定後にスクロールするため、1 ターン譲る。
-        Task { @MainActor in
+        // 連続リセット時に古い Task が新しい状態を上書きしないよう、pending Task を cancel する。
+        pendingScrollTask?.cancel()
+        pendingScrollTask = Task { @MainActor in
+            // LazyVStack の初期レイアウト確定後にスクロールするため、1 ターン譲る。
             await Task.yield()
-            proxy.scrollTo(WindowMetrics.bottomAnchorID, anchor: .bottom)
+            guard !Task.isCancelled else { return }
+            scrollToBottom(using: proxy)
             didCompleteInitialBottomScroll = true
+        }
+    }
+
+    private func scrollToBottom(using proxy: ScrollViewProxy) {
+        var transaction = Transaction(animation: nil)
+        transaction.disablesAnimations = true
+        withTransaction(transaction) {
+            proxy.scrollTo(WindowMetrics.bottomAnchorID, anchor: .bottom)
         }
     }
 }

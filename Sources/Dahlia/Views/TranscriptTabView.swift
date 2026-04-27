@@ -25,7 +25,12 @@ struct TranscriptTabView: View {
     @State private var shouldFollowLatest = true
     @State private var windowSize = WindowMetrics.initialWindowSize
     @State private var didCompleteInitialBottomScroll = false
+    /// 上端到達時の onAppear が連射しないようにする単発フラグ。
+    /// 一度 false に倒したら、ユーザーが上端から離れた瞬間 (`!isNearTop`) にのみ再アームする。
+    /// Spinner が表示領域に留まり続けるケースで誤って再ロードが走るのを防ぐ。
     @State private var canLoadMoreFromTop = true
+    /// resetWindowAndScrollToBottom 中の deferred scroll を保持し、リセット連発時に古い Task を cancel する。
+    @State private var pendingScrollTask: Task<Void, Never>?
 
     /// ForEach の ID 照合対象を制限するため、末尾 windowSize 件のみ返す。
     private var windowedSegments: ArraySlice<TranscriptSegment> {
@@ -142,9 +147,12 @@ struct TranscriptTabView: View {
         shouldFollowLatest = true
         windowSize = WindowMetrics.initialWindowSize
 
-        // LazyVStack の初期レイアウト確定後にスクロールするため、1 ターン譲る。
-        Task { @MainActor in
+        // 連続リセット時に古い Task が新しい状態を上書きしないよう、pending Task を cancel する。
+        pendingScrollTask?.cancel()
+        pendingScrollTask = Task { @MainActor in
+            // LazyVStack の初期レイアウト確定後にスクロールするため、1 ターン譲る。
             await Task.yield()
+            guard !Task.isCancelled else { return }
             scrollToBottom(using: proxy)
             didCompleteInitialBottomScroll = true
         }
