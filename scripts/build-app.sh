@@ -23,6 +23,7 @@ mkdir -p "$CLANG_MODULE_CACHE_PATH"
 
 echo "=== Building ${APP_NAME} ==="
 swift build -c release
+dsymutil ".build/release/${APP_NAME}" -o ".build/release/${APP_NAME}.dSYM"
 
 # .app バンドル作成
 BUILD_DIR=".build/release"

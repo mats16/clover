@@ -246,6 +246,7 @@ private struct AgentChatView: View {
     private enum WindowMetrics {
         static let initialWindowSize = 50
         static let loadMoreCount = 30
+        static let loadMoreThreshold: CGFloat = 24
     }
 
     @ObservedObject var service: AgentService
@@ -253,6 +254,8 @@ private struct AgentChatView: View {
     let showsLiveModeBadge: Bool
     @State private var inputText = ""
     @State private var messageWindowSize = WindowMetrics.initialWindowSize
+    @State private var didCompleteInitialBottomScroll = false
+    @State private var canLoadMoreFromTop = true
 
     private var windowedMessages: ArraySlice<AgentMessage> {
         let messages = service.messages
@@ -316,10 +319,7 @@ private struct AgentChatView: View {
                                 .frame(maxWidth: .infinity)
                                 .padding(.vertical, 8)
                                 .onAppear {
-                                    messageWindowSize = min(
-                                        messageWindowSize + WindowMetrics.loadMoreCount,
-                                        service.messages.count
-                                    )
+                                    loadMoreMessagesIfNeeded(totalCount: service.messages.count)
                                 }
                         }
 
@@ -349,7 +349,14 @@ private struct AgentChatView: View {
                     .padding(.top, 12)
                 }
                 .onAppear {
-                    proxy.scrollTo("agent-bottom", anchor: .bottom)
+                    resetMessageWindowAndScrollToBottom(using: proxy)
+                }
+                .onScrollGeometryChange(for: Bool.self) { geometry in
+                    geometry.contentOffset.y <= WindowMetrics.loadMoreThreshold
+                } action: { _, isNearTop in
+                    if !isNearTop {
+                        canLoadMoreFromTop = true
+                    }
                 }
                 .onChange(of: service.messages.count) {
                     var transaction = Transaction(animation: nil)
@@ -362,6 +369,27 @@ private struct AgentChatView: View {
                     }
                 }
             }
+        }
+    }
+
+    private func loadMoreMessagesIfNeeded(totalCount: Int) {
+        guard didCompleteInitialBottomScroll, canLoadMoreFromTop else { return }
+        canLoadMoreFromTop = false
+        messageWindowSize = min(
+            messageWindowSize + WindowMetrics.loadMoreCount,
+            totalCount
+        )
+    }
+
+    private func resetMessageWindowAndScrollToBottom(using proxy: ScrollViewProxy) {
+        didCompleteInitialBottomScroll = false
+        canLoadMoreFromTop = true
+        messageWindowSize = WindowMetrics.initialWindowSize
+
+        Task { @MainActor in
+            await Task.yield()
+            proxy.scrollTo("agent-bottom", anchor: .bottom)
+            didCompleteInitialBottomScroll = true
         }
     }
 }

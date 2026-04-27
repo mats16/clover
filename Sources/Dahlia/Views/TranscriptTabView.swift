@@ -4,6 +4,7 @@ struct TranscriptTabView: View {
     private enum ScrollMetrics {
         static let bottomAnchorID = "transcript-bottom"
         static let followThreshold: CGFloat = 32
+        static let loadMoreThreshold: CGFloat = 24
     }
 
     private enum WindowMetrics {
@@ -18,6 +19,8 @@ struct TranscriptTabView: View {
 
     @State private var shouldFollowLatest = true
     @State private var windowSize = WindowMetrics.initialWindowSize
+    @State private var didCompleteInitialBottomScroll = false
+    @State private var canLoadMoreFromTop = true
 
     /// ForEach の ID 照合対象を制限するため、末尾 windowSize 件のみ返す。
     private var windowedSegments: ArraySlice<TranscriptSegment> {
@@ -59,7 +62,7 @@ struct TranscriptTabView: View {
                             .frame(maxWidth: .infinity)
                             .padding(.vertical, 8)
                             .onAppear {
-                                loadMoreSegments()
+                                loadMoreSegmentsIfNeeded()
                             }
                     }
 
@@ -90,6 +93,12 @@ struct TranscriptTabView: View {
                 }
                 .padding(8)
             }
+            .onAppear {
+                resetWindowAndScrollToBottom(using: proxy)
+            }
+            .onChange(of: store.segments.first?.id) { _, _ in
+                resetWindowAndScrollToBottom(using: proxy)
+            }
             .onScrollGeometryChange(for: Bool.self) { geometry in
                 let distanceFromBottom = geometry.contentSize.height
                     - geometry.contentOffset.y
@@ -97,6 +106,13 @@ struct TranscriptTabView: View {
                 return distanceFromBottom <= ScrollMetrics.followThreshold
             } action: { _, isNearBottom in
                 shouldFollowLatest = isNearBottom
+            }
+            .onScrollGeometryChange(for: Bool.self) { geometry in
+                geometry.contentOffset.y <= ScrollMetrics.loadMoreThreshold
+            } action: { _, isNearTop in
+                if !isNearTop {
+                    canLoadMoreFromTop = true
+                }
             }
             .onChange(of: windowedSegmentCount) { oldCount, newCount in
                 guard newCount > oldCount, shouldFollowLatest else { return }
@@ -110,8 +126,23 @@ struct TranscriptTabView: View {
         }
     }
 
-    private func loadMoreSegments() {
+    private func loadMoreSegmentsIfNeeded() {
+        guard didCompleteInitialBottomScroll, !shouldFollowLatest, canLoadMoreFromTop else { return }
+        canLoadMoreFromTop = false
         windowSize = min(windowSize + WindowMetrics.loadMoreCount, store.segments.count)
+    }
+
+    private func resetWindowAndScrollToBottom(using proxy: ScrollViewProxy) {
+        didCompleteInitialBottomScroll = false
+        canLoadMoreFromTop = true
+        shouldFollowLatest = true
+        windowSize = WindowMetrics.initialWindowSize
+
+        Task { @MainActor in
+            await Task.yield()
+            scrollToBottom(using: proxy)
+            didCompleteInitialBottomScroll = true
+        }
     }
 
     private func scrollToBottom(using proxy: ScrollViewProxy) {
