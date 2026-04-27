@@ -12,7 +12,7 @@ fi
 BUILD_DIR="$1"
 APP_NAME="${2:-Dahlia}"
 DSYM_PATH="${BUILD_DIR}/${APP_NAME}.dSYM"
-SENTRY_ORG="${SENTRY_ORG:-dahlia-ez}"
+SENTRY_ORG="${SENTRY_ORG:-dahlia-app}"
 SENTRY_PROJECT="${SENTRY_PROJECT:-dahlia-app}"
 
 cd "$PROJECT_DIR"
